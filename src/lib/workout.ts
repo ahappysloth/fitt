@@ -24,6 +24,8 @@ export const emptyState = (): AppState => ({
   history: [],
   active: null,
   plan: null,
+  preferences: { displayName: '', celebration: 'playful', onboarded: false },
+  routines: [],
 })
 export function uid(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
@@ -183,6 +185,41 @@ export function generateWorkout(profile: Profile, history: Session[], seed = 0):
     createdAt: new Date().toISOString(),
     duration: profile.duration,
     exercises: selected,
+  }
+}
+
+export function freshWorkout(workout: Workout): Workout {
+  return {
+    id: uid(),
+    title: workout.title,
+    duration: workout.duration,
+    createdAt: new Date().toISOString(),
+    exercises: workout.exercises.map((entry) => ({
+      ...entry,
+      sets: entry.sets.map((set) => ({
+        ...set,
+        id: uid(),
+        done: false,
+        reps: set.target,
+        load: set.targetLoad,
+        effort: 'good',
+      })),
+    })),
+  }
+}
+
+export function quickWorkout(profile: Profile, history: Session[]): Workout {
+  const plan = generateWorkout({ ...profile, duration: 20 }, history)
+  const first = plan.exercises[0]
+  const second =
+    plan.exercises.find(
+      (entry) => entry !== first && ['core', 'squat'].includes(byId[entry.exerciseId].pattern),
+    ) || plan.exercises[1]
+  return {
+    ...plan,
+    title: 'A five-minute win',
+    duration: 5,
+    exercises: [first, second].filter(Boolean),
   }
 }
 

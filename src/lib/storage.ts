@@ -1,5 +1,5 @@
 import { byId, equipmentList } from './catalog'
-import { emptyState } from './workout'
+import { emptyState, localDay } from './workout'
 import type { AppState } from './types'
 
 export const STORAGE_KEY = 'form.training.v1'
@@ -8,31 +8,51 @@ const object = (x: unknown): x is Record<string, unknown> =>
 const numberIn = (n: unknown, min: number, max: number) =>
   typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max
 const date = (s: unknown) => typeof s === 'string' && !Number.isNaN(Date.parse(s))
+const text = (s: unknown, max: number) => typeof s === 'string' && s.length > 0 && s.length <= max
+const calendarDay = (s: unknown) => {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  const d = new Date(`${s}T12:00:00`)
+  return !Number.isNaN(d.getTime()) && localDay(d) === s
+}
 function workout(x: unknown, session = false, finished = false): boolean {
   if (
     !object(x) ||
-    typeof x.id !== 'string' ||
-    typeof x.title !== 'string' ||
+    !text(x.id, 128) ||
+    !text(x.title, 100) ||
     !date(x.createdAt) ||
     !numberIn(x.duration, 1, 180)
   )
     return false
   if (session && !date(x.startedAt)) return false
   if (finished && (!date(x.completedAt) || !numberIn(x.elapsedSeconds, 0, 604800))) return false
+  if (finished && Date.parse(x.completedAt as string) < Date.parse(x.startedAt as string))
+    return false
+  if (x.rewardContext !== undefined) {
+    const context = x.rewardContext
+    if (
+      !object(context) ||
+      context.version !== 1 ||
+      !numberIn(context.weeklyGoal, 1, 7) ||
+      !Number.isInteger(context.weeklyGoal) ||
+      !calendarDay(context.localDay)
+    )
+      return false
+  }
   if (!Array.isArray(x.exercises) || !x.exercises.length || x.exercises.length > 30) return false
-  return x.exercises.every(
+  const valid = x.exercises.every(
     (e) =>
       object(e) &&
       typeof e.exerciseId === 'string' &&
       Object.hasOwn(byId, e.exerciseId) &&
       typeof e.note === 'string' &&
+      e.note.length <= 2000 &&
       Array.isArray(e.sets) &&
       e.sets.length > 0 &&
       e.sets.length <= 10 &&
       e.sets.every(
         (s) =>
           object(s) &&
-          typeof s.id === 'string' &&
+          text(s.id, 128) &&
           numberIn(s.target, 1, 600) &&
           numberIn(s.reps, 0, 600) &&
           numberIn(s.load, 0, 300) &&
@@ -41,6 +61,11 @@ function workout(x: unknown, session = false, finished = false): boolean {
           typeof s.done === 'boolean',
       ),
   )
+  if (!valid) return false
+  const setIds = (x.exercises as { sets: { id: string }[] }[]).flatMap((e) =>
+    e.sets.map((s) => s.id),
+  )
+  return new Set(setIds).size === setIds.length
 }
 export function parseBackup(raw: string): AppState {
   if (raw.length > 10_000_000)
@@ -75,7 +100,41 @@ export function parseBackup(raw: string): AppState {
   const ids = x.history.map((s: { id: string }) => s.id)
   if (new Set(ids).size !== ids.length || (object(x.active) && ids.includes(x.active.id as string)))
     throw new Error('This backup contains duplicate workouts.')
-  return x as unknown as AppState
+  if (x.preferences !== undefined) {
+    const preferences = x.preferences
+    if (
+      !object(preferences) ||
+      typeof preferences.displayName !== 'string' ||
+      preferences.displayName.length > 40 ||
+      !['playful', 'calm'].includes(preferences.celebration as string) ||
+      typeof preferences.onboarded !== 'boolean'
+    )
+      throw new Error('The appearance preferences in this backup are invalid.')
+  }
+  if (
+    x.routines !== undefined &&
+    (!Array.isArray(x.routines) ||
+      x.routines.length > 100 ||
+      !x.routines.every((routine) => workout(routine)))
+  )
+    throw new Error('This backup contains invalid saved routines.')
+  const state = x as unknown as AppState
+  const routineIds = (state.routines || []).map((routine) => routine.id)
+  if (new Set(routineIds).size !== routineIds.length)
+    throw new Error('This backup contains duplicate saved routines.')
+  return {
+    ...state,
+    preferences: state.preferences || { displayName: '', celebration: 'playful', onboarded: true },
+    routines: state.routines || [],
+    history: state.history.map((session) => ({
+      ...session,
+      rewardContext: session.rewardContext || {
+        version: 1,
+        weeklyGoal: 3,
+        localDay: localDay(new Date(session.completedAt!)),
+      },
+    })),
+  }
 }
 export function loadState(): { state: AppState; error: string | null } {
   let raw: string | null

@@ -54,6 +54,16 @@ export interface Session extends Workout {
   startedAt: string
   completedAt?: string
   elapsedSeconds?: number
+  rewardContext?: {
+    version: 1
+    weeklyGoal: number
+    localDay: string
+  }
+}
+export interface UserPreferences {
+  displayName: string
+  celebration: 'playful' | 'calm'
+  onboarded: boolean
 }
 export interface AppState {
   version: 1
@@ -61,4 +71,6 @@ export interface AppState {
   history: Session[]
   active: Session | null
   plan: Workout | null
+  preferences?: UserPreferences
+  routines?: Workout[]
 }

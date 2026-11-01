@@ -186,7 +186,9 @@ describe('history and backups', () => {
       ...generateWorkout(defaultProfile, []),
       startedAt: new Date().toISOString(),
     }
-    expect(parseBackup(JSON.stringify(original))).toEqual(original)
+    const migrated = parseBackup(JSON.stringify(original))
+    expect(migrated).toMatchObject(original)
+    expect(parseBackup(JSON.stringify(migrated))).toEqual(migrated)
   })
   it('rejects corrupt, unknown-version and invalid exercise data', () => {
     expect(() => parseBackup('broken')).toThrow()
