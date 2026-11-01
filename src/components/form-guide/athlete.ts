@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import data from './body-data.json'
 import maleData from './male-body-data.json'
+import femaleData from './female-body-data.json'
 import type { BodyModel } from '../../lib/types'
 import type { PoseFrame, FocusRegion } from './contracts'
 export type { FocusRegion } from './contracts'
@@ -44,6 +45,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
   const geometry = new THREE.BufferGeometry()
   const positions = new Float32Array(decode(data.positions))
   const malePositions = new Float32Array(decode(maleData.positions))
+  const femalePositions = new Float32Array(decode(femaleData.positions))
   // Keep canonical coordinates intact for muscle masks and subsequent switches.
   geometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
   geometry.setAttribute(
@@ -124,7 +126,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     return frame
   }
   function model(value: BodyModel) {
-    geometry.attributes.position.array.set(value === 'male' ? malePositions : positions)
+    geometry.attributes.position.array.set(value === 'male' ? malePositions : femalePositions)
     geometry.attributes.position.needsUpdate = true
     geometry.computeVertexNormals()
     // A shape switch retains the skeleton, pose, masks and GPU resources.

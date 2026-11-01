@@ -1,6 +1,6 @@
 """Create Fitt's compact, offline skinned body from the CC0 MakeHuman sources.
 
-Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw male.target
+Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw male.target female-chest.target
 Source URLs, licensing, and the asset contract are in assets/form-guide/README.md.
 """
 import base64
@@ -15,6 +15,7 @@ from collections import defaultdict
 root = pathlib.Path(__file__).resolve().parents[1]
 obj_path, rig_path, weights_path = map(pathlib.Path, sys.argv[1:4])
 target_path = pathlib.Path(sys.argv[4])
+chest_target_path = pathlib.Path(sys.argv[5])
 rig = json.loads(rig_path.read_text())
 weights = json.loads(weights_path.read_text())
 assert rig['license'] == weights['license'] == 'CC0'
@@ -95,16 +96,20 @@ print(f'{len(used)} vertices, {len(faces)} triangles, {len(bones)} bones; {outpu
 
 # The authored male shape is normalized onto the canonical rig at build time.
 # Shared joints, topology and weights let both silhouettes use the same contact-aware
-# motion. Scale only along each bone; preserve the authored surface's cross-section.
-male_vertices = [point[:] for point in vertices]
-target = target_path.read_text()
-assert 'explicitly released as CC0' in target
-for line in target.splitlines():
-    if not line.strip() or line.lstrip().startswith('#'):
-        continue
-    index, *delta = line.split()
-    for axis in range(3):
-        male_vertices[int(index)][axis] += float(delta[axis]) * .1
+# motion. Scale along coherent anatomical frames and preserve their cross-sections.
+def apply_target(path, strength=1.):
+    points = [point[:] for point in vertices]
+    target = path.read_text()
+    assert 'explicitly released as CC0' in target
+    for line in target.splitlines():
+        if not line.strip() or line.lstrip().startswith('#'):
+            continue
+        index, *delta = line.split()
+        for axis in range(3):
+            points[int(index)][axis] += float(delta[axis]) * .1 * strength
+    return points
+
+male_vertices = apply_target(target_path)
 
 def sub(a, b):
     return [x-y for x, y in zip(a, b)]
@@ -122,35 +127,86 @@ def male_joint(name):
     source = rig['joints'][name]
     return [sum(male_vertices[v][axis] for v in source) / len(source) for axis in range(3)]
 
-mappings = []
-for bone in bones:
-    info = rig['bones'][bone['name']]
-    origin = male_joint(info['head'])
-    source_axis = sub(male_joint(info['tail']), origin)
-    dest_axis = sub(bone['tail'], bone['head'])
+def frame_mapping(origin, source_end, destination, destination_end):
+    source_axis = sub(source_end, origin)
+    dest_axis = sub(destination_end, destination)
     source_dir, dest_dir = normalized(source_axis), normalized(dest_axis)
     turn = cross(source_dir, dest_dir)
     cosine = dot(source_dir, dest_dir)
     assert cosine > -.99
-    mappings.append((origin, source_dir, turn, cosine, length(dest_axis)/length(source_axis)))
+    return (origin, destination, source_dir, turn, cosine, length(dest_axis)/length(source_axis))
+
+mappings = []
+for bone in bones:
+    info = rig['bones'][bone['name']]
+    mappings.append(frame_mapping(male_joint(info['head']), male_joint(info['tail']),
+                                  bone['head'], bone['tail']))
+
+# Spine subdivisions, clavicles and breast helpers do not move independently in
+# the exercise rig. Preserve the male thorax as one anatomical region instead of
+# fitting its internal landmarks to the female helper positions. The frame runs
+# from the pelvis to the shoulder midpoint, so the limb attachment height stays
+# aligned without introducing folds at the ribs or collarbones.
+def shoulder_center(source):
+    return [(source('upperarm01.L')[axis] + source('upperarm01.R')[axis]) / 2
+            for axis in range(3)]
+source_head = lambda name: male_joint(rig['bones'][name]['head'])
+canonical_head = lambda name: bones[indices[name]]['head']
+trunk_index = len(mappings)
+mappings.append(frame_mapping(source_head('spine05'), shoulder_center(source_head),
+                              canonical_head('spine05'), shoulder_center(canonical_head)))
+neck_start = source_head('neck01')[1]
+neck_end = source_head('head')[1]
+
+# Facial helper bones describe expressions, not independent anatomical segments.
+# Normalizing them separately scales adjacent parts of the male face by 0.58–1.75
+# and folds eyelids, lips and the nose into the canonical female landmarks. Move
+# the authored skull, jaw, face and eyeballs together in the head frame instead.
+# A continuous neck transition blends that frame smoothly into the torso.
+retarget_indices = []
+for index, bone in enumerate(bones):
+    ancestor = index
+    while ancestor >= 0 and names[ancestor] != 'head':
+        ancestor = bones[ancestor]['parent']
+    if ancestor >= 0:
+        retarget_indices.append(indices['head'])
+    elif bone['name'].startswith(('spine', 'neck', 'breast.', 'clavicle.')):
+        retarget_indices.append(trunk_index)
+    else:
+        retarget_indices.append(index)
+
+def mapped_point(point, bone_index):
+    origin, destination, direction, turn, cosine, ratio = mappings[bone_index]
+    offset = sub(point, origin)
+    along = dot(offset, direction)
+    offset = [offset[a] + direction[a]*along*(ratio-1) for a in range(3)]
+    first = cross(turn, offset)
+    second = cross(turn, first)
+    mapped = [destination[a] + offset[a] + first[a] + second[a]/(1+cosine)
+              for a in range(3)]
+    if bone_index == trunk_index:
+        t = max(0., min(1., (point[1]-neck_start)/(neck_end-neck_start)))
+        blend = t*t*(3-2*t)
+        if blend:
+            head = mapped_point(point, indices['head'])
+            mapped = [mapped[a]*(1-blend) + head[a]*blend for a in range(3)]
+    return mapped
 
 male_positions = []
 for index, old in enumerate(used):
     point = [0., 0., 0.]
     for slot in range(4):
-        bone_index = skin_indices[index*4+slot]
+        bone_index = retarget_indices[skin_indices[index*4+slot]]
         weight = skin_weights[index*4+slot] / 65535
         if not weight:
             continue
-        origin, direction, turn, cosine, ratio = mappings[bone_index]
-        offset = sub(male_vertices[old], origin)
-        along = dot(offset, direction)
-        offset = [offset[a] + direction[a]*along*(ratio-1) for a in range(3)]
-        first = cross(turn, offset)
-        second = cross(turn, first)
+        mapped = mapped_point(male_vertices[old], bone_index)
         for axis in range(3):
-            point[axis] += weight * (bones[bone_index]['head'][axis] + offset[axis]
-                                    + first[axis] + second[axis]/(1+cosine))
+            point[axis] += weight * mapped[axis]
+    if all(retarget_indices[skin_indices[index*4+s]] == indices['head']
+           for s in range(4) if skin_weights[index*4+s]):
+        expected = mapped_point(male_vertices[old], indices['head'])
+        assert length(sub(point, expected)) < 1e-12, 'Head surface must retain one coherent frame'
     # Preserve a smoothly blended contact envelope at the palms and knees. Body
     # selection changes the silhouette, not hand placement or mat clearance.
     contact = 0.
@@ -167,9 +223,27 @@ for index, old in enumerate(used):
 variant = {
     'version': 1,
     'source': 'MakeHuman hm08 male shape / CC0, retargeted to Fitt canonical rig',
+    'retargeting': 'Coherent pelvis-to-shoulder trunk frame and head frame, smoothly blended neck; weighted limb frames',
     'sourcesSha256': {**result['sourcesSha256'], target_path.name: hashlib.sha256(target_path.read_bytes()).hexdigest()},
     'positions': encode('f', male_positions),
 }
 variant_output = root / 'src/components/form-guide/male-body-data.json'
-variant_output.write_text(json.dumps(variant, separators=(',', ':')) + '\n')
+variant_output.write_text(json.dumps(variant, indent=2) + '\n')
 print(f'Male surface: {variant_output.stat().st_size // 1024} KiB; shares canonical rig and topology')
+
+# A restrained fraction of the authored adult female chest target. This is a
+# separate surface so the canonical rig, contact envelope and mask coordinates
+# remain identical. The target changes only chest/upper-torso vertices.
+chest_strength = .18
+female_vertices = apply_target(chest_target_path, chest_strength)
+female_positions = [coordinate for old in used for coordinate in female_vertices[old]]
+female_variant = {
+    'version': 1,
+    'source': 'MakeHuman hm08 female surface with authored adult chest shape / CC0',
+    'sourcesSha256': {**result['sourcesSha256'], chest_target_path.name: hashlib.sha256(chest_target_path.read_bytes()).hexdigest()},
+    'chestTargetStrength': chest_strength,
+    'positions': encode('f', female_positions),
+}
+female_output = root / 'src/components/form-guide/female-body-data.json'
+female_output.write_text(json.dumps(female_variant, indent=2) + '\n')
+print(f'Female surface: {female_output.stat().st_size // 1024} KiB; chest target at {chest_strength:.0%}')

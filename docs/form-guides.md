@@ -6,19 +6,19 @@ The first 3D prototype is integrated into **Knee Push-up** in both the workout a
 
 Use one canonical human rig, selectable surface models, and one shared viewer, with an independent movement definition for each exercise. Keep graphite materials, a quiet studio background, and electric-lime emphasis consistent across the library. Preset cameras give beginners useful views; free orbit is available when they want to explore.
 
-The male model is the default; the female option retains the original prototype surface. The guide's model picker and Settings share a local preference, also included in backups. Earlier saves default to male without changing training data. Model switching updates the position buffer and normals in place, preserving the current pose, playback, camera, muscle focus, and WebGL resources. The standalone study lets reviewers switch models independently of app data.
+The male model is the default; the female option retains the original facial features and proportions with a modest authored chest adjustment. The guide's model picker and Settings share a local preference, also included in backups. Earlier saves default to male without changing training data. Model switching updates the position buffer and normals in place, preserving the current pose, playback, camera, muscle focus, and WebGL resources. The standalone study lets reviewers switch models independently of app data.
 
 A complete skeleton and individually modeled muscles are a **content upgrade**, not a reason to replace the viewer. The prototype already has a real bone rig and weighted mesh. Its muscle highlights are approximate surface masks. The next anatomy asset should supply named muscle groups and optional bone meshes, all bound to the same canonical rig, or include a deliberate retargeting step. A detailed medical-looking asset still needs accurate movement clips and deformation work; more polygons alone will not fix form.
 
 ## Separation of responsibilities
 
-| Layer                                                 | Responsibility                                                                                                                 |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `body-data.json`, `male-body-data.json`, `athlete.ts` | Local surfaces, shared skeleton/weights, appearance, and muscle-region selection. Applies a pose without knowing the exercise. |
-| `contracts.ts`                                        | Pose transforms, contact landmarks, movement timing, phases, keyframes, instructions, and selectable regions.                  |
-| `knee-pushup.ts`                                      | Contact-aware knee push-up motion and coaching cues. No camera, UI, or rendering resources.                                    |
-| `scene.ts`                                            | Three.js lighting, mat, orbit/preset cameras, zoom, visibility-aware rendering, and resource ownership.                        |
-| `KneePushupGuide.tsx`                                 | Reusable `FormGuide` playback/scrubbing/region controls plus the small Knee Push-up adapter.                                   |
+| Layer                                                                          | Responsibility                                                                                                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `body-data.json`, `male-body-data.json`, `female-body-data.json`, `athlete.ts` | Local surfaces, shared skeleton/weights, appearance, and muscle-region selection. Applies a pose without knowing the exercise. |
+| `contracts.ts`                                                                 | Pose transforms, contact landmarks, movement timing, phases, keyframes, instructions, and selectable regions.                  |
+| `knee-pushup.ts`                                                               | Contact-aware knee push-up motion and coaching cues. No camera, UI, or rendering resources.                                    |
+| `scene.ts`                                                                     | Three.js lighting, mat, orbit/preset cameras, zoom, visibility-aware rendering, and resource ownership.                        |
+| `KneePushupGuide.tsx`                                                          | Reusable `FormGuide` playback/scrubbing/region controls plus the small Knee Push-up adapter.                                   |
 
 The source rig divides each upper/lower arm and leg into multiple bones. The motion solves each anatomical segment once and distributes its world transform across those subdivisions. Wrists, metacarpals, and fingers share a stable hand frame. Knees remain supported; the top stops short of a locked elbow. The lowered pose brings the forearms close to vertical and includes a brief pause before pressing up.
 
@@ -37,7 +37,7 @@ The calves and relaxed feet follow the torso's angular change around the planted
 
 Review this model's silhouette, material, movement, and camera framing first. Then settle the anatomy asset and export/rig contract. For each new movement, review setup, middle, bottom, and return from front and side; check contact, range, alignment, and interference with equipment. A qualified exercise coach should approve the final instructional movement before release.
 
-Unit tests verify constant limb lengths, calf/foot follow-through, fixed contact anchors, a seamless loop, stable skinned palms, knee-surface clearance, finite deformation for both models, and bottom forearm alignment. They also cover shape switching and preference migration/validation. Browser checks cover model selection/persistence without changing workouts, playback, scrubbing, camera controls, reduced-motion defaults, local/embedded previews, fallback, initialization cleanup, repeated dialog use, mobile fit, and the existing offline workflow.
+Unit tests verify constant limb lengths, calf/foot follow-through, fixed contact anchors, a seamless loop, stable skinned palms, knee-surface clearance, finite deformation for both models, and bottom forearm alignment. Surface checks guard against severe facial stretching and keep the female adjustment confined to the chest. They also cover shape switching and preference migration/validation. Browser checks cover model selection/persistence without changing workouts, playback, scrubbing, camera controls, reduced-motion defaults, local/embedded previews, fallback, initialization cleanup, repeated dialog use, mobile fit, and the existing offline workflow.
 
 The rig adapter currently has explicit arm/hand/shin/foot segments, with torso/thighs moving together for this exercise. Add independently posed thigh, pelvis, and spine segments when the next exercise requires them. Keep those changes in the rig/motion layers, without duplicating the viewer.
 

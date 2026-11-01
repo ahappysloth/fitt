@@ -6,6 +6,67 @@ import data from './body-data.json'
 
 const point = (name: string) =>
   new Vector3(...(data.bones.find((bone) => bone.name === name)!.head as [number, number, number]))
+
+describe('body surface quality', () => {
+  const raw = Uint8Array.from(atob(data.positions), (character) => character.charCodeAt(0))
+  const canonical = new Float32Array(raw.buffer)
+  const restVertex = (index: number) => new Vector3().fromArray(canonical, index * 3)
+
+  it('preserves local facial proportions instead of stretching tiny features across the head', () => {
+    const athlete = createAthlete('male')
+    try {
+      const { position } = athlete.mesh.geometry.attributes
+      const triangles = athlete.mesh.geometry.index!
+      let largestStretch = 0
+      let checked = 0
+      for (let index = 0; index < triangles.count; index += 3) {
+        const vertices = [0, 1, 2].map((offset) => triangles.getX(index + offset))
+        if (!vertices.every((vertex) => canonical[vertex * 3 + 1] > 0.67)) continue
+        for (let edge = 0; edge < 3; edge++) {
+          const start = vertices[edge],
+            end = vertices[(edge + 1) % 3]
+          const originalLength = restVertex(start).distanceTo(restVertex(end))
+          const length = new Vector3()
+            .fromBufferAttribute(position, start)
+            .distanceTo(new Vector3().fromBufferAttribute(position, end))
+          largestStretch = Math.max(largestStretch, length / originalLength)
+          checked++
+        }
+      }
+      // Different facial features are allowed. The broken per-feature retarget
+      // stretched some adjacent vertices 20× apart and visibly tore the eyelids.
+      expect(checked).toBeGreaterThan(10000)
+      expect(largestStretch).toBeLessThan(4)
+    } finally {
+      athlete.dispose()
+    }
+  })
+
+  it('keeps the female adjustment modest and confined to the chest', () => {
+    const athlete = createAthlete('female')
+    try {
+      const { position } = athlete.mesh.geometry.attributes
+      let changed = 0,
+        largestDisplacement = 0
+      for (let index = 0; index < position.count; index++) {
+        const original = restVertex(index)
+        const distance = original.distanceTo(new Vector3().fromBufferAttribute(position, index))
+        if (distance === 0) continue
+        changed++
+        largestDisplacement = Math.max(largestDisplacement, distance)
+        expect(Math.abs(original.x)).toBeLessThan(0.15)
+        expect(original.y).toBeGreaterThan(0.22)
+        expect(original.y).toBeLessThan(0.51)
+        expect(original.z).toBeGreaterThan(0.05)
+      }
+      expect(changed).toBeGreaterThan(0)
+      expect(largestDisplacement).toBeLessThan(0.025)
+    } finally {
+      athlete.dispose()
+    }
+  })
+})
+
 describe('the Knee Push-up movement contract', () => {
   it('keeps contact anchors and arm lengths fixed through the full rep without elbow flips', () => {
     const initial = kneePushupPose(0)
@@ -68,19 +129,24 @@ describe('the Knee Push-up movement contract', () => {
     }
   })
   it.each(['male', 'female'] as const)(
-    'keeps the weighted %s mesh finite throughout its motion',
+    'keeps the entire %s mesh finite and above the mat throughout its motion',
     (model) => {
       const athlete = createAthlete(model)
       const geometry = athlete.mesh.geometry
       expect(athlete.mesh.skeleton.bones.length).toBe(163)
       for (const progress of [0, 0.25, 0.54, 0.8, 1]) {
         athlete.applyPose(kneePushupPose(progress))
-        for (let index = 0; index < geometry.attributes.position.count; index += 17) {
+        let lowest = Infinity,
+          furthest = 0
+        for (let index = 0; index < geometry.attributes.position.count; index++) {
           const position = new Vector3().fromBufferAttribute(geometry.attributes.position, index)
           athlete.mesh.applyBoneTransform(index, position)
-          expect(position.toArray().every(Number.isFinite)).toBe(true)
-          expect(position.length()).toBeLessThan(2)
+          lowest = Math.min(lowest, position.y)
+          furthest = Math.max(furthest, position.length())
         }
+        expect(Number.isFinite(lowest) && Number.isFinite(furthest)).toBe(true)
+        expect(lowest).toBeGreaterThanOrEqual(0)
+        expect(furthest).toBeLessThan(2)
       }
       athlete.dispose()
     },
