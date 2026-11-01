@@ -146,6 +146,20 @@ describe('progression responds to actual performance', () => {
     ])
     expect(next.exerciseId).toBe('knee-pushup')
   })
+  it('never prescribes an added load that its own backup parser cannot reload', () => {
+    const exercise = byId['diamond-pushup']
+    const profile: Profile = { ...defaultProfile, equipment: ['vest'], level: 'intermediate' }
+    const history = [
+      session(exercise.id, exercise.max, { load: 300, targetLoad: 300 }),
+      session(exercise.id, exercise.max, { load: 300, targetLoad: 300 }),
+    ]
+    const entry = prescribe(exercise, profile, history)
+    expect(entry.sets.every((set) => set.load === 300 && set.targetLoad === 300)).toBe(true)
+    const plan = generateWorkout(profile, history)
+    expect(() =>
+      parseBackup(JSON.stringify({ version: 1, profile, history, active: null, plan })),
+    ).not.toThrow()
+  })
   it('adapts unlogged sets while keeping completed sets and original targets intact', () => {
     const entry = prescribe(byId.pushup, defaultProfile, [])
     entry.sets[0].reps = 4

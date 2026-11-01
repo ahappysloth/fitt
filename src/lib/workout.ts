@@ -1,4 +1,5 @@
 import { available, byId, exercises } from './catalog'
+import { MAX_ADDED_LOAD_KG } from './limits'
 import type {
   AppState,
   Exercise,
@@ -44,7 +45,7 @@ export const focusNames: Record<Focus, string> = {
   core: 'Core & control',
 }
 
-function makeSets(exercise: Exercise, count: number, target: number, load = 0): WorkoutSet[] {
+function makeSets(_exercise: Exercise, count: number, target: number, load = 0): WorkoutSet[] {
   return Array.from({ length: count }, () => ({
     id: uid(),
     target,
@@ -121,9 +122,14 @@ export function prescribe(
           load = 0
           note = 'Two strong sessions. You’ve earned the next variation.'
         } else if (exercise.weighted && profile.equipment.includes('vest')) {
-          load += 2.5
-          target = exercise.min
-          note = 'Two strong sessions. Add 2.5 kg and build your reps again.'
+          if (load >= MAX_ADDED_LOAD_KG) {
+            note = 'You’ve reached the added-load recording limit. Keep this target controlled.'
+          } else {
+            const increase = Math.min(2.5, MAX_ADDED_LOAD_KG - load)
+            load += increase
+            target = exercise.min
+            note = `Two strong sessions. Add ${increase} kg and build your reps again.`
+          }
         } else {
           note = 'You’ve reached this rep range. Keep each rep controlled.'
         }

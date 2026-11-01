@@ -1,6 +1,7 @@
 import { byId, equipmentList } from './catalog'
 import { emptyState, localDay } from './workout'
 import type { AppState } from './types'
+import { MAX_ADDED_LOAD_KG } from './limits'
 
 export const STORAGE_KEY = 'form.training.v1'
 const object = (x: unknown): x is Record<string, unknown> =>
@@ -55,8 +56,8 @@ function workout(x: unknown, session = false, finished = false): boolean {
           text(s.id, 128) &&
           numberIn(s.target, 1, 600) &&
           numberIn(s.reps, 0, 600) &&
-          numberIn(s.load, 0, 300) &&
-          numberIn(s.targetLoad, 0, 300) &&
+          numberIn(s.load, 0, MAX_ADDED_LOAD_KG) &&
+          numberIn(s.targetLoad, 0, MAX_ADDED_LOAD_KG) &&
           ['easy', 'good', 'hard'].includes(s.effort as string) &&
           typeof s.done === 'boolean',
       ),
