@@ -1,97 +1,102 @@
 # Fitt
 
-A mobile-first, installable calisthenics app. Built with React, TypeScript, Vite, and an offline service worker, with a static-assets configuration for Cloudflare Workers.
+A responsive, installable calisthenics app built with **Next.js 16 App Router, React 19, and Tailwind CSS v4**, ready for Cloudflare Workers through **OpenNext**. This version saves training on the device. It needs no account, credentials, database, or external API.
 
 ## Develop
 
-Use Node.js 22.12+ (validated with Node 24) and npm. No environment variables, credentials, database, or external API are needed for local development.
+Use Node.js 22.12+ and npm (validated with Node 24).
 
 ```sh
-cd /workspace/fitt
 npm ci
 npm run dev
 ```
 
-The development server uses port 5173. For a production build with offline caching:
+Development runs on port **5173**. To test the production app, including offline support:
 
 ```sh
 npm run build
-npm run preview -- --host 127.0.0.1 --port 4173
+npm run preview
 ```
 
-The service worker is enabled in the production build, not the Vite development server. Once the first full load completes, the app shell, fonts, exercise instructions, and original animated movement guides are cached locally. Installation requires HTTPS in production; localhost is also a secure development context. On iOS, use Safari → Share → Add to Home Screen.
-
-## ChatGPT and standalone HTML previews
-
-Open **`preview/fitt.html`** for a file-based preview. `npm run build` generates it alongside the production PWA; `npm run build:preview` regenerates only this HTML file. It includes the compiled application, styles, fonts, icons, and movement guides in one file, so it requires no running server or external assets.
-
-The root `index.html` is Vite's source entry and references TypeScript. Opening it directly in an HTML viewer cannot run the app. The standalone file bundles that source into browser-ready JavaScript. Its service-worker integration is disabled because file previews have no deployment scope; the normal `dist` build retains offline installation support.
-
-Embedded previews can block browser storage. Fitt remains usable in memory and displays an export reminder in that case. Export a backup before closing the preview if you want to keep its workouts. The app supports preview contexts where `crypto.randomUUID` is unavailable.
+The production server runs on port **4173**. A service worker caches the app, local fonts, exercise instructions, and existing animated guides after a successful initial load. Installation requires HTTPS in production; localhost also supports development testing. On iOS, use Safari → Share → Add to Home Screen.
 
 ## Features
 
-- Equipment-aware full-body, upper-body, lower-body, and core workouts, with 20/30/45-minute planning budgets and beginner/intermediate starting points.
-- 26 exercises, each with original interactive motion illustrations, slow playback, written technique instructions, and highlighted front/back muscle diagrams.
-- Editable reps, timed holds, added vest weight in kilograms, and easy/good/hard effort ratings. Unilateral reps are per side, as described in the exercise instructions.
-- Immediate adjustment of unfinished sets after a hard or missed target, easier/harder exercise swaps, optional extra sets, and rest/hold timers.
-- Autosaved sessions that resume after a reload; partial workouts preserve only logged performance in totals.
-- A training journal, calendar-week goals, working-set charts, and exercise-specific best-set trends with added load shown separately.
-- Versioned JSON export/import, validation before restore, confirmation before replacing data, and a data-reset confirmation.
-- Responsive desktop navigation and mobile bottom navigation; keyboard-operable dialogs and controls; animations start only when requested.
+- **Today:** an equipment-aware plan, weekly calendar, momentum, muscle focus, saved routines, and a five-minute option for low-energy days.
+- **Workout:** editable reps, timed holds, added vest weight in kilograms, effort ratings, rest/hold timers, exercise swaps, and autosave/resume. Hard or missed sets adjust upcoming targets.
+- **Routine builder:** choose and reorder movements, set targets, save reusable workouts, and edit or delete them. Leaving unsaved changes requires confirmation.
+- **Journey:** workout history, weekly activity, comparable personal bests, XP, levels, and milestone awards derived from real saved sessions.
+- **Library:** 26 exercises with equipment and muscle filters, written technique instructions, front/back muscle diagrams, and the existing offline animated guides.
+- **Settings:** name, beginner/intermediate level, equipment, focus, session length, weekly goal, playful/calm celebrations, install guidance, and validated backup/restore.
+- **Accessible interaction:** responsive desktop/mobile navigation, keyboard-operated dialogs, visible focus states, reduced-motion support, and a calm celebration option.
 
-## How progression works
+The interface preserves the F logo and approved charcoal/electric-lime design. Existing exercise illustrations are reused; a replacement illustration system is deferred.
 
-The generator uses the most recent compatible variation for each movement pattern. An exercise advances after two consecutive recorded attempts in which **every set** meets its prescribed reps/time and added load with good or easy effort. It adds one rep per set, or five seconds for holds. At the upper end of a movement’s range, it selects the linked harder variation only if its equipment is available. If no harder variation is available, a weighted-capable exercise can add 2.5 kg when a vest is selected. Otherwise, the target stays at the top of its current range.
+## Training and rewards
 
-A missed target, reduced load, or hard effort reduces the next prescription, with load reduction preferred before a simpler variation. During a workout, adaptations apply only to unlogged sets; completed set values and their target snapshots are retained. A partial exercise cannot earn an increase. Previously logged work is preserved when equipment or preferences change. Changing the experience level resets the upcoming plan’s starting variation, not history.
+The adaptive plan uses the latest compatible movement variation. It increases targets after two consecutive recorded attempts where **every set** meets its prescribed reps/time and added load with good or easy effort. Increases are one rep per set or five seconds for holds. At the movement's upper range, the planner chooses an available harder variation; eligible exercises can instead add 2.5 kg when a weighted vest is selected.
 
-These are transparent heuristics, not an AI model, medical assessment, or measured recovery estimate. Session times are planning estimates. Muscle maps indicate involvement, not exact activation or fatigue. No-equipment back movements provide light control work; they do not replace loaded rows or pull-ups. The drawings are schematic movement guides, not filmed demonstrations or individual form assessments.
+A missed target, reduced load, or challenging effort reduces the next prescription. During a workout, only unlogged sets change; recorded values and target snapshots stay intact. A partial exercise cannot earn an increase. Saved custom routines keep their chosen targets until edited, while the generated plan adapts to history. Removing equipment preserves history and prevents starting routines that still require it. Added-load prescriptions and backups share a 300 kg validation ceiling.
+
+Rewards are calculated from saved history: **5 XP per logged set, 35 XP per saved session, 15 XP for a comparable personal best, and 25 XP for meeting the weekly goal**. Personal-best and weekly bonuses are awarded at most once per session/week respectively. A level is 250 XP. The first workout of a week fixes that week's goal so later preference changes do not rewrite earned progress. Rest days never subtract XP. First exposure to a movement is a baseline; personal bests compare the same exercise, unit, and added load.
+
+Session durations are planning estimates. Muscle diagrams show involvement, not measured activation or fatigue. The exercise drawings are schematic guides. No-equipment back movements provide light control work; they do not replace loaded rows or pull-ups.
+
+## Data and backup behavior
+
+Training is stored under **`form.training.v1`** in localStorage for the current browser and origin. The original key and version remain compatible with existing workouts and backups. Legacy records receive the new optional preferences/reward metadata without losing exercise data.
+
+Export from **Settings** before moving to another browser or domain. Import validates the complete backup and asks before replacing local data. Reset also requires confirmation. Clearing browser storage removes the local copy; there is no account sync in this version.
+
+Malformed original data is preserved and automatic writes pause. The recovery banner can download the original data separately from current in-memory progress. If storage fills up or is blocked, the app remains usable in memory and offers export. A successful later write clears a transient storage error. If another tab changes training data, the current tab pauses writes to prevent overwriting that tab's work; reload to use the latest saved state.
+
+## ChatGPT and standalone previews
+
+```sh
+npm run build:preview
+```
+
+Open **`preview/fitt.html`** for the complete app in a single HTML file. It bundles JavaScript, styles, fonts, icons, and guides and needs no running server or external assets. This is also the file to open in ChatGPT's web preview. The root `index.html` is an exporter source entry and cannot run directly in a file viewer.
+
+The standalone artifact disables service-worker registration because it has no deployment scope. Embedded previews may block browser storage; in that case, export a backup before closing to preserve progress. Vite remains only for this exporter and unit tests; the deployed app runs on Next.
+
+The approved component study remains in `design-preview/` for reference. It is separate from the working application.
 
 ## Validate
 
 ```sh
+npm run typecheck
 npm test
+npm run format:check
 npm run build
+npm run build:preview
 npm run test:e2e
 npm run check:deploy
 ```
 
-Unit tests cover equipment combinations, progression/regression, unit changes, workout adaptation, backup integrity, and calendar boundaries. Playwright runs end-to-end checks in Chromium at desktop and mobile viewport sizes, including offline reload, exercise guides, weight entry, full/partial workouts, autosave/resume, and backup round trips. It starts a production preview server on port 4173. Run the build first.
+Unit tests cover progression/regression, equipment combinations, reward/calendar rules, backup integrity, and service-worker caching. Playwright covers desktop and mobile workflows, including offline reload, saved routines, full/partial workouts, resume, backups, legacy migration, quota failures, real cross-tab conflicts, and an opaque embedded preview. Build both the production app and standalone preview before running it. The suite starts or reuses port 4173.
 
-The cloud environment includes `/usr/bin/chromium`. Elsewhere, install Playwright’s browser with `npx playwright install chromium`, or set `CHROMIUM_PATH` to an installed Chromium executable. The tests use that local executable automatically when available. Mobile checks emulate Chromium; native Safari installation should be checked on a real iOS device before release.
+The cloud environment provides `/usr/bin/chromium`. Elsewhere, use `npx playwright install chromium` or set `CHROMIUM_PATH`. Mobile tests emulate Chromium; Safari installation still needs a real iOS device check before release.
 
-## Cloudflare Workers
-
-`wrangler.jsonc` serves `dist` through Workers Static Assets with a single-page fallback. `public/_headers` supplies cache and security headers. No database or Worker API is needed for this version. To validate the Worker locally after building:
+## Cloudflare and future services
 
 ```sh
+npm run build:worker
 npm run dev:worker
 ```
 
-When you choose to deploy, authenticate Wrangler with your Cloudflare account, choose your desired Worker name in `wrangler.jsonc`, and run:
+OpenNext produces `.open-next/worker.js` and its assets. `npm run check:deploy` validates this bundle with a Wrangler dry run and **does not publish**. When deployment is authorized, authenticate Wrangler, choose the Worker name in `wrangler.jsonc`, and run `npm run deploy`.
 
-```sh
-npm run deploy
-```
-
-The project is prepared for deployment; setup does not publish it. `check:deploy` is a local dry run and needs no Cloudflare credentials. Account sync can be added later with a Worker API and an appropriate database/authentication layer.
-
-## Data and backup behavior
-
-Data is stored under `form.training.v1` in localStorage for the current browser and origin. This existing key is deliberately retained after the Fitt rename to preserve earlier workouts and backups. Nothing is sent to a server. Clearing browser storage, private browsing expiration, changing devices, or moving to another domain can make local history unavailable. Export a backup from **My setup** before changing origin or browser, then import it at the destination. Import replaces existing local data after confirmation. This first version is intended for one active browser tab at a time.
-
-Malformed stored data is not overwritten automatically. The app pauses saving and offers export so the original data can be recovered. Storage/quota failures show a persistent message; export an in-memory backup to retain current changes.
+Database, authentication, account synchronization, and realtime are deferred. The planned stack remains Neon/Drizzle through `@turnal-io/db/serverless` (WebSocket driver with per-request pools released through `ctx.waitUntil(pool.end())`), passwordless Better Auth through `@turnal-io/auth` (magic link + Google), and `WorkspaceDO` with WebSocket Hibernation. These integrations will need their real package interfaces and a migration/sync design that preserves device history. See [platform details](docs/platform.md).
 
 ## Project structure
 
-- `src/lib/catalog.ts`: equipment requirements, technique cues, and progression links.
-- `src/lib/workout.ts`: pure workout generation, adaptation, and summary functions.
-- `src/lib/storage.ts`: versioned state parsing and persistence.
-- `src/components/ExerciseGuide.tsx`: exercise poses, animated guides, and matching thumbnails.
-- `src/components/ExerciseArtwork.tsx`: shared illustrated athlete, clothing, and body contours.
-- `src/components/Visuals.tsx`: original brand, hero art, and muscle maps.
-- `src/App.tsx`: application state and navigation.
-- `src/styles.css`: responsive interface and accessible interaction states.
+- `src/app/`: Next App Router shell, metadata, loading/error boundaries, and Tailwind tokens.
+- `src/App.tsx`: app navigation, local state coordination, and session lifecycle.
+- `src/components/`: Today, Workout, Journey, Library, Settings, builder, shared UI, and existing guides.
+- `src/lib/catalog.ts`, `workout.ts`, `rewards.ts`: exercise catalog and pure training/reward rules.
+- `src/lib/storage.ts`, `useTrainingStore.ts`: backup validation, migration, persistence, and recovery.
+- `src/lib/usePwa.ts`, `scripts/`: offline installation, version updates, and preview generation.
+- `tests/`: desktop/mobile end-to-end workflows.
 
-Use the existing checkout. Cloud tasks are isolated already; a Git worktree is unnecessary unless specifically requested. This is a local implementation. Do not commit or push changes unless explicitly requested.
+Use the existing checkout. Cloud tasks are already isolated; a worktree is unnecessary unless requested. Commit, push, and deploy only within the user's current authorization.
