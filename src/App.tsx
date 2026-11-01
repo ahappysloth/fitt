@@ -47,6 +47,7 @@ import SessionView from './components/SessionView'
 import JourneyView from './components/JourneyView'
 import LibraryView from './components/LibraryView'
 import SetupView from './components/SetupView'
+import AccountPanel from './components/AccountPanel'
 import WorkoutBuilder from './components/WorkoutBuilder'
 import AppDialogs, { type AppDialog } from './components/AppDialogs'
 import './app-experience.css'
@@ -103,6 +104,14 @@ export default function App() {
   useEffect(() => {
     document.documentElement.dataset.motion = preferences.celebration
   }, [preferences.celebration])
+  useEffect(() => {
+    if (!store.account.returnToAccount) return
+    setPage('settings')
+    const frame = requestAnimationFrame(() =>
+      document.getElementById('main-content')?.focus({ preventScroll: true }),
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [store.account.returnToAccount])
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000)
     const wake = () => setNow(Date.now())
@@ -459,6 +468,24 @@ export default function App() {
               )}
             </div>
           )}
+          {store.account.user &&
+            ['conflict', 'expired', 'error'].includes(store.account.status) && (
+              <div className="state-banner warning" role="status">
+                <div>
+                  <strong>
+                    {store.account.status === 'conflict'
+                      ? 'Choose which changes to keep.'
+                      : store.account.status === 'expired'
+                        ? 'Sign in again to sync your progress.'
+                        : 'Your progress is waiting to sync.'}
+                  </strong>
+                  <p>Your changes stay on this device while you resolve the account update.</p>
+                </div>
+                <Button variant="secondary" onClick={() => navigate('settings')}>
+                  Review account
+                </Button>
+              </div>
+            )}
           {pwa.needRefresh && (
             <div className="state-banner">
               <p>
@@ -511,6 +538,8 @@ export default function App() {
               />
             ) : page === 'settings' ? (
               <SetupView
+                accountPanel={<AccountPanel account={store.account} />}
+                accountMode={!!store.account.user}
                 profile={state.profile}
                 active={!!state.active}
                 preferences={preferences}
@@ -580,9 +609,13 @@ export default function App() {
               <button onClick={() => setDialog({ type: 'how' })}>
                 {storageError
                   ? 'Session only · export to keep'
-                  : pwa.offlineReady
-                    ? 'Ready for offline training'
-                    : 'Saved on this device'}
+                  : store.account.user
+                    ? store.account.status === 'synced'
+                      ? 'Account up to date'
+                      : 'Saved here · sync pending'
+                    : pwa.offlineReady
+                      ? 'Ready for offline training'
+                      : 'Saved on this device'}
                 <ShieldCheck size={13} />
               </button>
             </footer>
@@ -617,6 +650,7 @@ export default function App() {
         dialog={dialog}
         state={state}
         storageError={storageError}
+        accountMode={!!store.account.user}
         onClose={() => {
           setDialog(null)
           pwa.dismissInstallHelp()

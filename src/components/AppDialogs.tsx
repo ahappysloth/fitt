@@ -43,6 +43,7 @@ export default function AppDialogs({
   dialog,
   state,
   storageError,
+  accountMode = false,
   onClose,
   onSwap,
   onFinish,
@@ -57,6 +58,7 @@ export default function AppDialogs({
   dialog: AppDialog | null
   state: AppState
   storageError: string | null
+  accountMode?: boolean
   onClose: () => void
   onSwap: (exercise: Exercise) => void
   onFinish: () => void
@@ -175,8 +177,9 @@ export default function AppDialogs({
       {dialog.type === 'reset' && (
         <>
           <p className="dialog-copy">
-            This deletes workout history, saved routines, progress, and preferences from this
-            device. Export a backup first if you want to keep them.
+            {accountMode
+              ? 'This deletes your account’s workout history, saved routines, progress, and preferences. The deletion will sync to your other devices. Your separate guest history stays unchanged. Export a backup first if you want to keep your account data.'
+              : 'This deletes workout history, saved routines, progress, and preferences from this device. Export a backup first if you want to keep them.'}
           </p>
           <Button variant="secondary" onClick={onExport}>
             Export backup
@@ -196,8 +199,10 @@ export default function AppDialogs({
           <p className="dialog-copy">
             Restore {dialog.state.history.length} completed workout
             {dialog.state.history.length === 1 ? '' : 's'} and {dialog.state.routines?.length || 0}{' '}
-            saved routines. This replaces your current data on this device, including any active
-            workout.
+            saved routines.{' '}
+            {accountMode
+              ? 'This replaces your account’s training data and will sync to your other devices. It also replaces the active workout on this device. Your separate guest history stays unchanged.'
+              : 'This replaces your current data on this device, including any active workout.'}
           </p>
           <Button variant="secondary" onClick={onExport}>
             Export current data first
@@ -292,8 +297,10 @@ export default function AppDialogs({
             </li>
           </ul>
           <p>
-            Load the app online once so it can save its offline files. Your workouts are saved in
-            this browser; export a backup before changing devices or domains.
+            Load the app online once so it can save its offline files.{' '}
+            {accountMode
+              ? 'Wait for your account to finish syncing before changing devices. Active workouts and unsynced changes stay in this browser; export a backup to keep them.'
+              : 'Your workouts are saved in this browser; export a backup before changing devices or domains.'}
           </p>
         </div>
       )}

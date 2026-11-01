@@ -25,6 +25,24 @@ const env = {
 } satisfies FittEnv
 
 describe('passwordless authentication', () => {
+  it('returns a callback with missing OAuth state to the trusted account controls', async () => {
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    try {
+      const built = buildRequestAuth(db, env, undefined, async () => {})
+      const response = await built.auth.handler(
+        new Request(`${env.BETTER_AUTH_URL}/api/auth/callback/google`),
+      )
+      expect(response.status).toBe(302)
+      const destination = new URL(response.headers.get('location')!)
+      expect(destination.origin).toBe(env.BETTER_AUTH_URL)
+      expect(destination.pathname).toBe('/')
+      expect(destination.searchParams.get('account')).toBe('return')
+      expect(destination.searchParams.has('error')).toBe(true)
+    } finally {
+      await pool.end()
+    }
+  })
+
   it('retains provider identity while discarding unneeded Google credentials', async () => {
     const input = {
       userId: 'user',

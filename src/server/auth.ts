@@ -68,6 +68,7 @@ export function buildRequestAuth(
   // errors can contain SQL parameters, including one-time verification tokens.
   built.auth.options.logger = { disabled: true }
   built.auth.options.onAPIError = {
+    errorURL: new URL('/?account=return', env.BETTER_AUTH_URL).toString(),
     onError(error) {
       if (error instanceof APIError) throw error
       console.error('[Fitt] Authentication action could not complete')

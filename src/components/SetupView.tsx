@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, type ReactNode } from 'react'
 import {
   ArrowUpRight,
   Check,
@@ -19,6 +19,8 @@ import { focusNames } from '../lib/workout'
 import './preferences.css'
 
 export interface SetupViewProps {
+  accountPanel?: ReactNode
+  accountMode?: boolean
   profile: Profile
   active: boolean
   preferences?: UserPreferences
@@ -32,6 +34,8 @@ export interface SetupViewProps {
 }
 
 export default function SetupView({
+  accountPanel,
+  accountMode = false,
   profile,
   active,
   preferences,
@@ -64,6 +68,7 @@ export default function SetupView({
           <Dumbbell size={25} />
         </span>
       </div>
+      {accountPanel}
       {active && (
         <p className="pref-notice" role="status">
           Your workout is in progress. Finish or discard it before changing training preferences.
@@ -300,10 +305,15 @@ export default function SetupView({
               <ShieldCheck size={25} />
             </span>
             <h2>Your progress stays yours.</h2>
-            <p>Your workouts and routines are saved in this browser, on this device.</p>
+            <p>
+              {accountMode
+                ? 'Your completed workouts and routines sync with your account. Workouts in progress stay on this device.'
+                : 'Your workouts and routines are saved in this browser, on this device.'}
+            </p>
             <p className="pref-caption">
-              Export a backup before clearing browser data or moving to another device. Importing a
-              backup replaces your current data after confirmation.
+              {accountMode
+                ? 'Export a backup before replacing your data. Importing a backup replaces your current training data after confirmation and syncs those changes to your account.'
+                : 'Export a backup before clearing browser data or moving to another device. Importing a backup replaces your current data after confirmation.'}
             </p>
             <button type="button" className="secondary-button pref-full" onClick={onExport}>
               <Download size={17} />
@@ -350,7 +360,7 @@ export default function SetupView({
             </button>
           )}
           <button type="button" className="pref-reset" onClick={onReset}>
-            Reset all local data
+            {accountMode ? 'Reset account training data' : 'Reset all local data'}
           </button>
         </aside>
       </div>
