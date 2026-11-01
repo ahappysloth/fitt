@@ -14,7 +14,13 @@ export default defineConfig({
       executablePath:
         process.env.CHROMIUM_PATH ||
         (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined),
-      args: ['--no-sandbox'],
+      // Use software WebGL to exercise the real 3D guide in headless CI.
+      args: [
+        '--no-sandbox',
+        '--use-gl=angle',
+        '--use-angle=swiftshader',
+        '--enable-unsafe-swiftshader',
+      ],
     },
     timezoneId: 'America/New_York',
   },

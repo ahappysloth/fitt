@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import type { Exercise } from '../lib/types'
 import { AthleteFigure, type AthletePose, type Point } from './ExerciseArtwork'
@@ -665,7 +665,26 @@ export function ExerciseThumbnail({
   )
 }
 
+const KneePushupGuide = lazy(() => import('./form-guide/KneePushupGuide'))
+
 export default function ExerciseGuide({ exercise }: { exercise: Exercise }) {
+  if (exercise.id === 'knee-pushup') {
+    return (
+      <Suspense
+        fallback={
+          <p className="guide-caption" role="status">
+            Preparing your form guide…
+          </p>
+        }
+      >
+        <KneePushupGuide fallback={<LegacyExerciseGuide exercise={exercise} />} />
+      </Suspense>
+    )
+  }
+  return <LegacyExerciseGuide exercise={exercise} />
+}
+
+function LegacyExerciseGuide({ exercise }: { exercise: Exercise }) {
   const demo = demos[exercise.id]
   const [playing, setPlaying] = useState(false),
     [phase, setPhase] = useState(0),

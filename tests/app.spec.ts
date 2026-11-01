@@ -192,6 +192,7 @@ test('uses its offline cache for guides and logging after a full reload', async 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Your next chapter.' })).toBeVisible()
   await page.getByRole('button', { name: 'View Knee push-up instructions', exact: true }).click()
+  await expect(page.locator('.form-3d[data-ready=true]')).toBeVisible()
   await page.getByRole('button', { name: 'Play animation' }).click()
   await expect(page.getByRole('button', { name: 'Pause animation' })).toBeVisible()
   await page.getByRole('button', { name: 'Close dialog' }).click()

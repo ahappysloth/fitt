@@ -5,6 +5,7 @@ import { build } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const formStudy = process.argv.includes('--form')
 
 // A file preview has no server or service-worker scope. Keep PWA registration in
 // the normal deployment build; bundle the full application into this preview.
@@ -22,7 +23,7 @@ const result = await build({
     minify: true,
     cssCodeSplit: false,
     lib: {
-      entry: resolve(root, 'src/main.tsx'),
+      entry: resolve(root, formStudy ? 'src/form-preview/main.tsx' : 'src/main.tsx'),
       name: 'FittPreview',
       formats: ['iife'],
       fileName: 'form-preview',
@@ -41,6 +42,7 @@ const css = styles.map((file) => file.source.toString()).join('\n')
 const icon = await readFile(resolve(root, 'public/icon.svg'), 'utf8')
 const source = await readFile(resolve(root, 'index.html'), 'utf8')
 const html = source
+  .replace(/<title>.*?<\/title>/, formStudy ? '<title>Fitt — Form Studio</title>' : '$&')
   .replace('href="/icon.svg"', `href="data:image/svg+xml,${encodeURIComponent(icon)}"`)
   .replace(/\s*<link[^>]+rel="apple-touch-icon"[^>]*>/, '')
   .replace('</head>', `<style>${css}</style></head>`)
@@ -51,9 +53,10 @@ const html = source
 
 if (html.includes('src="/src/main.tsx"')) throw new Error('The source entry was not bundled.')
 await mkdir(resolve(root, 'preview'), { recursive: true })
-await writeFile(resolve(root, 'preview/fitt.html'), html)
+const filename = formStudy ? 'fitt-form-studio.html' : 'fitt.html'
+await writeFile(resolve(root, `preview/${filename}`), html)
 // Keep the earlier preview link working after the Fitt rename.
-await writeFile(resolve(root, 'preview/form.html'), html)
+if (!formStudy) await writeFile(resolve(root, 'preview/form.html'), html)
 console.log(
-  `Standalone preview: preview/fitt.html (${Math.round(Buffer.byteLength(html) / 1024)} KiB)`,
+  `Standalone preview: preview/${filename} (${Math.round(Buffer.byteLength(html) / 1024)} KiB)`,
 )
