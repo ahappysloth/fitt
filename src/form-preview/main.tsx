@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { ArrowDown, ArrowUpRight, Check, CirclePlay, Move3D, ShieldCheck } from 'lucide-react'
 import { FMark } from '../components/FittArtwork'
 import KneePushupGuide from '../components/form-guide/KneePushupGuide'
+import ModelInspector from '../components/form-guide/ModelInspector'
 import { BodyModelPreferenceProvider } from '../components/BodyModelPreference'
 import type { BodyModel } from '../lib/types'
 import '../app/globals.css'
@@ -75,6 +76,7 @@ function FormStudioPreview() {
           </BodyModelPreferenceProvider>
         </div>
       </main>
+      <ModelInspector bodyModel={bodyModel} onBodyModelChange={setBodyModel} />
       <section id="the-system" className="form-study__system">
         <div className="form-study__section-title">
           <div>

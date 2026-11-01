@@ -253,6 +253,7 @@
   font-size: 0.75rem !important;
 }
 .form-3d__playback input[type='range'] {
+  --form-progress: 0%;
   appearance: none;
   width: 100%;
   min-width: 0;

@@ -181,7 +181,6 @@ export function createGuideScene(
       playing = false,
       speed = 1,
       previous = 0,
-      lastReport = 0,
       inView = true
     const render = () => {
       if (!disposed) renderer.render(scene, camera)
@@ -216,10 +215,8 @@ export function createGuideScene(
         onLost()
         return
       }
-      if (time - lastReport > 70) {
-        onProgress(progress)
-        lastReport = time
-      }
+      // The timeline shares the rendered pose's clock, including on slow frames.
+      onProgress(progress)
       frame = requestAnimationFrame(tick)
     }
     function schedule() {
@@ -321,6 +318,11 @@ export function createGuideScene(
         schedule()
       },
       seek(value) {
+        // Stop synchronously: a queued frame must not overwrite a drag/keyboard seek.
+        playing = false
+        if (frame) cancelAnimationFrame(frame)
+        frame = 0
+        previous = 0
         progress = THREE.MathUtils.clamp(value, 0, 1)
         setPose()
         onProgress(progress)

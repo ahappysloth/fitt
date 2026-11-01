@@ -8,6 +8,8 @@ Use one canonical human rig, selectable surface models, and one shared viewer, w
 
 The male model is the default; the female option retains the original facial features and proportions with a modest authored chest adjustment. The guide's model picker and Settings share a local preference, also included in backups. Earlier saves default to male without changing training data. Model switching updates the position buffer and normals in place, preserving the current pose, playback, camera, muscle focus, and WebGL resources. The standalone study lets reviewers switch models independently of app data.
 
+The study also includes a standing model inspector below the exercise viewer. It shares the model selection and shows the unposed mesh without muscle highlighting. Free orbit, pan, close-up zoom, front/side/back presets, and head/feet/full-body framing support anatomy review. Mouse, touch, keyboard, and visible buttons operate the same camera. Its separate WebGL context initializes near the viewport and renders only after a camera, model, or size change.
+
 A complete skeleton and individually modeled muscles are a **content upgrade**, not a reason to replace the viewer. The prototype already has a real bone rig and weighted mesh. Its muscle highlights are approximate surface masks. The next anatomy asset should supply named muscle groups and optional bone meshes, all bound to the same canonical rig, or include a deliberate retargeting step. A detailed medical-looking asset still needs accurate movement clips and deformation work; more polygons alone will not fix form.
 
 ## Separation of responsibilities
@@ -29,6 +31,7 @@ The calves and relaxed feet follow the torso's angular change around the planted
 - The guide starts paused. Explicit playback is allowed even with reduced-motion preferences; camera presets do not animate.
 - Drag to orbit, choose front/side/three-quarter views, or use rotation/zoom buttons. The canvas also supports arrow keys, +/−, and Home.
 - The native range input supports keyboard scrubbing and announces the current phase. Changing keyframes or scrubbing pauses playback.
+- Playback updates the timeline directly from the same animation frame as the pose. React updates coaching at phase/cue boundaries; it does not control the range value. Pointer scrubbing pauses immediately, and seeking cancels a queued playback frame so it cannot overwrite the user's position.
 - A paused scene renders only when something changes. Animation stops rendering outside the viewport, behind a modal, or in a hidden tab. Pixel density is capped to limit mobile GPU work.
 - All mesh data, code, fonts, and styles are bundled locally. Next lazy-loads the 3D module; the PWA caches its production chunks for offline use.
 - If WebGL cannot initialize or its context is lost, the app retains the existing illustrated guide; the standalone study retains written instructions. Partial initialization failures and normal unmount both release canvases, observers, handlers, geometry, materials, skeleton textures, shadow maps, and the renderer.

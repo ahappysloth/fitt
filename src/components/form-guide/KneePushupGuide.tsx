@@ -29,24 +29,51 @@ export default function KneePushupGuide({ fallback }: { fallback?: ReactNode }) 
 export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?: ReactNode }) {
   const { bodyModel, onBodyModelChange } = useBodyModelPreference()
   const host = useRef<HTMLDivElement>(null)
+  const timeline = useRef<HTMLInputElement>(null)
   const scene = useRef<GuideScene | null>(null)
   const [ready, setReady] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
   const [playing, setPlaying] = useState(false)
-  const [progress, setProgress] = useState(0)
+  const [movement, setMovement] = useState(() => motion.describe(0))
   const [speed, setSpeed] = useState(1)
   const [view, setView] = useState<CameraView | 'custom'>('angle')
   const [muscles, setMuscles] = useState(true)
   const [region, setRegion] = useState<FocusRegion>('all')
   const [alignment, setAlignment] = useState(false)
-  const movement = motion.describe(progress)
   useEffect(() => {
     if (!host.current) return
+    let lastMovement = motion.describe(0)
+    let lastAccessibleValue = ''
+    function updateProgress(progress: number) {
+      const next = motion.describe(progress)
+      const percentage = progress * 100
+      const input = timeline.current
+      if (input) {
+        // This native input is intentionally uncontrolled. Only the animation
+        // clock writes playback positions; React never reapplies a stale value.
+        input.value = String(percentage)
+        input.style.setProperty('--form-progress', `${percentage}%`)
+        const accessibleValue = `${next.phase}, ${Math.round(percentage)} percent through the rep`
+        if (accessibleValue !== lastAccessibleValue) {
+          input.setAttribute('aria-valuetext', accessibleValue)
+          lastAccessibleValue = accessibleValue
+        }
+      }
+      // Coaching changes at phase/cue boundaries, not on every rendered frame.
+      if (
+        next.phase !== lastMovement.phase ||
+        next.cue !== lastMovement.cue ||
+        next.breath !== lastMovement.breath
+      ) {
+        setMovement(next)
+        lastMovement = next
+      }
+    }
     try {
       scene.current = createGuideScene(
         host.current,
         motion,
-        setProgress,
+        updateProgress,
         () => setUnavailable(true),
         setView,
       )
@@ -83,6 +110,10 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
   function seek(value: number) {
     setPlaying(false)
     scene.current?.seek(value)
+  }
+  function pauseForScrubbing() {
+    scene.current?.play(false)
+    setPlaying(false)
   }
   function camera(value: CameraView) {
     setView(value)
@@ -246,15 +277,31 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
           </button>
         </div>
         <input
+          ref={timeline}
           aria-label="Movement progress"
-          aria-valuetext={`${movement.phase}, ${Math.round(progress * 100)} percent through the rep`}
+          aria-valuetext={`${motion.describe(0).phase}, 0 percent through the rep`}
           type="range"
           min="0"
           max="100"
           step=".1"
-          value={progress * 100}
+          defaultValue="0"
+          onPointerDown={pauseForScrubbing}
+          onKeyDown={(event) => {
+            if (
+              [
+                'ArrowLeft',
+                'ArrowRight',
+                'ArrowUp',
+                'ArrowDown',
+                'Home',
+                'End',
+                'PageUp',
+                'PageDown',
+              ].includes(event.key)
+            )
+              pauseForScrubbing()
+          }}
           onChange={(event) => seek(Number(event.target.value) / 100)}
-          style={{ '--form-progress': `${progress * 100}%` } as React.CSSProperties}
         />
         <div className="form-3d__keyframes">
           {motion.keyframes.map(({ label, progress }) => (
