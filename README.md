@@ -1,10 +1,10 @@
 # Fitt
 
-A responsive, installable calisthenics app built with **Next.js 16 App Router, React 19, and Tailwind CSS v4**, ready for Cloudflare Workers through **OpenNext**. This version saves training on the device. It needs no account, credentials, database, or external API.
+A responsive, installable calisthenics app built with **Next.js 16 App Router, React 19, and Tailwind CSS v4**, built for **Cloudflare Workers through OpenNext**. Train on your device without an account, or sign in to sync completed workouts, routines, and preferences through Neon. Device history is imported only when you explicitly choose to add it to an account.
 
 ## Develop
 
-Use Node.js 22.12+ and npm (validated with Node 24).
+Use Node.js 22.12+ and npm (validated with Node 24). Installing the private `@turnal-io/*` packages requires `GITHUB_PACKAGES_TOKEN` with package read access; `.npmrc` contains only a variable reference. In the managed environment, use the configured registry HTTP-secret binding. Do not put its value in source files.
 
 ```sh
 npm ci
@@ -28,6 +28,7 @@ The production server runs on port **4173**. A service worker caches the app, lo
 - **Journey:** workout history, weekly activity, comparable personal bests, XP, levels, and milestone awards derived from real saved sessions.
 - **Library:** 26 exercises with equipment and muscle filters, written technique instructions, front/back muscle diagrams, and the existing offline animated guides.
 - **Settings:** name, beginner/intermediate level, equipment, focus, session length, weekly goal, playful/calm celebrations, install guidance, and validated backup/restore.
+- **Optional accounts:** Google or magic-link sign-in, explicit device-history import, account-scoped offline changes, conflict resolution, and cross-device sync. Active workouts remain on the device where they started.
 - **Accessible interaction:** responsive desktop/mobile navigation, keyboard-operated dialogs, visible focus states, reduced-motion support, and a calm celebration option.
 
 The interface preserves the F logo and approved charcoal/electric-lime design. Knee Push-up now has an interactive 3D form-guide prototype; the remaining exercise illustrations are reused pending review. Run `npm run build:form-preview` to create `preview/fitt-form-studio.html`. See the [form-guide foundation](docs/form-guides.md) and [asset provenance](assets/form-guide/README.md).
@@ -44,9 +45,9 @@ Session durations are planning estimates. Muscle diagrams show involvement, not 
 
 ## Data and backup behavior
 
-Training is stored under **`form.training.v1`** in localStorage for the current browser and origin. The original key and version remain compatible with existing workouts and backups. Legacy records receive the new optional preferences/reward metadata without losing exercise data.
+Guest training is stored under **`form.training.v1`** in localStorage for the current browser and origin. The original key and version remain compatible with existing workouts and backups. Legacy records receive the new optional preferences/reward metadata without losing exercise data. Signed-in accounts use separate local caches and queues keyed by account ID; signing in never automatically uploads guest data.
 
-Export from **Settings** before moving to another browser or domain. Import validates the complete backup and asks before replacing local data. Reset also requires confirmation. Clearing browser storage removes the local copy; there is no account sync in this version.
+Export from **Settings** to keep an independent backup, especially before clearing browser storage or moving unsynced progress to another browser/domain. Import validates the complete backup and asks before replacing data. Reset also requires confirmation. For signed-in accounts, replacement/deletion syncs to the account and its other devices; the dialogs make that scope explicit. Clearing browser storage removes pending changes that have not reached the server.
 
 Malformed original data is preserved and automatic writes pause. The recovery banner can download the original data separately from current in-memory progress. If storage fills up or is blocked, the app remains usable in memory and offers export. A successful later write clears a transient storage error. If another tab changes training data, the current tab pauses writes to prevent overwriting that tab's work; reload to use the latest saved state.
 
@@ -58,7 +59,7 @@ npm run build:preview
 
 Open **`preview/fitt.html`** for the complete app in a single HTML file. It bundles JavaScript, styles, fonts, icons, and guides and needs no running server or external assets. This is also the file to open in ChatGPT's web preview. The root `index.html` is an exporter source entry and cannot run directly in a file viewer.
 
-The standalone artifact disables service-worker registration because it has no deployment scope. Embedded previews may block browser storage; in that case, export a backup before closing to preserve progress. Vite remains only for this exporter and unit tests; the deployed app runs on Next.
+The standalone artifact disables service-worker registration and account requests because it has no server or deployment scope. Embedded previews may block browser storage; in that case, export a backup before closing to preserve progress. Vite remains only for this exporter and unit tests; the deployed app runs on Next.
 
 The approved component study remains in `design-preview/` for reference. It is separate from the working application.
 
@@ -66,28 +67,34 @@ The approved component study remains in `design-preview/` for reference. It is s
 
 ```sh
 npm run typecheck
+npm run typecheck:worker
 npm test
+npm run test:realtime
+npm run test:email-worker
 npm run format:check
 npm run build
 npm run build:preview
 npm run test:e2e
 npm run check:deploy
+npm run test:worker-account
 ```
 
-Unit tests cover progression/regression, equipment combinations, reward/calendar rules, backup integrity, and service-worker caching. Playwright covers desktop and mobile workflows, including offline reload, saved routines, full/partial workouts, resume, backups, legacy migration, quota failures, real cross-tab conflicts, and an opaque embedded preview. Build both the production app and standalone preview before running it. The suite starts or reuses port 4173.
+Unit tests cover progression/regression, equipment combinations, reward/calendar rules, backup integrity, service-worker caching, account isolation, offline queues, merge conflicts, request validation, and realtime authentication. Playwright covers desktop and mobile workflows, including offline reload, saved routines, full/partial workouts, resume, backups, legacy migration, quota failures, real cross-tab conflicts, and an opaque embedded preview. Build the production app and both standalone previews before running it. The suite starts or reuses port 4173.
+
+With the Fitt development database migrated, `npm run test:db` runs actual transaction/auth tests and `npm run test:account` exercises two browser devices, explicit import, offline replay, and account isolation. These opt-in tests create uniquely named fixture users and delete only those fixtures afterward. They never send email to a real recipient. See [account setup and validation](docs/accounts.md). The separate [realtime runtime test](docs/realtime-testing.md) exercises the Durable Object in local workerd without external services. `test:email-worker` verifies the actual Worker mail module and rendering with a stubbed delivery transport; real SMTP delivery still needs a hosted check.
 
 The cloud environment provides `/usr/bin/chromium`. Elsewhere, use `npx playwright install chromium` or set `CHROMIUM_PATH`. Mobile tests emulate Chromium; Safari installation still needs a real iOS device check before release.
 
-## Cloudflare and future services
+## Cloudflare and account services
 
 ```sh
 npm run build:worker
 npm run dev:worker
 ```
 
-OpenNext produces `.open-next/worker.js` and its assets. `npm run check:deploy` validates this bundle with a Wrangler dry run and **does not publish**. When deployment is authorized, authenticate Wrangler, choose the Worker name in `wrangler.jsonc`, and run `npm run deploy`.
+OpenNext produces `.open-next/worker.js` and its assets. The source `worker.ts` wraps it with the authenticated realtime endpoint, supplies a request-local Worker email adapter, and exports `WorkspaceDO`. `npm run check:deploy` validates this bundle with a Wrangler dry run and **does not publish**. After that build, `npm run test:worker-account` exercises its account metadata and origin rejection in local workerd using synthetic bindings. When deployment is authorized, configure Worker secrets and a stable origin, authenticate Wrangler, and run `npm run deploy`.
 
-Database, authentication, account synchronization, and realtime are deferred. The planned stack remains Neon/Drizzle through `@turnal-io/db/serverless` (WebSocket driver with per-request pools released through `ctx.waitUntil(pool.end())`), passwordless Better Auth through `@turnal-io/auth` (magic link + Google), and `WorkspaceDO` with WebSocket Hibernation. These integrations will need their real package interfaces and a migration/sync design that preserves device history. See [platform details](docs/platform.md).
+Accounts use Neon/Drizzle through `@turnal-io/db/serverless`, passwordless Better Auth through `@turnal-io/auth`, and `WorkspaceDO` with WebSocket Hibernation. Copy the names in `.env.example` into your development environment; use `.dev.vars.example` for Worker preview and configure deployed Worker secrets separately. Apply the versioned schema explicitly with `npm run db:migrate`; neither app startup nor builds apply migrations. SMTP uses TLS on port 465. The managed cloud environment's HTTP proxy cannot enable public SMTP, so hosted delivery still needs validation on an appropriate runtime. See [account setup](docs/accounts.md) and [platform details](docs/platform.md).
 
 ## Project structure
 
@@ -96,6 +103,9 @@ Database, authentication, account synchronization, and realtime are deferred. Th
 - `src/components/`: Today, Workout, Journey, Library, Settings, builder, shared UI, and existing guides.
 - `src/lib/catalog.ts`, `workout.ts`, `rewards.ts`: exercise catalog and pure training/reward rules.
 - `src/lib/storage.ts`, `useTrainingStore.ts`: backup validation, migration, persistence, and recovery.
+- `src/lib/cloud/`: account caches, offline queue, merge rules, session transitions, and sync controls.
+- `src/server/`, `src/db/`, `drizzle/`: request-scoped services, validated training API, schema, and versioned SQL migrations.
+- `worker.ts`, `src/server/realtime/`: authenticated revision notifications and hibernating Durable Objects.
 - `src/lib/usePwa.ts`, `scripts/`: offline installation, version updates, and preview generation.
 - `tests/`: desktop/mobile end-to-end workflows.
 

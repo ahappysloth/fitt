@@ -1,6 +1,6 @@
 # Fitt platform
 
-Fitt uses Next.js 16 App Router, React 19, and Tailwind CSS v4. OpenNext adapts the production build to Cloudflare Workers. This release keeps workout data on the device; database, authentication, account synchronization, and realtime services are intentionally deferred.
+Fitt uses Next.js 16 App Router, React 19, and Tailwind CSS v4. OpenNext adapts the production build to Cloudflare Workers. Device-only training remains available; optional accounts add Neon storage, passwordless auth, offline sync, and realtime revision notifications.
 
 ## Rendering and styling
 
@@ -22,7 +22,7 @@ Fitt uses Next.js 16 App Router, React 19, and Tailwind CSS v4. OpenNext adapts 
 | `npm run dev:worker`    | Preview the built Worker locally                          |
 | `npm run check:deploy`  | Build and validate a Worker deployment without publishing |
 
-The production Worker entry is `.open-next/worker.js`; static assets are in `.open-next/assets`. `wrangler.jsonc` configures the asset and Worker self-reference bindings. The OpenNext adapter is responsible for the Worker implementation; application components remain ordinary Next/React code.
+The production Worker entry is `worker.ts`, which delegates normal requests to `.open-next/worker.js`; static assets are in `.open-next/assets`. `wrangler.jsonc` configures assets, the Worker self-reference, and a SQLite-backed `WORKSPACE_DO` binding. The custom entry authenticates `/api/realtime` upgrades and exports `WorkspaceDO`; application components remain ordinary Next/React code.
 
 ## Offline and updates
 
@@ -34,8 +34,12 @@ Offline navigation uses the complete cached version. A newer online page cannot 
 
 Service workers are enabled only in a production build on a secure HTTP origin. Localhost is supported for testing. The standalone exporter defines `NEXT_PUBLIC_STANDALONE=true`, which disables worker registration and all PWA setup requests in the review artifact.
 
-## Future server integrations
+## Account services
 
-The deployment target remains Neon Postgres + Drizzle through `@turnal-io/db/serverless`, using the WebSocket driver and per-request pools released with `ctx.waitUntil(pool.end())`; passwordless Better Auth through `@turnal-io/auth` with magic link and Google sign-in; and workspace-scoped realtime through a `WorkspaceDO` Durable Object using WebSocket Hibernation.
+Neon Postgres + Drizzle use `@turnal-io/db/serverless` and the WebSocket driver. Each request owns its pool. Worker background work is drained before pool cleanup through `ctx.waitUntil`; Node waits for cleanup directly. Node development preserves configured HTTPS proxies and TLS trust through a `ws` adapter. Worker requests use the runtime WebSocket implementation. Shared database pools are not cached globally.
 
-Those integrations require the real Turnal package interfaces and an explicit synchronization design that preserves existing device history. No substitute package APIs or placeholder authenticated endpoints are included in this release.
+Better Auth is constructed through `@turnal-io/auth` with magic link and Google sign-in. Server endpoints are private/no-store, mutations validate the exact origin, and session-derived ownership is required for every training operation. A queued write also carries its expected account ID, preventing a changed browser cookie from redirecting an old account's queued data into another account. Google provider tokens are not retained for ongoing API access.
+
+Training sync uses an atomic per-account revision and bounded idempotency receipts. The server normalizes completed workouts and set facts, routines, and profile/preferences under account-scoped keys. Active workouts and generated plans stay local. Realtime sends revision hints only; authenticated HTTP remains the source of truth. Durable Object sockets have bounded lifetimes, origin checks, per-account routing, and hibernation-compatible expiry alarms. HTTP polling/focus refresh works when realtime is unavailable.
+
+See [accounts](accounts.md) for deployment variables, migrations, import/merge behavior, and hosted-validation limits.
