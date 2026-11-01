@@ -108,7 +108,9 @@ export function parseBackup(raw: string): AppState {
       typeof preferences.displayName !== 'string' ||
       preferences.displayName.length > 40 ||
       !['playful', 'calm'].includes(preferences.celebration as string) ||
-      typeof preferences.onboarded !== 'boolean'
+      typeof preferences.onboarded !== 'boolean' ||
+      (preferences.bodyModel !== undefined &&
+        !['male', 'female'].includes(preferences.bodyModel as string))
     )
       throw new Error('The appearance preferences in this backup are invalid.')
   }
@@ -125,7 +127,10 @@ export function parseBackup(raw: string): AppState {
     throw new Error('This backup contains duplicate saved routines.')
   return {
     ...state,
-    preferences: state.preferences || { displayName: '', celebration: 'playful', onboarded: true },
+    preferences: {
+      ...(state.preferences || { displayName: '', celebration: 'playful', onboarded: true }),
+      bodyModel: state.preferences?.bodyModel ?? 'male',
+    },
     routines: state.routines || [],
     history: state.history.map((session) => ({
       ...session,

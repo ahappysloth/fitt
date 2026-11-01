@@ -48,6 +48,7 @@ export default function SetupView({
     displayName: '',
     celebration: 'playful' as const,
     onboarded: false,
+    bodyModel: 'male' as const,
   }
   return (
     <div className="pref-view">
@@ -66,7 +67,7 @@ export default function SetupView({
       {active && (
         <p className="pref-notice" role="status">
           Your workout is in progress. Finish or discard it before changing training preferences.
-          You can still change your name and celebrations.
+          You can still change your guide model, name, and celebrations.
         </p>
       )}
       <div className="pref-layout">
@@ -238,6 +239,29 @@ export default function SetupView({
                 }
               />
             </label>
+            <fieldset className="pref-fieldset" disabled={!onPreferences}>
+              <legend>Exercise guide body model</legend>
+              <div className="pref-levels">
+                {(['male', 'female'] as const).map((bodyModel) => (
+                  <button
+                    key={bodyModel}
+                    type="button"
+                    aria-pressed={(personal.bodyModel ?? 'male') === bodyModel}
+                    className={(personal.bodyModel ?? 'male') === bodyModel ? 'is-selected' : ''}
+                    onClick={() => onPreferences?.({ ...personal, bodyModel })}
+                  >
+                    <strong>{bodyModel === 'male' ? 'Male model' : 'Female model'}</strong>
+                    <small>
+                      {bodyModel === 'male'
+                        ? 'Default guide appearance'
+                        : 'Alternative guide appearance'}
+                    </small>
+                    {(personal.bodyModel ?? 'male') === bodyModel && <Check size={16} />}
+                  </button>
+                ))}
+              </div>
+              <p className="pref-caption">Used wherever a 3D guide is available.</p>
+            </fieldset>
             <fieldset className="pref-fieldset" disabled={!onPreferences}>
               <legend>Celebration style</legend>
               <div className="pref-celebrations">

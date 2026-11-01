@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { parseBackup } from './storage'
+import { describe, expect, it, vi } from 'vitest'
+import { loadState, parseBackup, saveState, STORAGE_KEY } from './storage'
 import { emptyState, freshWorkout, generateWorkout, localDay, quickWorkout } from './workout'
 import type { AppState, Session } from './types'
 
@@ -29,12 +29,18 @@ describe('data migration and saved routines', () => {
       localDay: localDay(new Date(legacy.history[0].completedAt!)),
     })
     expect(migrated.preferences?.onboarded).toBe(true)
+    expect(migrated.preferences?.bodyModel).toBe('male')
     expect(migrated.routines).toEqual([])
     expect(parseBackup(JSON.stringify(migrated))).toEqual(migrated)
   })
   it('round-trips appearance, name, saved routines and reward snapshots', () => {
     const state = savedState()
-    state.preferences = { displayName: 'Alex', celebration: 'calm', onboarded: true }
+    state.preferences = {
+      displayName: 'Alex',
+      celebration: 'calm',
+      onboarded: true,
+      bodyModel: 'female',
+    }
     state.routines = [generateWorkout(state.profile, [])]
     state.history[0].rewardContext = { version: 1, weeklyGoal: 2, localDay: '2026-10-31' }
     expect(parseBackup(JSON.stringify(state))).toEqual(state)
@@ -69,5 +75,55 @@ describe('data migration and saved routines', () => {
     expect(plan.duration).toBe(5)
     expect(plan.exercises).toHaveLength(2)
     expect(plan.exercises.every((e) => e.sets.length === 2)).toBe(true)
+  })
+})
+
+describe('body-model preferences', () => {
+  it('defaults new profiles to the male model', () => {
+    expect(emptyState().preferences?.bodyModel).toBe('male')
+  })
+
+  it('adds the male default to existing preferences without changing training data', () => {
+    const legacy = savedState()
+    legacy.preferences = { displayName: 'Sam', celebration: 'calm', onboarded: true }
+    legacy.plan = generateWorkout(legacy.profile, legacy.history)
+    legacy.active = { ...freshWorkout(legacy.plan), startedAt: '2026-11-01T12:00:00Z' }
+    legacy.routines = [generateWorkout(legacy.profile, [])]
+    const migrated = parseBackup(JSON.stringify(legacy))
+    expect(migrated.preferences).toEqual({ ...legacy.preferences, bodyModel: 'male' })
+    expect(migrated.profile).toEqual(legacy.profile)
+    expect(migrated.plan).toEqual(legacy.plan)
+    expect(migrated.active).toEqual(legacy.active)
+    expect(migrated.routines).toEqual(legacy.routines)
+    expect(migrated.history[0].exercises).toEqual(legacy.history[0].exercises)
+    expect(legacy.preferences.bodyModel).toBeUndefined()
+    expect(parseBackup(JSON.stringify(migrated))).toEqual(migrated)
+  })
+
+  it.each(['male', 'female'] as const)(
+    'persists and exports/imports the %s choice',
+    (bodyModel) => {
+      const state = parseBackup(JSON.stringify(savedState()))
+      state.preferences = { ...state.preferences!, bodyModel }
+      const memory = new Map<string, string>()
+      vi.stubGlobal('localStorage', {
+        getItem: (key: string) => memory.get(key) ?? null,
+        setItem: (key: string, value: string) => memory.set(key, value),
+      })
+      try {
+        expect(saveState(state)).toBeNull()
+        expect(JSON.parse(memory.get(STORAGE_KEY)!).preferences.bodyModel).toBe(bodyModel)
+        expect(loadState()).toEqual({ state, error: null })
+        expect(parseBackup(JSON.stringify(state))).toEqual(state)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    },
+  )
+
+  it.each(['unknown', '', null, 1, {}])('rejects invalid body-model value %j', (bodyModel) => {
+    const state = savedState()
+    const invalid = { ...state, preferences: { ...state.preferences, bodyModel } }
+    expect(() => parseBackup(JSON.stringify(invalid))).toThrow('appearance preferences')
   })
 })

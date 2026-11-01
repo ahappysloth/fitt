@@ -44,6 +44,18 @@
   color: #a6b38e;
   letter-spacing: 0.06em;
 }
+.form-3d__model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px 0;
+}
+.form-3d__model-row > span {
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  color: #a4ada0;
+}
 .form-3d__stage {
   position: relative;
   isolation: isolate;
@@ -408,6 +420,9 @@
 @media (max-width: 480px) {
   .form-3d__heading {
     padding: 14px 13px 0;
+  }
+  .form-3d__model-row {
+    padding: 10px 13px 0;
   }
   .form-3d__phase {
     left: 13px;

@@ -20,12 +20,14 @@ import { kneePushupMotion } from './knee-pushup'
 import type { GuideMotion } from './contracts'
 import { createGuideScene, type CameraView, type GuideScene } from './scene'
 import './form-guide.css'
+import { useBodyModelPreference } from '../BodyModelPreference'
 
 export default function KneePushupGuide({ fallback }: { fallback?: ReactNode }) {
   return <FormGuide key={kneePushupMotion.id} motion={kneePushupMotion} fallback={fallback} />
 }
 
 export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?: ReactNode }) {
+  const { bodyModel, onBodyModelChange } = useBodyModelPreference()
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<GuideScene | null>(null)
   const [ready, setReady] = useState(false)
@@ -57,6 +59,9 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
       scene.current = null
     }
   }, [motion])
+  useEffect(() => {
+    scene.current?.model(bodyModel)
+  }, [bodyModel])
   useEffect(() => {
     scene.current?.play(playing)
   }, [playing])
@@ -100,7 +105,12 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
       </div>
     )
   return (
-    <section className="form-3d" aria-label={`${motion.name} animated guide`} data-ready={ready}>
+    <section
+      className="form-3d"
+      aria-label={`${motion.name} animated guide`}
+      data-ready={ready}
+      data-model={bodyModel}
+    >
       <div className="form-3d__heading">
         <span>
           <span className="form-3d__live-dot" /> FORM STUDIO
@@ -109,6 +119,23 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
           <Move3D size={12} /> EXPLORE IN 3D
         </span>
       </div>
+      {onBodyModelChange && (
+        <div className="form-3d__model-row">
+          <span>BODY MODEL</span>
+          <div role="group" aria-label="Body model" className="form-3d__views">
+            {(['male', 'female'] as const).map((model) => (
+              <button
+                key={model}
+                type="button"
+                aria-pressed={bodyModel === model}
+                onClick={() => onBodyModelChange(model)}
+              >
+                {model === 'male' ? 'Male' : 'Female'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="form-3d__stage">
         <div className="form-3d__phase">
           <span>{String(motion.phases.indexOf(movement.phase) + 1).padStart(2, '0')}</span>

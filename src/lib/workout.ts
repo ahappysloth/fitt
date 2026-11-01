@@ -25,7 +25,7 @@ export const emptyState = (): AppState => ({
   history: [],
   active: null,
   plan: null,
-  preferences: { displayName: '', celebration: 'playful', onboarded: false },
+  preferences: { displayName: '', celebration: 'playful', onboarded: false, bodyModel: 'male' },
   routines: [],
 })
 export function uid(): string {

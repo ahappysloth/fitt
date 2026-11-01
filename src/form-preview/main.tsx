@@ -1,12 +1,16 @@
 import { createRoot } from 'react-dom/client'
+import { useState } from 'react'
 import { ArrowDown, ArrowUpRight, Check, CirclePlay, Move3D, ShieldCheck } from 'lucide-react'
 import { FMark } from '../components/FittArtwork'
 import KneePushupGuide from '../components/form-guide/KneePushupGuide'
+import { BodyModelPreferenceProvider } from '../components/BodyModelPreference'
+import type { BodyModel } from '../lib/types'
 import '../app/globals.css'
 import '../styles.css'
 import './preview.css'
 
 function FormStudioPreview() {
+  const [bodyModel, setBodyModel] = useState<BodyModel>('male')
   return (
     <div className="form-study">
       <header className="form-study__header">
@@ -66,14 +70,16 @@ function FormStudioPreview() {
           </div>
         </div>
         <div className="form-study__viewer">
-          <KneePushupGuide />
+          <BodyModelPreferenceProvider value={{ bodyModel, onBodyModelChange: setBodyModel }}>
+            <KneePushupGuide />
+          </BodyModelPreferenceProvider>
         </div>
       </main>
       <section id="the-system" className="form-study__system">
         <div className="form-study__section-title">
           <div>
             <p className="eyebrow">THE FOUNDATION</p>
-            <h2>One body. A consistent way to learn.</h2>
+            <h2>Your model. A consistent way to learn.</h2>
           </div>
           <span>
             FIRST MOVEMENT STUDY <ArrowUpRight size={14} />
@@ -84,8 +90,8 @@ function FormStudioPreview() {
             <Move3D size={20} />
             <h3>Explore the form</h3>
             <p>
-              A rigged human model, stable contact points, and useful camera angles. Rotate when it
-              helps; use the side view to check the body line.
+              Choose a male or female model with the same guided movement and useful camera angles.
+              Rotate when it helps; use the side view to check the body line.
             </p>
           </article>
           <article>

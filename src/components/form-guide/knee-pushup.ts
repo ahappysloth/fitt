@@ -102,6 +102,12 @@ export function kneePushupPose(progress: number): PoseFrame {
     Math.PI / 2 - angle,
   )
   const body: RigTransform = { original: kneeCenter, anchor: fixedCenter, rotation: bodyRotation }
+  // Keep the knee bend consistent as the body pivots. The calves and relaxed
+  // feet follow the torso's angular change while the knees stay supported.
+  const legFollow = new THREE.Quaternion().setFromAxisAngle(
+    new THREE.Vector3(1, 0, 0),
+    THREE.MathUtils.degToRad(depth * 13.2),
+  )
   const apply = (point: THREE.Vector3) =>
     point.sub(body.original).applyQuaternion(body.rotation).add(body.anchor)
   const transforms = new Map<string, RigTransform>([['body', body]])
@@ -125,7 +131,7 @@ export function kneePushupPose(progress: number): PoseFrame {
       originalShoulder.distanceTo(originalElbow),
       originalElbow.distanceTo(originalWrist),
     )
-    const backward = new THREE.Vector3(0, 0, -1)
+    const backward = new THREE.Vector3(0, 0, -1).applyQuaternion(legFollow)
     const upperRotation = frameRotation(
       originalElbow.clone().sub(originalShoulder),
       new THREE.Vector3(0, 0, 1),
@@ -166,7 +172,7 @@ export function kneePushupPose(progress: number): PoseFrame {
     const originalKnee = head(`lowerleg01.${side}`),
       originalAnkle = head(`foot.${side}`)
     const knee = apply(originalKnee.clone())
-    const shinDirection = new THREE.Vector3(0, 0.36, -0.94).normalize()
+    const shinDirection = new THREE.Vector3(0, 0.36, -0.94).normalize().applyQuaternion(legFollow)
     const ankle = knee
       .clone()
       .addScaledVector(shinDirection, originalKnee.distanceTo(originalAnkle))

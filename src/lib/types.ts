@@ -5,6 +5,7 @@ export type Muscle =
   'chest' | 'back' | 'shoulders' | 'arms' | 'core' | 'quads' | 'glutes' | 'hamstrings'
 export type Pattern = 'push' | 'pull' | 'squat' | 'hinge' | 'core' | 'shoulder'
 export type Effort = 'easy' | 'good' | 'hard'
+export type BodyModel = 'male' | 'female'
 export interface Exercise {
   id: string
   name: string
@@ -64,6 +65,7 @@ export interface UserPreferences {
   displayName: string
   celebration: 'playful' | 'calm'
   onboarded: boolean
+  bodyModel?: BodyModel
 }
 export interface AppState {
   version: 1

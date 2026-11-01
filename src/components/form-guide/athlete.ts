@@ -1,5 +1,7 @@
 import * as THREE from 'three'
 import data from './body-data.json'
+import maleData from './male-body-data.json'
+import type { BodyModel } from '../../lib/types'
 import type { PoseFrame, FocusRegion } from './contracts'
 export type { FocusRegion } from './contracts'
 
@@ -38,10 +40,12 @@ function transformKey(name: string) {
   return 'body'
 }
 
-export function createAthlete() {
+export function createAthlete(initialModel: BodyModel = 'male') {
   const geometry = new THREE.BufferGeometry()
   const positions = new Float32Array(decode(data.positions))
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  const malePositions = new Float32Array(decode(maleData.positions))
+  // Keep canonical coordinates intact for muscle masks and subsequent switches.
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
   geometry.setAttribute(
     'skinIndex',
     new THREE.Uint8BufferAttribute(new Uint8Array(decode(data.skinIndices)), 4),
@@ -51,7 +55,6 @@ export function createAthlete() {
     new THREE.Uint16BufferAttribute(new Uint16Array(decode(data.skinWeights)), 4, true),
   )
   geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(decode(data.indices)), 1))
-  geometry.computeVertexNormals()
   const colors = new Float32Array(positions.length)
   const masks = Array.from({ length: data.vertices }, (_, i) =>
     regionWeights(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]),
@@ -120,11 +123,20 @@ export function createAthlete() {
     skeleton.update()
     return frame
   }
+  function model(value: BodyModel) {
+    geometry.attributes.position.array.set(value === 'male' ? malePositions : positions)
+    geometry.attributes.position.needsUpdate = true
+    geometry.computeVertexNormals()
+    // A shape switch retains the skeleton, pose, masks and GPU resources.
+    mesh.name = `Fitt ${value} training mannequin`
+  }
+  model(initialModel)
   focus(true, 'all')
   return {
     mesh,
     applyPose,
     focus,
+    model,
     dispose: () => {
       geometry.dispose()
       material.dispose()

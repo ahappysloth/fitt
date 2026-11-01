@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowUpRight,
   BookOpen,
@@ -15,7 +15,15 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import type { AppState, Exercise, Profile, Session, UserPreferences, Workout } from './lib/types'
+import type {
+  AppState,
+  BodyModel,
+  Exercise,
+  Profile,
+  Session,
+  UserPreferences,
+  Workout,
+} from './lib/types'
 import { available, byId } from './lib/catalog'
 import {
   doneSets,
@@ -32,6 +40,7 @@ import { createRewardContext, getRewards } from './lib/rewards'
 import { useTrainingStore } from './lib/useTrainingStore'
 import { usePwa } from './lib/usePwa'
 import { FMark, SparkBuddy } from './components/FittArtwork'
+import { BodyModelPreferenceProvider } from './components/BodyModelPreference'
 import { Button } from './components/ui'
 import TodayView from './components/TodayView'
 import SessionView from './components/SessionView'
@@ -54,6 +63,7 @@ const defaultPreferences: UserPreferences = {
   displayName: '',
   celebration: 'playful',
   onboarded: false,
+  bodyModel: 'male',
 }
 
 export default function App() {
@@ -69,6 +79,23 @@ export default function App() {
   const [now, setNow] = useState(() => Date.now())
   const finishing = useRef(false)
   const preferences = state.preferences || defaultPreferences
+  const changeBodyModel = useCallback(
+    (bodyModel: BodyModel) => {
+      setState((previous) => {
+        const current = previous.preferences || defaultPreferences
+        if ((current.bodyModel ?? 'male') === bodyModel) return previous
+        return { ...previous, preferences: { ...current, bodyModel } }
+      })
+    },
+    [setState],
+  )
+  const bodyModelPreference = useMemo(
+    () => ({
+      bodyModel: preferences.bodyModel ?? 'male',
+      onBodyModelChange: changeBodyModel,
+    }),
+    [preferences.bodyModel, changeBodyModel],
+  )
   const rewards = useMemo(
     () => getRewards(state.history, state.profile.weeklyGoal, new Date(now)),
     [state.history, state.profile.weeklyGoal, now],
@@ -307,7 +334,7 @@ export default function App() {
       </div>
     )
   return (
-    <>
+    <BodyModelPreferenceProvider value={bodyModelPreference}>
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
@@ -623,6 +650,6 @@ export default function App() {
         onJourney={() => navigate('journey')}
         onExport={exportBackup}
       />
-    </>
+    </BodyModelPreferenceProvider>
   )
 }

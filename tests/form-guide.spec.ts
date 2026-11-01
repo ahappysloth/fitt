@@ -21,6 +21,7 @@ test('3D form study supports deliberate playback, scrubbing, cameras, and muscle
   await expect(guide).toBeVisible()
   const progress = page.getByRole('slider', { name: 'Movement progress' })
   await expect(progress).toHaveValue('0')
+  await expect(guide).toHaveAttribute('data-model', 'male')
   await page.getByRole('button', { name: 'Play animation', exact: true }).click()
   await expect.poll(async () => Number(await progress.inputValue())).toBeGreaterThan(3)
   await page.getByRole('button', { name: 'Pause animation', exact: true }).click()
@@ -34,6 +35,20 @@ test('3D form study supports deliberate playback, scrubbing, cameras, and muscle
   await expect(page.locator('.form-3d__phase strong')).toHaveText('Pause')
   await page.getByRole('button', { name: 'Side', exact: true }).click()
   const side = await page.locator('canvas').screenshot()
+  const canvas = await page.locator('canvas').elementHandle()
+  const models = page.getByRole('group', { name: 'Body model', exact: true })
+  await models.getByRole('button', { name: 'Female', exact: true }).click()
+  await expect(guide).toHaveAttribute('data-model', 'female')
+  await expect(progress).toHaveValue('54')
+  await expect(page.getByRole('button', { name: 'Side', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  expect(await page.locator('canvas').screenshot()).not.toEqual(side)
+  expect(await canvas!.evaluate((element) => element === document.querySelector('canvas'))).toBe(
+    true,
+  )
+  await models.getByRole('button', { name: 'Male', exact: true }).click()
   await page.getByRole('button', { name: 'Front', exact: true }).click()
   expect(await page.locator('canvas').screenshot()).not.toEqual(side)
   await page.getByRole('button', { name: 'Rotate model right' }).click()
@@ -66,6 +81,44 @@ test('3D form study supports deliberate playback, scrubbing, cameras, and muscle
   await page.setViewportSize({ width: 320, height: 900 })
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   expect(errors).toEqual([])
+})
+
+test('body model choice persists across guides, settings, and reloads without changing the workout', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  const guide = page.locator('.form-3d[data-ready=true]')
+  await expect(guide).toHaveAttribute('data-model', 'male')
+  const savedTraining = () =>
+    page.evaluate(() => {
+      const { active, history, profile, plan, routines } = JSON.parse(
+        localStorage.getItem('form.training.v1')!,
+      )
+      return { active, history, profile, plan, routines }
+    })
+  const before = await savedTraining()
+  await page
+    .getByRole('group', { name: 'Body model', exact: true })
+    .getByRole('button', { name: 'Female', exact: true })
+    .click()
+  await expect(guide).toHaveAttribute('data-model', 'female')
+  expect(await savedTraining()).toEqual(before)
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^Female model/ })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await page.reload()
+  await page.getByRole('button', { name: 'Resume workout', exact: true }).first().click()
+  await expect(guide).toHaveAttribute('data-model', 'female')
+  expect(await savedTraining()).toEqual(before)
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('button', { name: /^Male model/ }).click()
+  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await page.getByRole('button', { name: 'View Knee push-up instructions', exact: true }).click()
+  await expect(guide).toHaveAttribute('data-model', 'male')
+  expect(await savedTraining()).toEqual(before)
 })
 
 test('opening and closing the integrated Knee Push-up guide releases its canvas', async ({
@@ -145,6 +198,11 @@ test('the 3D study works offline inside an opaque embedded preview', async ({ pa
   )
   const frame = page.frameLocator('iframe')
   await expect(frame.locator('.form-3d[data-ready=true]')).toBeVisible()
+  await frame
+    .getByRole('group', { name: 'Body model', exact: true })
+    .getByRole('button', { name: 'Female', exact: true })
+    .click()
+  await expect(frame.locator('.form-3d')).toHaveAttribute('data-model', 'female')
   await frame.getByRole('button', { name: 'Lower & pause', exact: true }).click()
   await expect(frame.getByRole('slider', { name: 'Movement progress' })).toHaveValue('54')
   await frame.getByRole('button', { name: 'Side', exact: true }).click()

@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { createAthlete, type FocusRegion } from './athlete'
 import type { GuideMotion } from './contracts'
+import type { BodyModel } from '../../lib/types'
 
 export type CameraView = 'angle' | 'side' | 'front'
 export interface GuideScene {
@@ -13,6 +14,7 @@ export interface GuideScene {
   zoom(amount: number): void
   focus(enabled: boolean, region: FocusRegion): void
   alignment(enabled: boolean): void
+  model(value: BodyModel): void
   dispose(): void
 }
 
@@ -336,6 +338,10 @@ export function createGuideScene(
       },
       alignment(enabled) {
         alignment.visible = enabled
+        render()
+      },
+      model(value) {
+        athlete.model(value)
         render()
       },
       dispose,
