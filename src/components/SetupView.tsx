@@ -1,123 +1,148 @@
 import { useRef } from 'react'
 import {
+  ArrowUpRight,
   Check,
   Download,
   Dumbbell,
-  HardDrive,
+  HelpCircle,
+  Moon,
   Plus,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Upload,
+  UserRound,
 } from 'lucide-react'
-import type { Profile } from '../lib/types'
+import type { Profile, UserPreferences } from '../lib/types'
 import { equipmentList } from '../lib/catalog'
+import { focusNames } from '../lib/workout'
+import './preferences.css'
+
+export interface SetupViewProps {
+  profile: Profile
+  active: boolean
+  preferences?: UserPreferences
+  onChange: (profile: Profile) => void
+  onPreferences?: (preferences: UserPreferences) => void
+  onExport: () => void
+  onImport: (file: File) => void
+  onReset: () => void
+  onInstall: () => void
+  onHelp?: () => void
+}
 
 export default function SetupView({
   profile,
   active,
+  preferences,
   onChange,
+  onPreferences,
   onExport,
   onImport,
   onReset,
   onInstall,
-}: {
-  profile: Profile
-  active: boolean
-  onChange: (p: Profile) => void
-  onExport: () => void
-  onImport: (f: File) => void
-  onReset: () => void
-  onInstall: () => void
-}) {
-  const input = useRef<HTMLInputElement>(null)
+  onHelp,
+}: SetupViewProps) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const personal = preferences ?? {
+    displayName: '',
+    celebration: 'playful' as const,
+    onboarded: false,
+  }
   return (
-    <div className="page-enter">
+    <div className="pref-view">
       <div className="page-heading">
         <div>
           <p className="eyebrow">MAKE IT YOUR OWN</p>
           <h1>
-            Your space. Your pace<span>.</span>
+            Your space. Your pace<span className="greeting-dot">.</span>
           </h1>
-          <p className="subtitle">A good plan fits the life you actually live.</p>
+          <p>A good plan fits the life you actually live.</p>
         </div>
-        <span className="heading-symbol">
-          <Dumbbell size={28} />
+        <span className="pref-heading-icon" aria-hidden="true">
+          <Dumbbell size={25} />
         </span>
       </div>
       {active && (
-        <div className="notice">
-          Your session is in progress. Finish or discard it before changing training preferences.
-        </div>
+        <p className="pref-notice" role="status">
+          Your workout is in progress. Finish or discard it before changing training preferences.
+          You can still change your name and celebrations.
+        </p>
       )}
-      <div className="setup-layout">
-        <div>
-          <section className="panel">
-            <div className="panel-heading">
+      <div className="pref-layout">
+        <div className="pref-main">
+          <section className="panel pref-panel">
+            <div className="pref-section-heading">
               <div>
-                <h2>What are you working with?</h2>
-                <p>Pick your equipment. We’ll take care of the workout.</p>
+                <p className="eyebrow">01 / YOUR EQUIPMENT</p>
+                <h2>Start with what you have.</h2>
+                <p>Choose the equipment you can use. Bodyweight is always included.</p>
               </div>
-              <span className="step-label">01</span>
             </div>
-            <div className="bodyweight-option">
-              <span className="equipment-check">
+            <div className="pref-bodyweight">
+              <span className="pref-check">
                 <Check size={16} />
               </span>
               <div>
                 <strong>Your bodyweight</strong>
-                <small>Always with you. Always enough to begin.</small>
+                <small>Enough to take your first step.</small>
               </div>
-              <span className="tag">Included</span>
+              <span className="pill">Included</span>
             </div>
-            <div className="equipment-grid">
-              {equipmentList.map((item) => (
-                <button
-                  key={item.id}
-                  disabled={active}
-                  className={`equipment-option ${profile.equipment.includes(item.id) ? 'selected' : ''}`}
-                  aria-pressed={profile.equipment.includes(item.id)}
-                  onClick={() =>
-                    onChange({
-                      ...profile,
-                      equipment: profile.equipment.includes(item.id)
-                        ? profile.equipment.filter((e) => e !== item.id)
-                        : [...profile.equipment, item.id],
-                    })
-                  }
-                >
-                  <span className="equipment-symbol">
-                    <EquipmentGlyph id={item.id} />
-                  </span>
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{item.detail}</small>
-                  </span>
-                  <span className="equipment-check">
-                    {profile.equipment.includes(item.id) ? <Check size={14} /> : <Plus size={14} />}
-                  </span>
-                </button>
-              ))}
+            <div className="pref-equipment-grid">
+              {equipmentList.map((item) => {
+                const selected = profile.equipment.includes(item.id)
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    disabled={active}
+                    className={`pref-equipment ${selected ? 'is-selected' : ''}`}
+                    aria-pressed={selected}
+                    onClick={() =>
+                      onChange({
+                        ...profile,
+                        equipment: selected
+                          ? profile.equipment.filter((id) => id !== item.id)
+                          : [...profile.equipment, item.id],
+                      })
+                    }
+                  >
+                    <span className="pref-equipment-icon">
+                      <EquipmentGlyph id={item.id} />
+                    </span>
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>{item.detail}</small>
+                    </span>
+                    <span className="pref-check">
+                      {selected ? <Check size={14} /> : <Plus size={14} />}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-            <p className="caption">
-              Choose only equipment you can use securely. Floor back exercises offer light control
-              work; a bar, rings, or bands unlock stronger pulling options.
+            <p className="pref-caption">
+              Use equipment that is secure and stable. A bar, rings, or bands unlock stronger
+              pulling options; floor exercises focus on back control.
             </p>
           </section>
-          <section className="panel preferences">
-            <div className="panel-heading">
+          <section className="panel pref-panel">
+            <div className="pref-section-heading">
               <div>
-                <h2>A rhythm that works for you</h2>
-                <p>Start where you are. Build from there.</p>
+                <p className="eyebrow">02 / YOUR RHYTHM</p>
+                <h2>Make room for progress.</h2>
+                <p>Choose a starting point. You can adjust it as you grow.</p>
               </div>
-              <span className="step-label">02</span>
             </div>
-            <fieldset disabled={active}>
+            <fieldset className="pref-fieldset" disabled={active}>
               <legend>Experience</legend>
-              <div className="level-options">
+              <div className="pref-levels">
                 {(['beginner', 'intermediate'] as const).map((level) => (
                   <button
                     key={level}
-                    className={profile.level === level ? 'selected' : ''}
+                    type="button"
+                    className={profile.level === level ? 'is-selected' : ''}
                     aria-pressed={profile.level === level}
                     onClick={() => onChange({ ...profile, level })}
                   >
@@ -129,109 +154,183 @@ export default function SetupView({
                         ? 'Beginner · accessible variations'
                         : 'Intermediate · more demanding movements'}
                     </small>
-                    {profile.level === level && <Check size={17} />}
+                    {profile.level === level && <Check size={16} />}
+                  </button>
+                ))}
+              </div>
+              <div className="pref-fields">
+                <label>
+                  Session length
+                  <select
+                    value={profile.duration}
+                    onChange={(event) =>
+                      onChange({
+                        ...profile,
+                        duration: Number(event.target.value) as Profile['duration'],
+                      })
+                    }
+                  >
+                    {[20, 30, 45].map((n) => (
+                      <option key={n} value={n}>
+                        {n} minutes
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Default focus
+                  <select
+                    value={profile.focus}
+                    onChange={(event) =>
+                      onChange({ ...profile, focus: event.target.value as Profile['focus'] })
+                    }
+                  >
+                    {Object.entries(focusNames).map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Weekly goal
+                  <select
+                    value={profile.weeklyGoal}
+                    onChange={(event) =>
+                      onChange({ ...profile, weeklyGoal: Number(event.target.value) })
+                    }
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? 'session' : 'sessions'} / week
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </fieldset>
+            <p className="pref-caption">
+              Session times include rest and are estimates. Leave recovery days between demanding
+              sessions. After your first workout of the week, a changed weekly goal takes effect
+              next week.
+            </p>
+          </section>
+          <section className="panel pref-panel">
+            <div className="pref-section-heading">
+              <div>
+                <p className="eyebrow">03 / YOUR PERSONALITY</p>
+                <h2>Make it feel like you.</h2>
+              </div>
+              <UserRound size={21} />
+            </div>
+            <label className="pref-name">
+              What should we call you?
+              <input
+                type="text"
+                name="displayName"
+                autoComplete="given-name"
+                maxLength={40}
+                placeholder="Your first name (optional)"
+                value={personal.displayName}
+                disabled={!onPreferences}
+                onChange={(event) =>
+                  onPreferences?.({ ...personal, displayName: event.target.value })
+                }
+              />
+            </label>
+            <fieldset className="pref-fieldset" disabled={!onPreferences}>
+              <legend>Celebration style</legend>
+              <div className="pref-celebrations">
+                {(['playful', 'calm'] as const).map((style) => (
+                  <button
+                    key={style}
+                    type="button"
+                    aria-pressed={personal.celebration === style}
+                    className={personal.celebration === style ? 'is-selected' : ''}
+                    onClick={() => onPreferences?.({ ...personal, celebration: style })}
+                  >
+                    {style === 'playful' ? <Sparkles size={22} /> : <Moon size={22} />}
+                    <span>
+                      <strong>
+                        {style === 'playful' ? 'A little celebration' : 'Keep it calm'}
+                      </strong>
+                      <small>
+                        {style === 'playful'
+                          ? 'Confetti and a moment to enjoy the win.'
+                          : 'The same progress, with quieter feedback.'}
+                      </small>
+                    </span>
+                    {personal.celebration === style && <Check size={16} />}
                   </button>
                 ))}
               </div>
             </fieldset>
-            <div className="preference-row">
-              <label>
-                Session length
-                <select
-                  disabled={active}
-                  value={profile.duration}
-                  onChange={(e) =>
-                    onChange({
-                      ...profile,
-                      duration: Number(e.target.value) as Profile['duration'],
-                    })
-                  }
-                >
-                  <option value={20}>20 minutes</option>
-                  <option value={30}>30 minutes</option>
-                  <option value={45}>45 minutes</option>
-                </select>
-              </label>
-              <label>
-                Weekly goal
-                <select
-                  disabled={active}
-                  value={profile.weeklyGoal}
-                  onChange={(e) => onChange({ ...profile, weeklyGoal: Number(e.target.value) })}
-                >
-                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                    <option key={n} value={n}>
-                      {n} {n === 1 ? 'session' : 'sessions'} / week
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="caption">
-              Session times are estimates including rest. Schedule rest days between demanding
-              sessions. Changing level changes new plans; logged exercise progress stays with you.
+            <p className="pref-caption">
+              Your device’s reduced-motion preference is always respected.
             </p>
           </section>
         </div>
-        <aside className="setup-aside">
-          <section className="panel privacy-card">
-            <ShieldCheck size={30} />
-            <h2>Yours. And only yours.</h2>
-            <p>Your workouts stay in this browser on this device. No account, no ads, no upload.</p>
-            <div className="local-storage-note">
-              <HardDrive size={16} />
-              <span>
-                Clearing browser data removes your history. Keep a backup to move devices or stay
-                protected.
-              </span>
-            </div>
-            <button className="secondary-button full" onClick={onExport}>
-              <Download size={16} /> Export backup
+        <aside className="pref-aside">
+          <section className="panel pref-panel pref-data">
+            <span className="pref-feature-icon">
+              <ShieldCheck size={25} />
+            </span>
+            <h2>Your progress stays yours.</h2>
+            <p>Your workouts and routines are saved in this browser, on this device.</p>
+            <p className="pref-caption">
+              Export a backup before clearing browser data or moving to another device. Importing a
+              backup replaces your current data after confirmation.
+            </p>
+            <button type="button" className="secondary-button pref-full" onClick={onExport}>
+              <Download size={17} />
+              Export backup
             </button>
-            <button className="text-button full" onClick={() => input.current?.click()}>
-              <Upload size={16} /> Import a backup
+            <button
+              type="button"
+              className="pref-text-button"
+              onClick={() => fileInput.current?.click()}
+            >
+              <Upload size={17} />
+              Import a backup
             </button>
             <input
-              ref={input}
+              ref={fileInput}
               type="file"
               accept="application/json,.json"
-              className="sr-only"
+              hidden
               aria-label="Import Fitt backup"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) onImport(f)
-                e.target.value = ''
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) onImport(file)
+                event.target.value = ''
               }}
             />
           </section>
-          <section className="install-card">
-            <Smartphone size={26} />
-            <h3>A little closer to your next rep.</h3>
-            <p>Add Fitt to your home screen. Train offline after your first visit.</p>
-            <button className="text-button" onClick={onInstall}>
-              Install the app <ArrowUpRightIcon />
+          <section className="panel pref-panel pref-install">
+            <Smartphone size={25} />
+            <h2>A little closer to your next rep.</h2>
+            <p>
+              Add Fitt to your home screen. Once the app is ready offline, your workouts and guides
+              travel with you.
+            </p>
+            <button type="button" className="pref-text-button" onClick={onInstall}>
+              Install the app
+              <ArrowUpRight size={17} />
             </button>
           </section>
-          <button className="text-button danger reset-button" onClick={onReset}>
+          {onHelp && (
+            <button type="button" className="pref-help" onClick={onHelp}>
+              <HelpCircle size={19} />
+              <span>How Fitt adapts your workouts</span>
+              <ArrowUpRight size={17} />
+            </button>
+          )}
+          <button type="button" className="pref-reset" onClick={onReset}>
             Reset all local data
           </button>
         </aside>
       </div>
     </div>
-  )
-}
-function ArrowUpRightIcon() {
-  return (
-    <svg
-      width="17"
-      height="17"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path d="M5 19 19 5M5 5h14v14" />
-    </svg>
   )
 }
 function EquipmentGlyph({ id }: { id: string }) {

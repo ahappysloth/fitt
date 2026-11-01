@@ -5,7 +5,6 @@ import { build } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const previewPwaId = '\0form-preview-pwa'
 
 // A file preview has no server or service-worker scope. Keep PWA registration in
 // the normal deployment build; bundle the full application into this preview.
@@ -13,26 +12,11 @@ const result = await build({
   root,
   configFile: false,
   mode: 'standalone',
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-  plugins: [
-    react(),
-    {
-      name: 'form-preview-pwa',
-      resolveId(id) {
-        if (id === 'virtual:pwa-register/react') return previewPwaId
-      },
-      load(id) {
-        if (id === previewPwaId)
-          return `export function useRegisterSW() {
-            return {
-              offlineReady: [false, () => {}],
-              needRefresh: [false, () => {}],
-              updateServiceWorker: async () => {},
-            }
-          }`
-      },
-    },
-  ],
+  define: {
+    'process.env.NODE_ENV': JSON.stringify('production'),
+    'process.env.NEXT_PUBLIC_STANDALONE': JSON.stringify('true'),
+  },
+  plugins: [react()],
   build: {
     write: false,
     minify: true,

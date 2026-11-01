@@ -1,0 +1,83 @@
+@import 'tailwindcss' source('../');
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-line: var(--line);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-lime: var(--accent);
+  --font-sans: 'DM Sans Variable', sans-serif;
+  --font-heading: 'Manrope Variable', sans-serif;
+  --text-chip: 0.625rem;
+  --text-meta: 0.6875rem;
+  --text-label: 0.75rem;
+  --text-body: 0.875rem;
+  --radius-card: 1.375rem;
+}
+
+.app-loading {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 2rem;
+  text-align: center;
+  font-family: 'DM Sans Variable', sans-serif;
+  background: #101010;
+  color: #f4f4ef;
+}
+
+.app-loading > svg {
+  color: #c7fa53;
+}
+
+.app-loading > h1 {
+  font-size: clamp(1.5rem, 5vw, 2rem);
+}
+
+.app-loading > p {
+  color: #ababaa;
+  font-size: 0.875rem;
+  max-width: 30rem;
+  line-height: 1.6;
+}
+
+.app-loading-line {
+  width: 4rem;
+  height: 3px;
+  border-radius: 2px;
+  background: #c7fa53;
+  animation: loading-breathe 1.5s ease-in-out infinite alternate;
+}
+
+.app-retry {
+  min-height: 44px;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  background: #c7fa53;
+  color: #18210a;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.app-retry:focus-visible {
+  outline: 2px solid #c7fa53;
+  outline-offset: 4px;
+}
+
+@keyframes loading-breathe {
+  to {
+    opacity: 0.35;
+    transform: scaleX(0.65);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-line {
+    animation: none;
+  }
+}

@@ -9,3 +9,11 @@ playwright-report/
 !.env.example
 .DS_Store
 .wrangler/
+.next/
+.open-next/
+out/
+public/sw.js
+next-env.d.ts
+cloudflare-env.d.ts
+.dev.vars
+.dev.vars.*
