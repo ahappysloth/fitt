@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# New PR commits replace obsolete checks. A running main deployment finishes.
+concurrency:
+  group: fitt-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
+  WRANGLER_SEND_METRICS: 'false'
+
+jobs:
+  verify:
+    name: Types, tests, and Worker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install pinned dependencies
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          test -n "$GITHUB_PACKAGES_TOKEN" || { echo "GH_PACKAGES_TOKEN is required to install the private packages."; exit 1; }
+          npm ci
+      - name: Generate framework and Worker types
+        run: |
+          npm run cf:typegen
+          npx next typegen
+      - name: Check formatting and types
+        run: |
+          npm run format:check
+          npm run typecheck
+          npm run typecheck:worker
+      - name: Test application rules and Worker modules
+        run: |
+          npm test
+          npm run test:realtime
+          npm run test:email-worker
+      - name: Build and validate the complete Worker
+        run: |
+          npm run check:deploy
+          npm run test:worker-account
+      - name: Build standalone previews
+        run: |
+          npm run build:preview
+          npm run build:form-preview
+      - name: Install the browser test runtime
+        run: npx playwright install --with-deps chromium
+      - name: Test desktop and mobile workflows
+        run: npm run test:e2e
+      - name: Preserve failed browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: browser-diagnostics
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  deploy:
+    name: Deploy Fitt to Cloudflare
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Install pinned dependencies
+        env:
+          GITHUB_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: npm ci
+      # Rebuild from the checked commit; do not deploy a downloaded PR artifact.
+      # Cloudflare deploy credentials are available only to the deployment step.
+      - name: Build the release
+        run: |
+          npm run cf:typegen
+          npm run build:worker
+      - name: Deploy the built Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx opennextjs-cloudflare deploy

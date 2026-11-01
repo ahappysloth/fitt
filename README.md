@@ -87,6 +87,8 @@ The cloud environment provides `/usr/bin/chromium`. Elsewhere, use `npx playwrig
 
 ## Cloudflare and account services
 
+The configured deployment target is `https://fitt.turnal.workers.dev`. See [deployment setup](docs/deployment.md) for Worker secrets, Google callbacks, first deployment, and the GitHub Actions workflow.
+
 ```sh
 npm run build:worker
 npm run dev:worker

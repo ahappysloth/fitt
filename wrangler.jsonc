@@ -1,7 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "fitt-calisthenics",
+  "name": "fitt",
   "main": "worker.ts",
+  "workers_dev": true,
+  "preview_urls": false,
   "compatibility_date": "2026-10-30",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -11,7 +13,7 @@
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "fitt-calisthenics",
+      "service": "fitt",
     },
   ],
   "observability": { "enabled": true },
@@ -19,4 +21,8 @@
     "bindings": [{ "name": "WORKSPACE_DO", "class_name": "WorkspaceDO" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WorkspaceDO"] }],
+  "vars": {
+    "BETTER_AUTH_URL": "https://fitt.turnal.workers.dev",
+    "TRUSTED_ORIGINS": "https://fitt.turnal.workers.dev",
+  },
 }
