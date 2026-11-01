@@ -56,11 +56,11 @@ describe('body surface quality', () => {
         largestDisplacement = Math.max(largestDisplacement, distance)
         expect(Math.abs(original.x)).toBeLessThan(0.15)
         expect(original.y).toBeGreaterThan(0.22)
-        expect(original.y).toBeLessThan(0.51)
+        expect(original.y).toBeLessThan(0.53)
         expect(original.z).toBeGreaterThan(0.05)
       }
       expect(changed).toBeGreaterThan(0)
-      expect(largestDisplacement).toBeLessThan(0.025)
+      expect(largestDisplacement).toBeLessThan(0.035)
     } finally {
       athlete.dispose()
     }

@@ -1,6 +1,6 @@
 """Create Fitt's compact, offline skinned body from the CC0 MakeHuman sources.
 
-Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw male.target female-chest.target
+Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw male.target female-size.target female-firmness.target female-size-firmness.target female-upper-volume.target
 Source URLs, licensing, and the asset contract are in assets/form-guide/README.md.
 """
 import base64
@@ -16,6 +16,9 @@ root = pathlib.Path(__file__).resolve().parents[1]
 obj_path, rig_path, weights_path = map(pathlib.Path, sys.argv[1:4])
 target_path = pathlib.Path(sys.argv[4])
 chest_target_path = pathlib.Path(sys.argv[5])
+firmness_target_path = pathlib.Path(sys.argv[6])
+full_firmness_target_path = pathlib.Path(sys.argv[7])
+upper_volume_target_path = pathlib.Path(sys.argv[8])
 rig = json.loads(rig_path.read_text())
 weights = json.loads(weights_path.read_text())
 assert rig['license'] == weights['license'] == 'CC0'
@@ -97,8 +100,8 @@ print(f'{len(used)} vertices, {len(faces)} triangles, {len(bones)} bones; {outpu
 # The authored male shape is normalized onto the canonical rig at build time.
 # Shared joints, topology and weights let both silhouettes use the same contact-aware
 # motion. Scale along coherent anatomical frames and preserve their cross-sections.
-def apply_target(path, strength=1.):
-    points = [point[:] for point in vertices]
+def apply_target(path, strength=1., source=None):
+    points = [point[:] for point in (vertices if source is None else source)]
     target = path.read_text()
     assert 'explicitly released as CC0' in target
     for line in target.splitlines():
@@ -231,19 +234,34 @@ variant_output = root / 'src/components/form-guide/male-body-data.json'
 variant_output.write_text(json.dumps(variant, indent=2) + '\n')
 print(f'Male surface: {variant_output.stat().st_size // 1024} KiB; shares canonical rig and topology')
 
-# A restrained fraction of the authored adult female chest target. This is a
-# separate surface so the canonical rig, contact envelope and mask coordinates
-# remain identical. The target changes only chest/upper-torso vertices.
-chest_strength = .18
-female_vertices = apply_target(chest_target_path, chest_strength)
+# Blend the authored adult size/firmness target grid bilinearly. Firmness rounds
+# and lifts the added volume; increasing size alone would produce a longer,
+# lower silhouette. The missing average-size/average-firmness corner is the base.
+# A restrained upper-volume target fills out the upper curve of the chest.
+# This separate surface keeps the canonical rig, contact envelope and masks intact.
+chest_strength = .38
+firmness_strength = .7
+upper_volume_strength = .3
+chest_targets = [
+    (chest_target_path, chest_strength * (1-firmness_strength)),
+    (firmness_target_path, (1-chest_strength) * firmness_strength),
+    (full_firmness_target_path, chest_strength * firmness_strength),
+    (upper_volume_target_path, upper_volume_strength),
+]
+female_vertices = vertices
+for path, strength in chest_targets:
+    female_vertices = apply_target(path, strength, female_vertices)
 female_positions = [coordinate for old in used for coordinate in female_vertices[old]]
 female_variant = {
     'version': 1,
-    'source': 'MakeHuman hm08 female surface with authored adult chest shape / CC0',
-    'sourcesSha256': {**result['sourcesSha256'], chest_target_path.name: hashlib.sha256(chest_target_path.read_bytes()).hexdigest()},
+    'source': 'MakeHuman hm08 female surface with authored adult chest size, firmness and upper volume / CC0',
+    'sourcesSha256': {**result['sourcesSha256'], **{
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path, _ in chest_targets}},
     'chestTargetStrength': chest_strength,
+    'chestFirmnessStrength': firmness_strength,
+    'chestUpperVolumeStrength': upper_volume_strength,
     'positions': encode('f', female_positions),
 }
 female_output = root / 'src/components/form-guide/female-body-data.json'
 female_output.write_text(json.dumps(female_variant, indent=2) + '\n')
-print(f'Female surface: {female_output.stat().st_size // 1024} KiB; chest target at {chest_strength:.0%}')
+print(f'Female surface: {female_output.stat().st_size // 1024} KiB; size {chest_strength:.0%}, firmness {firmness_strength:.0%}, upper volume {upper_volume_strength:.0%}')
