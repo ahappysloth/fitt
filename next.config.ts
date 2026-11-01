@@ -3,6 +3,14 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // Preserve the email transport's runtime choice: Node SMTP locally, workerd on Workers.
+  serverExternalPackages: [
+    '@turnal-io/email',
+    'nodemailer',
+    // Keep ws optional native optimizations out of Webpack's server stubs.
+    'ws',
+    'https-proxy-agent',
+  ],
   async headers() {
     return [
       {

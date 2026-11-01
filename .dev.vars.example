@@ -1,0 +1,12 @@
+# Worker-local preview bindings, copied privately to .dev.vars (ignored).
+# These bindings also reach worker.ts and Durable Objects, unlike .env.local.
+DATABASE_URL=
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:8787
+TRUSTED_ORIGINS=http://localhost:8787
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+SMTP_HOST=smtp.purelymail.com
+SMTP_USER=
+SMTP_PASS=
+EMAIL_FROM=

@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "fitt-calisthenics",
-  "main": ".open-next/worker.js",
+  "main": "worker.ts",
   "compatibility_date": "2026-10-30",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
@@ -15,4 +15,8 @@
     },
   ],
   "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "WORKSPACE_DO", "class_name": "WorkspaceDO" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WorkspaceDO"] }],
 }

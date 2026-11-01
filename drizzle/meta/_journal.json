@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793563541331,
+      "tag": "0000_account_training",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793564014361,
+      "tag": "0001_auth_uuid_defaults",
+      "breakpoints": true
+    }
+  ]
+}

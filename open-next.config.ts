@@ -1,5 +1,5 @@
 import { defineCloudflareConfig } from '@opennextjs/cloudflare'
 
-// The first release keeps workouts on the device. Add account-backed cache,
-// database, and realtime bindings when the server integrations are introduced.
+// Account and training routes opt out of caching. The custom Worker entry
+// supplies SMTP and the WorkspaceDO binding without a shared database pool.
 export default defineCloudflareConfig()
