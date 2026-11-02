@@ -17,6 +17,8 @@ const keys = [
 ] as const
 
 export type FittEnv = Record<(typeof keys)[number], string> & {
+  /** Comma-separated verified emails; absent means no administrator access. */
+  FITT_ADMIN_EMAILS?: string
   WORKSPACE_DO?: DurableObjectNamespace
   /** Request-local adapter supplied by worker.ts; not a configured secret. */
   __FITT_SEND_EMAIL?: SendEmail
@@ -33,6 +35,13 @@ export function resolveServerEnv(
     const fromWorker = typeof worker[key] === 'string' ? worker[key] : undefined
     output[key] = String((development ? local[key] || fromWorker : fromWorker || local[key]) ?? '')
   }
+  const adminFromWorker =
+    typeof worker.FITT_ADMIN_EMAILS === 'string' ? worker.FITT_ADMIN_EMAILS : undefined
+  output.FITT_ADMIN_EMAILS = String(
+    (development
+      ? local.FITT_ADMIN_EMAILS || adminFromWorker
+      : adminFromWorker || local.FITT_ADMIN_EMAILS) ?? '',
+  )
   if (worker.WORKSPACE_DO) output.WORKSPACE_DO = worker.WORKSPACE_DO as FittEnv['WORKSPACE_DO']
   if (typeof worker.__FITT_SEND_EMAIL === 'function') {
     output.__FITT_SEND_EMAIL = worker.__FITT_SEND_EMAIL as SendEmail

@@ -111,6 +111,16 @@
   color: #a1a19c;
   border-color: var(--line);
 }
+.bottom-nav.has-admin {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 2px;
+}
+.bottom-nav.has-admin button {
+  min-width: 0;
+  flex: 1;
+  padding-inline: 2px;
+  font-size: 0.6875rem;
+}
 .plan-controls {
   display: flex;
   flex-wrap: wrap;

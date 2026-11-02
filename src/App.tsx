@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowUpRight,
   BookOpen,
@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   TrendingUp,
   WifiOff,
+  Wrench,
   X,
   Zap,
 } from 'lucide-react'
@@ -50,9 +51,12 @@ import SetupView from './components/SetupView'
 import AccountPanel from './components/AccountPanel'
 import WorkoutBuilder from './components/WorkoutBuilder'
 import AppDialogs, { type AppDialog } from './components/AppDialogs'
+import { useAdminAccess } from './components/admin/useAdminAccess'
 import './app-experience.css'
 
-type Page = 'today' | 'workout' | 'journey' | 'library' | 'settings' | 'builder'
+const AdminView = lazy(() => import('./components/admin/AdminView'))
+
+type Page = 'today' | 'workout' | 'journey' | 'library' | 'settings' | 'builder' | 'admin'
 const navigation = [
   { id: 'today', label: 'Today', icon: Home },
   { id: 'workout', label: 'Workout', icon: Dumbbell },
@@ -70,8 +74,15 @@ const defaultPreferences: UserPreferences = {
 export default function App() {
   const store = useTrainingStore()
   const { state, setState, ready, storageError, recoveryRaw, replaceState } = store
+  const admin = useAdminAccess(store.account.user?.id)
+  const navigationItems = admin.allowed
+    ? [...navigation, { id: 'admin' as const, label: 'Admin', icon: Wrench }]
+    : navigation
   const pwa = usePwa()
   const [page, setPage] = useState<Page>('today')
+  useEffect(() => {
+    if (page === 'admin' && !admin.allowed) setPage('settings')
+  }, [page, admin.allowed])
   const [dialog, setDialog] = useState<AppDialog | null>(null)
   const [toast, setToast] = useState('')
   const [builderInitial, setBuilderInitial] = useState<Workout | undefined>()
@@ -357,7 +368,7 @@ export default function App() {
           </button>
           <div className="workspace-label">A LITTLE STRONGER, EVERY DAY</div>
           <nav aria-label="Main navigation">
-            {navigation.map((item) => (
+            {navigationItems.map((item) => (
               <button
                 key={item.id}
                 className={`nav-item ${activeNavigation === item.id ? 'active' : ''}`}
@@ -420,7 +431,7 @@ export default function App() {
               <strong>
                 {page === 'builder'
                   ? 'Create workout'
-                  : navigation.find((item) => item.id === page)?.label}
+                  : navigationItems.find((item) => item.id === page)?.label}
               </strong>
             </div>
             <div className="topbar-right">
@@ -556,6 +567,12 @@ export default function App() {
                 onInstall={install}
                 onHelp={() => setDialog({ type: 'how' })}
               />
+            ) : page === 'admin' ? (
+              admin.allowed && store.account.user ? (
+                <Suspense fallback={<p role="status">Opening your admin studio…</p>}>
+                  <AdminView key={store.account.user.id} userId={store.account.user.id} />
+                </Suspense>
+              ) : null
             ) : page === 'builder' ? (
               <WorkoutBuilder
                 profile={state.profile}
@@ -620,8 +637,11 @@ export default function App() {
               </button>
             </footer>
           </main>
-          <nav className="bottom-nav" aria-label="Mobile navigation">
-            {navigation.map((item) => (
+          <nav
+            className={`bottom-nav${admin.allowed ? ' has-admin' : ''}`}
+            aria-label="Mobile navigation"
+          >
+            {navigationItems.map((item) => (
               <button
                 key={item.id}
                 className={activeNavigation === item.id ? 'active' : ''}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   ArrowLeft,
@@ -36,6 +36,7 @@ import '@fontsource-variable/manrope'
 import ExerciseGuide, { ExerciseThumbnail } from '../src/components/ExerciseGuide'
 import { MuscleMap } from '../src/components/Visuals'
 import Modal from '../src/components/Modal'
+import { Tooltip } from '../src/components/ui/Tooltip'
 import { byId } from '../src/lib/catalog'
 import { FMark, SparkBuddy, TrophyArt } from './Artwork'
 import { CountUp, Confetti, Pill, ProgressBar, SectionTitle, Week, XPCard } from './components'
@@ -43,6 +44,11 @@ import { BASE_XP, exercises } from './demo-data'
 import './styles.css'
 
 type View = 'today' | 'workout' | 'journey' | 'components'
+declare global {
+  interface Window {
+    __FITT_ADMIN_PREVIEW__?: 'form' | 'components'
+  }
+}
 type LoggedSet = { exerciseId: string; reps: number }
 const nav = [
   { id: 'today' as View, label: 'Today', icon: House },
@@ -51,7 +57,9 @@ const nav = [
 ]
 
 function App() {
-  const [view, setView] = useState<View>('today')
+  const [view, setView] = useState<View>(() =>
+    window.__FITT_ADMIN_PREVIEW__ === 'components' ? 'components' : 'today',
+  )
   const [mobile, setMobile] = useState(false)
   const [accent, setAccent] = useState<'lime' | 'mint'>('lime')
   const [calm, setCalm] = useState(false)
@@ -124,7 +132,7 @@ function App() {
     setFinished(true)
     setCelebrate(true)
   }
-  function demoFinish() {
+  const demoFinish = useCallback(() => {
     setQuick(false)
     setLogs(
       exercises.flatMap((e) =>
@@ -134,7 +142,17 @@ function App() {
     setFinished(true)
     setRest(0)
     setCelebrate(true)
-  }
+  }, [])
+  useEffect(() => {
+    if (window.__FITT_ADMIN_PREVIEW__ !== 'components' || window.parent === window) return
+    const receive = (event: MessageEvent) => {
+      if (event.source !== window.parent || event.data?.type !== 'fitt-admin-preview') return
+      if (event.data.command === 'celebrate') demoFinish()
+    }
+    window.addEventListener('message', receive)
+    window.parent.postMessage({ type: 'fitt-admin-preview-ready', kind: 'components' }, '*')
+    return () => window.removeEventListener('message', receive)
+  }, [demoFinish])
   function logSet() {
     if (finished || logs.length >= total) return
     const next = [...logs, { exerciseId: current.id, reps }]
@@ -158,15 +176,16 @@ function App() {
         {mobile ? <Maximize2 size={15} /> : <Smartphone size={15} />}
         <span>{mobile ? 'Expand' : 'Mobile'}</span>
       </button>
-      <button
-        className="review-button review-tune"
-        onClick={() => setSettings(true)}
-        aria-label="Tune the feel"
-        title="Tune the feel"
-      >
-        <Settings2 size={15} />
-        <span>Tune the feel</span>
-      </button>
+      <Tooltip content="Tune the feel">
+        <button
+          className="review-button review-tune"
+          onClick={() => setSettings(true)}
+          aria-label="Tune the feel"
+        >
+          <Settings2 size={15} />
+          <span>Tune the feel</span>
+        </button>
+      </Tooltip>
       <button className="review-button reset-demo" onClick={reset} aria-label="Reset demo">
         <RotateCcw size={14} />
         <span>Reset demo</span>

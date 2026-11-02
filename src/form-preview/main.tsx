@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUpRight, Check, CirclePlay, Move3D, ShieldCheck } from 'lucide-react'
 import { FMark } from '../components/FittArtwork'
 import KneePushupGuide from '../components/form-guide/KneePushupGuide'
@@ -12,6 +12,14 @@ import './preview.css'
 
 function FormStudioPreview() {
   const [bodyModel, setBodyModel] = useState<BodyModel>('male')
+  useEffect(() => {
+    if (
+      (window as Window & { __FITT_ADMIN_PREVIEW__?: string }).__FITT_ADMIN_PREVIEW__ === 'form' &&
+      window.parent !== window
+    ) {
+      window.parent.postMessage({ type: 'fitt-admin-preview-ready', kind: 'form' }, '*')
+    }
+  }, [])
   return (
     <div className="form-study">
       <header className="form-study__header">

@@ -11,6 +11,7 @@ playwright-report/
 .wrangler/
 .next/
 .open-next/
+.generated/
 out/
 public/sw.js
 next-env.d.ts

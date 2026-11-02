@@ -9,15 +9,15 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "dev": "next dev --hostname 0.0.0.0 --port 5173",
-    "build": "next build --webpack && node scripts/build-service-worker.mjs",
+    "dev": "node scripts/build-admin-previews.mjs && next dev --hostname 0.0.0.0 --port 5173",
+    "build": "node scripts/build-admin-previews.mjs && next build --webpack && node scripts/build-service-worker.mjs",
     "build:preview": "node scripts/build-preview.mjs",
     "build:worker": "opennextjs-cloudflare build",
     "preview": "next start --hostname 0.0.0.0 --port 4173",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.design-preview.json",
     "typecheck:worker": "tsc --noEmit -p tsconfig.worker.json",
     "test:db": "FITT_RUN_LIVE_DB_TESTS=1 vitest run src/server/training.live.test.ts src/server/auth.live.test.ts src/server/migrations.live.test.ts",
     "test:account": "FITT_RUN_LIVE_DB_TESTS=1 playwright test tests/account-live.spec.ts",
@@ -30,7 +30,9 @@
     "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build:form-preview": "node scripts/build-preview.mjs --form"
+    "build:form-preview": "node scripts/build-preview.mjs --form",
+    "build:design-preview": "node scripts/build-preview.mjs --design",
+    "build:admin-previews": "node scripts/build-admin-previews.mjs"
   },
   "dependencies": {
     "@better-auth/core": "1.6.23",
