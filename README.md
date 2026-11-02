@@ -1,6 +1,6 @@
 # Fitt
 
-A responsive, installable calisthenics app built with **Next.js 16 App Router, React 19, and Tailwind CSS v4**, built for **Cloudflare Workers through OpenNext**. Train on your device without an account, or sign in to sync completed workouts, routines, and preferences through Neon. Device history is imported only when you explicitly choose to add it to an account.
+A responsive, installable calisthenics app built with **vinext, React 19, and Tailwind CSS v4**, using App Router conventions and the **Cloudflare Vite plugin** to run on Workers. Train on your device without an account, or sign in to sync completed workouts, routines, and preferences through Neon. Device history is imported only when you explicitly choose to add it to an account.
 
 ## Develop
 
@@ -18,7 +18,7 @@ npm run build
 npm run preview
 ```
 
-The production server runs on port **4173**. A service worker caches the app, local fonts, exercise instructions, and existing animated guides after a successful initial load. Installation requires HTTPS in production; localhost also supports development testing. On iOS, use Safari → Share → Add to Home Screen.
+The built Worker runs locally through Wrangler on **http://127.0.0.1:4173**. This exercises the same Worker routing, bindings, and static assets as a deployment. A service worker caches the app, local fonts, exercise instructions, and existing animated guides after a successful initial load. Installation requires HTTPS in production; localhost also supports development testing. On iOS, use Safari → Share → Add to Home Screen.
 
 ## Features
 
@@ -59,7 +59,7 @@ npm run build:preview
 
 Open **`preview/fitt.html`** for the complete app in a single HTML file. It bundles JavaScript, styles, fonts, icons, and guides and needs no running server or external assets. This is also the file to open in ChatGPT's web preview. The root `index.html` is an exporter source entry and cannot run directly in a file viewer.
 
-The standalone artifact disables service-worker registration and account requests because it has no server or deployment scope. Embedded previews may block browser storage; in that case, export a backup before closing to preserve progress. Vite remains only for this exporter and unit tests; the deployed app runs on Next.
+The standalone artifact disables service-worker registration and account requests because it has no server or deployment scope. Embedded previews may block browser storage; in that case, export a backup before closing to preserve progress. Its separate Vite exporter does not include the server runtime or private account configuration.
 
 The approved component study remains in `design-preview/` for reference. It is separate from the working application.
 
@@ -71,15 +71,17 @@ npm run typecheck:worker
 npm test
 npm run test:realtime
 npm run test:email-worker
+npm run test:worker-context
 npm run format:check
-npm run build
-npm run build:preview
-npm run test:e2e
+npm run check:compatibility
 npm run check:deploy
 npm run test:worker-account
+npm run build:preview
+npm run build:form-preview
+npm run test:e2e
 ```
 
-Unit tests cover progression/regression, equipment combinations, reward/calendar rules, backup integrity, service-worker caching, account isolation, offline queues, merge conflicts, request validation, and realtime authentication. Playwright covers desktop and mobile workflows, including offline reload, saved routines, full/partial workouts, resume, backups, legacy migration, quota failures, real cross-tab conflicts, and an opaque embedded preview. Build the production app and both standalone previews before running it. The suite starts or reuses port 4173.
+Unit tests cover progression/regression, equipment combinations, reward/calendar rules, backup integrity, service-worker caching, account isolation, offline queues, merge conflicts, request validation, and realtime authentication. Playwright covers desktop and mobile workflows, including offline reload, saved routines, full/partial workouts, resume, backups, legacy migration, quota failures, real cross-tab conflicts, and an opaque embedded preview. Build the Worker and both standalone previews before running it. The suite starts or reuses the built Worker on port 4173. Current migration results and outstanding hosted checks are recorded in [vinext migration validation](docs/vinext-migration.md).
 
 With the Fitt development database migrated, `npm run test:db` runs actual transaction/auth tests and `npm run test:account` exercises two browser devices, explicit import, offline replay, and account isolation. These opt-in tests create uniquely named fixture users and delete only those fixtures afterward. They never send email to a real recipient. See [account setup and validation](docs/accounts.md). The separate [realtime runtime test](docs/realtime-testing.md) exercises the Durable Object in local workerd without external services. `test:email-worker` verifies the actual Worker mail module and rendering with a stubbed delivery transport; real SMTP delivery still needs a hosted check.
 
@@ -94,13 +96,15 @@ npm run build:worker
 npm run dev:worker
 ```
 
-OpenNext produces `.open-next/worker.js` and its assets. The source `worker.ts` wraps it with the authenticated realtime endpoint, supplies a request-local Worker email adapter, and exports `WorkspaceDO`. `npm run check:deploy` validates this bundle with a Wrangler dry run and **does not publish**. After that build, `npm run test:worker-account` exercises its account metadata and origin rejection in local workerd using synthetic bindings. When deployment is authorized, configure Worker secrets and a stable origin, authenticate Wrangler, and run `npm run deploy`.
+Vite produces the Worker module graph in `dist/server/`, static assets in `dist/client/`, and the deployment configuration at `dist/server/wrangler.json`. The source `worker.ts` handles authenticated realtime upgrades, delegates other requests to `vinext/server/app-router-entry`, and exports `WorkspaceDO`. Native `cloudflare:workers` bindings supply the request environment and background-work lifetime. `npm run check:deploy` validates this output with a Wrangler dry run and **does not publish**. Afterward, `npm run test:worker-account` checks account metadata, origin rejection, private Admin boundaries, realtime routing, and assets in local workerd using synthetic bindings. `npm run test:worker-context` separately verifies request cleanup with native Worker bindings.
 
-Accounts use Neon/Drizzle through `@turnal-io/db/serverless`, passwordless Better Auth through `@turnal-io/auth`, and `WorkspaceDO` with WebSocket Hibernation. Copy the names in `.env.example` into your development environment; use `.dev.vars.example` for Worker preview and configure deployed Worker secrets separately. Apply the versioned schema explicitly with `npm run db:migrate`; neither app startup nor builds apply migrations. SMTP uses TLS on port 465. The managed cloud environment's HTTP proxy cannot enable public SMTP, so hosted delivery still needs validation on an appropriate runtime. See [account setup](docs/accounts.md) and [platform details](docs/platform.md).
+The migration deploys to the existing `fitt` Worker and production URL after local validation. The existing Google callback and hostname remain valid. Keep `backup/nextjs-before-vinext` pointing to release `dd1f1b2` and record the active Cloudflare version before merging the migration into `main`. The main workflow deploys the checked commit; `npm run deploy` is the equivalent authorized manual build and deployment command.
+
+Accounts use Neon/Drizzle through `@turnal-io/db/serverless`, passwordless Better Auth through `@turnal-io/auth`, and `WorkspaceDO` with WebSocket Hibernation. Copy the names in `.env.example` into your development environment; use `.dev.vars.example` for optional ignored Worker-local configuration and provision deployed Worker secrets separately. Apply the versioned schema explicitly with `npm run db:migrate`; neither app startup nor builds apply migrations. SMTP uses TLS on port 465. The managed cloud environment's HTTP proxy cannot enable public SMTP, so hosted delivery still needs validation on an appropriate runtime. See [account setup](docs/accounts.md) and [platform details](docs/platform.md). Next remains a development dependency for the Turnal auth package's peer/type requirements; it does not serve the deployed app.
 
 ## Project structure
 
-- `src/app/`: Next App Router shell, metadata, loading/error boundaries, and Tailwind tokens.
+- `src/app/`: App Router shell, route handlers, metadata, loading/error boundaries, and Tailwind tokens.
 - `src/App.tsx`: app navigation, local state coordination, and session lifecycle.
 - `src/components/`: Today, Workout, Journey, Library, Settings, builder, shared UI, and existing guides.
 - `src/lib/catalog.ts`, `workout.ts`, `rewards.ts`: exercise catalog and pure training/reward rules.

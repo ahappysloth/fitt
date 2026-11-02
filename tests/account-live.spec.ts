@@ -8,7 +8,10 @@ import { STORAGE_KEY } from '../src/lib/storage'
 import type { AppState, Session } from '../src/lib/types'
 import type { CloudSnapshot } from '../src/lib/cloud-contract'
 
-const origin = 'http://127.0.0.1:4173'
+const origin = process.env.FITT_LIVE_TEST_ORIGIN
+  ? new URL(process.env.FITT_LIVE_TEST_ORIGIN).origin
+  : 'http://127.0.0.1:4173'
+const secureOrigin = origin.startsWith('https:')
 test.skip(
   !process.env.FITT_RUN_LIVE_DB_TESTS,
   'Enable explicitly with a migrated Fitt development database.',
@@ -41,14 +44,22 @@ test('real account restores imported history on another device and syncs an offl
   const token = randomBytes(32).toString('hex')
   const otherToken = randomBytes(32).toString('hex')
   const contexts: BrowserContext[] = []
+  const createContext = async () => {
+    const context = await browser.newContext({
+      viewport: testInfo.project.use.viewport,
+      proxy: testInfo.project.use.proxy,
+    })
+    contexts.push(context)
+    return context
+  }
   const cookie = (value: string) => ({
-    name: 'better-auth.session_token',
+    name: `${secureOrigin ? '__Secure-' : ''}better-auth.session_token`,
     value: encodeURIComponent(
       `${value}.${createHmac('sha256', process.env.BETTER_AUTH_SECRET!).update(value).digest('base64')}`,
     ),
     url: origin,
     httpOnly: true,
-    secure: false,
+    secure: secureOrigin,
     sameSite: 'Lax' as const,
   })
   try {
@@ -68,8 +79,7 @@ test('real account restores imported history on another device and syncs an offl
         expiresAt: new Date(Date.now() + 600_000),
       })),
     )
-    const first = await browser.newContext({ viewport: testInfo.project.use.viewport })
-    contexts.push(first)
+    const first = await createContext()
     const guest = guestHistory()
     const page = await first.newPage()
     await page.goto(origin)
@@ -106,10 +116,23 @@ test('real account restores imported history on another device and syncs an offl
       ),
     ).toBe(1)
 
-    const second = await browser.newContext({ viewport: testInfo.project.use.viewport })
-    contexts.push(second)
+    const second = await createContext()
     await second.addCookies([cookie(token)])
     const secondPage = await second.newPage()
+    const realtimeRevisions: number[] = []
+    secondPage.on('websocket', (socket) => {
+      if (new URL(socket.url()).pathname !== '/api/realtime') return
+      socket.on('framereceived', ({ payload }) => {
+        try {
+          const message = JSON.parse(String(payload)) as { type?: unknown; revision?: unknown }
+          if (message.type === 'revision' && Number.isSafeInteger(message.revision)) {
+            realtimeRevisions.push(message.revision as number)
+          }
+        } catch {
+          // Unrelated/malformed frames cannot satisfy the expected revision.
+        }
+      })
+    })
     await secondPage.goto(origin)
     await secondPage.getByRole('button', { name: 'Settings', exact: true }).click()
     await expect(
@@ -123,6 +146,10 @@ test('real account restores imported history on another device and syncs an offl
         }, ids[0]),
       )
       .toBe(1)
+    const importedRevision = (await cloud()).revision
+    await expect
+      .poll(() => realtimeRevisions.includes(importedRevision), { timeout: 20_000 })
+      .toBe(true)
 
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready
@@ -142,22 +169,26 @@ test('real account restores imported history on another device and syncs an offl
     await expect(page.locator('.account-status')).toContainText('Offline')
     await first.setOffline(false)
     await expect.poll(async () => (await cloud()).data.history.length, { timeout: 20_000 }).toBe(2)
-    await secondPage.getByRole('button', { name: 'Sync now', exact: true }).click()
+    const syncedRevision = (await cloud()).revision
     await expect
-      .poll(() =>
-        secondPage.evaluate(
-          (id) =>
-            JSON.parse(localStorage.getItem(`fitt.account.${encodeURIComponent(id)}.v1`)!).state
-              .history.length,
-          ids[0],
-        ),
+      .poll(() => realtimeRevisions.includes(syncedRevision), { timeout: 20_000 })
+      .toBe(true)
+    await expect
+      .poll(
+        () =>
+          secondPage.evaluate(
+            (id) =>
+              JSON.parse(localStorage.getItem(`fitt.account.${encodeURIComponent(id)}.v1`)!).state
+                .history.length,
+            ids[0],
+          ),
+        { timeout: 20_000 },
       )
       .toBe(2)
     await page.reload()
     await expect.poll(async () => (await cloud()).data.history.length).toBe(2)
 
-    const other = await browser.newContext()
-    contexts.push(other)
+    const other = await createContext()
     await other.addCookies([cookie(otherToken)])
     expect((await cloud(other, ids[1])).data.history).toHaveLength(0)
     const forbidden = await other.request.put(`${origin}/api/training`, {
@@ -184,11 +215,14 @@ test('real account restores imported history on another device and syncs an offl
       ),
     ).toBe(1)
   } finally {
-    await Promise.all(contexts.map((context) => context.close()))
     try {
-      await resource.db.delete(user).where(inArray(user.id, ids))
+      await Promise.all(contexts.map((context) => context.close()))
     } finally {
-      await resource.dispose()
+      try {
+        await resource.db.delete(user).where(inArray(user.id, ids))
+      } finally {
+        await resource.dispose()
+      }
     }
   }
 })

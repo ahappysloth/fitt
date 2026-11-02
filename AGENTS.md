@@ -1,3 +1,10 @@
+Fitt runs on vinext with the Cloudflare Vite plugin. `npm run dev` starts Vite;
+`npm run build` creates `dist/server` and `dist/client`; `npm run preview` runs
+the built Worker in workerd. Next is retained only for the auth package's peer
+dependency and compatible API types. Do not restore the Next CLI or OpenNext.
+Check vinext's installed documentation/source for runtime behavior; the Next
+documentation below remains useful for the compatible App Router API surface.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know

@@ -1,14 +1,16 @@
 # Accounts, storage, and sync
 
-Fitt can be used without signing in. Account features add cloud storage while keeping the workout experience available offline. Google and magic-link auth are passwordless. The single-file ChatGPT preview remains a device-only artifact; use the Next app or Worker to exercise accounts.
+Fitt can be used without signing in. Account features add cloud storage while keeping the workout experience available offline. Google and magic-link auth are passwordless. The single-file ChatGPT preview remains a device-only artifact; use the vinext development server or built Worker to exercise accounts.
 
 ## Configuration
 
 Use the ten names in `.env.example`: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM`. Supply credentials through environment settings or ignored local configuration. Use a Fitt-specific signing secret generated with `openssl rand -base64 32` and a pooled Neon development-branch URL. No secret has a `NEXT_PUBLIC_` prefix.
 
-Next development uses port 5173. Worker local preview uses its own origin (normally port 8787); configure its bindings from `.dev.vars.example`. Google's authorized callback must be exactly `<BETTER_AUTH_URL>/api/auth/callback/google`. A stable `workers.dev` origin can be used before a custom domain is chosen. The production origin and trusted origins must use HTTPS; use exact origins, not wildcards. Codex environment variables do not automatically populate a deployed Worker.
+Vite development uses port 5173. `npm run build && npm run preview` runs the built Worker at `http://127.0.0.1:4173`, with both authentication origins explicitly set to that address. Local Wrangler can read the application variables declared in `wrangler.jsonc` from the process environment; `.dev.vars.example` documents optional ignored Worker-local configuration. Package/deployment credentials are not application bindings. Google's authorized callback must be exactly `<BETTER_AUTH_URL>/api/auth/callback/google`. Production origins must use HTTPS; use exact origins, not wildcards. Codex environment variables do not automatically populate a deployed Worker.
 
-The chosen deployment origin is `https://fitt.turnal.workers.dev`. Its two public auth-origin values are declared in `wrangler.jsonc`; the other eight application values must be provisioned on the Worker. See [deployment setup](deployment.md) for the exact GitHub secret names and release workflow.
+The production origin remains `https://fitt.turnal.workers.dev` during the vinext migration. Its two public auth-origin values are declared in `wrangler.jsonc`; the other eight application values must be provisioned on the Worker. The existing Google callback, `https://fitt.turnal.workers.dev/api/auth/callback/google`, remains unchanged. No additional Worker, hostname, or OAuth callback is required. See [deployment setup](deployment.md) for GitHub secret names and release workflow, and [migration validation](vinext-migration.md) for the current verification status.
+
+Private Admin access additionally requires `FITT_ADMIN_EMAILS`, a comma-separated allowlist of verified sign-in email addresses. An absent allowlist denies access. This is a server-only setting, never a client-side permission check.
 
 Private packages come from GitHub Packages through `.npmrc` and `GITHUB_PACKAGES_TOKEN`. The token is install-time tooling, not an application secret. Current compatible versions are `@turnal-io/db` 1.0.1, `@turnal-io/auth` 1.1.0, and Better Auth 1.6.23. Better Auth 1.7 removes an export imported by this Turnal auth version; upgrade the packages together after verifying compatibility. Vitest uses the supported 4.x range rather than bypassing peer dependency checks.
 
@@ -41,7 +43,7 @@ The browser saves an immutable outbox before sending. It merges independent addi
 
 ## Realtime and validation
 
-`worker.ts` handles `/api/realtime` before delegating to OpenNext. It checks the browser origin and signed, unexpired database-backed session. The authenticated account selects its Durable Object; clients cannot select another account. Only internal server writes publish revision hints. WebSocket Hibernation stores bounded attachments; alarms expire connections and force fresh authorization. The channel carries no workout documents and is not required for syncing.
+`worker.ts` handles `/api/realtime` before delegating to `vinext/server/app-router-entry`. It checks the browser origin and signed, unexpired database-backed session. The authenticated account selects its Durable Object; clients cannot select another account. Only internal server writes publish revision hints. WebSocket Hibernation stores bounded attachments; alarms expire connections and force fresh authorization. The channel carries no workout documents and is not required for syncing.
 
 ```sh
 npm run typecheck
@@ -49,14 +51,16 @@ npm run typecheck:worker
 npm test
 npm run test:realtime
 npm run test:email-worker
+npm run test:worker-context
 npm run test:db
-npm run build
+npm run check:deploy
+npm run test:worker-account
 npm run build:preview
 npm run build:form-preview
 npm run test:e2e
 npm run test:account
-npm run check:deploy
-npm run test:worker-account
 ```
 
-Live tests require a migrated development database and opt in via `FITT_RUN_LIVE_DB_TESTS=1` (set by `test:db`/`test:account`). Each test creates unique fixture users and removes those users with cascading data cleanup. Browser tests override auth origins to the local test server and use short-lived fixture sessions; they do not bypass production auth or add a test-login endpoint. Full Google provider login, real SMTP delivery, and production Worker bindings must still be validated on the authorized hosted environment. A dry-run bundle check is not a deployment.
+Live tests require a migrated development database and opt in via `FITT_RUN_LIVE_DB_TESTS=1` (set by `test:db`/`test:account`). Each test creates unique fixture users and removes those users with cascading data cleanup. Browser tests default to the built Worker on `http://127.0.0.1:4173`. For an explicitly authorized hosted check, set `FITT_LIVE_TEST_ORIGIN` to the exact HTTPS origin and use its matching database and signing secret; only the live-account suite runs, without a local server. Short-lived fixture sessions use secure cookies on HTTPS, traces are disabled, and managed proxy settings remain active. The tests do not bypass production auth or add a test-login endpoint.
+
+The built Worker smoke suite uses synthetic configuration to check account availability, origin rejection, signed-out Admin denial, private asset protection, realtime routing, and public assets without connecting to a database or SMTP. The native context suite separately verifies background-work completion and per-request pool cleanup. Full Google provider login, real SMTP delivery, and hosted Worker bindings must still be validated on the authorized environment. A dry-run bundle check is not a deployment. See [migration validation](vinext-migration.md) for the managed environment's local workerd/Neon networking limitation and the prepared hosted check.
