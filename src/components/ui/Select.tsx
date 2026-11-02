@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import * as SelectPrimitive from '@radix-ui/react-select'
 import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import './controls.css'
@@ -22,6 +22,7 @@ export interface SelectProps {
   required?: boolean
   className?: string
   describedBy?: string
+  leadingIcon?: ReactNode
 }
 
 /** One styled select across the app, with Radix handling listbox navigation. */
@@ -36,6 +37,7 @@ export function Select({
   required,
   className = '',
   describedBy,
+  leadingIcon,
 }: SelectProps) {
   const trigger = useRef<HTMLButtonElement>(null)
   const tabTarget = useRef<HTMLElement | null>(null)
@@ -71,6 +73,11 @@ export function Select({
         aria-label={label}
         aria-describedby={describedBy}
       >
+        {leadingIcon && (
+          <span className="ui-select__leading-icon" aria-hidden="true">
+            {leadingIcon}
+          </span>
+        )}
         <span className="ui-select__value">
           <SelectPrimitive.Value />
         </span>

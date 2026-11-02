@@ -53,25 +53,7 @@
   padding: 0;
 }
 .library-muscle-filter {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  border: 1px solid #373a32;
-  border-radius: 10px;
-  padding: 0 11px;
-  min-height: 46px;
-  background: var(--canvas);
-  color: var(--muted);
-}
-.library-muscle-filter select {
-  background: transparent;
-  color: var(--text);
-  font-size: var(--type-body);
-  font-family: inherit;
-  border: 0;
-  min-height: 44px;
-  padding: 5px 5px 5px 0;
-  max-width: 190px;
+  --ui-select-background: var(--canvas);
 }
 .library-available-toggle {
   display: flex;
@@ -246,10 +228,6 @@
   }
   .library-muscle-filter {
     flex: 1;
-  }
-  .library-muscle-filter select {
-    width: 100%;
-    max-width: none;
   }
   .library-available-toggle {
     flex: 1;

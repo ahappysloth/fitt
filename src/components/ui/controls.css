@@ -8,7 +8,7 @@
   padding: 10px 14px;
   border: 1px solid #383b33;
   border-radius: 11px;
-  background: var(--surface-raised, #1c1c1c);
+  background: var(--ui-select-background, var(--surface-raised, #1c1c1c));
   color: var(--text, #f4f4ef);
   font: inherit;
   font-size: var(--type-body, 0.875rem);
@@ -29,10 +29,17 @@
   outline-offset: 3px;
 }
 .ui-select__value {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ui-select__leading-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--muted, #ababaa);
 }
 .ui-select__chevron {
   flex: 0 0 16px;
@@ -117,13 +124,6 @@
 .plan-controls .ui-select {
   min-width: 112px;
   font-size: var(--type-caption, 0.75rem);
-}
-.library-muscle-filter .ui-select {
-  flex: 1;
-  border: 0;
-  background: transparent;
-  padding-left: 0;
-  padding-right: 0;
 }
 .journey-record-filter .ui-select {
   width: min(220px, 100%);

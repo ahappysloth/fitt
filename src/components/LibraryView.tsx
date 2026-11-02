@@ -60,18 +60,17 @@ export default function LibraryView({ profile, onInfo }: LibraryViewProps) {
             </button>
           )}
         </label>
-        <label className="library-muscle-filter">
-          <SlidersHorizontal size={16} />
-          <Select
-            label="Filter muscle group"
-            value={muscle}
-            onValueChange={(value) => setMuscle(value as Muscle | 'all')}
-            options={[
-              { value: 'all', label: 'All muscle groups' },
-              ...Object.entries(muscleNames).map(([value, label]) => ({ value, label })),
-            ]}
-          />
-        </label>
+        <Select
+          className="library-muscle-filter"
+          label="Filter muscle group"
+          leadingIcon={<SlidersHorizontal size={16} />}
+          value={muscle}
+          onValueChange={(value) => setMuscle(value as Muscle | 'all')}
+          options={[
+            { value: 'all', label: 'All muscle groups' },
+            ...Object.entries(muscleNames).map(([value, label]) => ({ value, label })),
+          ]}
+        />
         <button
           className={`library-available-toggle ${onlyAvailable ? 'is-selected' : ''}`}
           type="button"

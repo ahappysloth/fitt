@@ -151,3 +151,31 @@ test('app dropdowns save preferences and close on an outside pointer press', asy
   await expect(page.getByRole('combobox', { name: 'Default focus' })).toBeDisabled()
   await expect(page.getByRole('combobox', { name: 'Weekly goal' })).toBeDisabled()
 })
+
+test('the library filter highlights and opens from its whole surface', async ({ page }, info) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Library', exact: true }).click()
+  const filter = page.locator('.library-muscle-filter')
+  const select = page.getByRole('combobox', { name: 'Filter muscle group' })
+  if (!info.project.use.isMobile) {
+    const idleBackground = await filter.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    )
+    await filter.hover()
+    await expect
+      .poll(() => filter.evaluate((element) => getComputedStyle(element).backgroundColor))
+      .not.toBe(idleBackground)
+  }
+  const bounds = (await filter.boundingBox())!
+  // The left padding and decorative icon are part of the same interactive surface.
+  await filter.click({ position: { x: 8, y: bounds.height / 2 } })
+  await expect(page.getByRole('listbox')).toBeVisible()
+  await page.getByRole('option', { name: 'Forearms', exact: true }).click()
+  await expect(select).toHaveText('Forearms')
+  await select.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('listbox')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(select).toBeFocused()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+})
