@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
+import { mountSandboxedPreview, openPreviewHost } from './helpers/embedded-preview'
 
 const study = () => readFile('preview/fitt-form-studio.html', 'utf8')
 async function openStudy(page: Page) {
@@ -278,21 +279,13 @@ test('failed 3D initialization cleans up and leaves useful instructions', async 
 })
 
 test('the 3D study works offline inside an opaque embedded preview', async ({ page, context }) => {
+  await openPreviewHost(page)
   const requests: string[] = []
   page.on('request', (request) => {
     if (/^https?:/.test(request.url())) requests.push(request.url())
   })
   await context.setOffline(true)
-  await page.setContent(
-    '<iframe title="Fitt study" sandbox="allow-scripts" style="width:100%;height:900px;border:0"></iframe>',
-  )
-  await page.locator('iframe').evaluate(
-    (iframe: HTMLIFrameElement, html) => {
-      iframe.srcdoc = html
-    },
-    await study(),
-  )
-  const frame = page.frameLocator('iframe')
+  const frame = await mountSandboxedPreview(page, await study(), 'Fitt study')
   await expect(frame.locator('.form-3d[data-ready=true]')).toBeVisible()
   await frame
     .getByRole('group', { name: 'Body model', exact: true })
