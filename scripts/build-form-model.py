@@ -1,6 +1,6 @@
 """Create Fitt's compact, offline skinned body from the CC0 MakeHuman sources.
 
-Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw male.target female-size.target female-firmness.target female-size-firmness.target female-upper-volume.target
+Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw male.target female-size.target female-firmness.target female-size-firmness.target female-upper-volume.target male-muscle.target
 Source URLs, licensing, and the asset contract are in assets/form-guide/README.md.
 """
 import base64
@@ -19,6 +19,7 @@ chest_target_path = pathlib.Path(sys.argv[5])
 firmness_target_path = pathlib.Path(sys.argv[6])
 full_firmness_target_path = pathlib.Path(sys.argv[7])
 upper_volume_target_path = pathlib.Path(sys.argv[8])
+muscle_target_path = pathlib.Path(sys.argv[9])
 rig = json.loads(rig_path.read_text())
 weights = json.loads(weights_path.read_text())
 assert rig['license'] == weights['license'] == 'CC0'
@@ -112,7 +113,22 @@ def apply_target(path, strength=1., source=None):
             points[int(index)][axis] += float(delta[axis]) * .1 * strength
     return points
 
+def smoothstep(start, end, value):
+    t = max(0., min(1., (value-start)/(end-start)))
+    return t*t*(3-2*t)
+
+# Keep masculine facial proportions, but bring their exaggerated brow/jaw and
+# low skull back toward the same base sculpt used by the female. Apply the blend
+# to the entire source head (including eyes and joint helpers) before retargeting.
+# This preserves local features and the single coherent anatomical head frame.
+male_head_strength = .55
+male_muscle_strength = .40
 male_vertices = apply_target(target_path)
+for index, point in enumerate(male_vertices):
+    strength = 1-(1-male_head_strength)*smoothstep(.54, .66, vertices[index][1])
+    male_vertices[index] = [base+(value-base)*strength
+                            for base, value in zip(vertices[index], point)]
+male_vertices = apply_target(muscle_target_path, male_muscle_strength, male_vertices)
 
 def sub(a, b):
     return [x-y for x, y in zip(a, b)]
@@ -227,7 +243,11 @@ variant = {
     'version': 1,
     'source': 'MakeHuman hm08 male shape / CC0, retargeted to Fitt canonical rig',
     'retargeting': 'Coherent pelvis-to-shoulder trunk frame and head frame, smoothly blended neck; weighted limb frames',
-    'sourcesSha256': {**result['sourcesSha256'], target_path.name: hashlib.sha256(target_path.read_bytes()).hexdigest()},
+    'maleHeadTargetStrength': male_head_strength,
+    'maleMuscleTargetStrength': male_muscle_strength,
+    'sourcesSha256': {**result['sourcesSha256'], **{
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (target_path, muscle_target_path)}},
     'positions': encode('f', male_positions),
 }
 variant_output = root / 'src/components/form-guide/male-body-data.json'
@@ -239,9 +259,9 @@ print(f'Male surface: {variant_output.stat().st_size // 1024} KiB; shares canoni
 # lower silhouette. The missing average-size/average-firmness corner is the base.
 # A restrained upper-volume target fills out the upper curve of the chest.
 # This separate surface keeps the canonical rig, contact envelope and masks intact.
-chest_strength = .38
-firmness_strength = .7
-upper_volume_strength = .3
+chest_strength = .30
+firmness_strength = .95
+upper_volume_strength = .50
 chest_targets = [
     (chest_target_path, chest_strength * (1-firmness_strength)),
     (firmness_target_path, (1-chest_strength) * firmness_strength),
@@ -251,6 +271,27 @@ chest_targets = [
 female_vertices = vertices
 for path, strength in chest_targets:
     female_vertices = apply_target(path, strength, female_vertices)
+
+# The low-resolution chest's lower contour can read as a hard, scalloped shelf.
+# Relax only the authored morph's support, fading to zero at its boundary. This
+# follows the existing surface topology and keeps the chest's anatomical shape;
+# the unmodified face, limbs and contact surfaces remain byte-identical.
+chest_support = {old for old in used if length(sub(female_vertices[old], vertices[old])) > 1e-10}
+neighbors = defaultdict(set)
+for face in faces:
+    for offset, old in enumerate(face):
+        neighbors[old].update((face[(offset+1)%3], face[(offset+2)%3]))
+neighbors = {old: sorted(adjacent) for old, adjacent in neighbors.items()}
+relaxation = {old: .32*min(1., length(sub(female_vertices[old], vertices[old]))/.008)
+              for old in chest_support}
+for _ in range(3):
+    relaxed = [point[:] for point in female_vertices]
+    for old, strength in relaxation.items():
+        adjacent = neighbors[old]
+        for axis in range(3):
+            average = sum(female_vertices[other][axis] for other in adjacent)/len(adjacent)
+            relaxed[old][axis] += strength*(average-female_vertices[old][axis])
+    female_vertices = relaxed
 female_positions = [coordinate for old in used for coordinate in female_vertices[old]]
 female_variant = {
     'version': 1,
@@ -260,6 +301,7 @@ female_variant = {
     'chestTargetStrength': chest_strength,
     'chestFirmnessStrength': firmness_strength,
     'chestUpperVolumeStrength': upper_volume_strength,
+    'chestSurfaceRelaxation': {'iterations': 3, 'strength': .32, 'boundaryFadeMeters': .008},
     'positions': encode('f', female_positions),
 }
 female_output = root / 'src/components/form-guide/female-body-data.json'
