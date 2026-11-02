@@ -60,6 +60,7 @@ export function usePwa() {
       /^https?:$/.test(window.location.protocol) &&
       window.isSecureContext &&
       'serviceWorker' in navigator
+    let previousController = canRegister ? navigator.serviceWorker.controller : null
 
     const register = async () => {
       if (!canRegister || !live) return
@@ -100,7 +101,15 @@ export function usePwa() {
       }
     }
     const controllerChanged = () => {
-      if (requestedUpdate.current) window.location.reload()
+      const hadController = !!previousController
+      previousController = navigator.serviceWorker.controller
+      if (requestedUpdate.current) {
+        window.location.reload()
+      } else if (hadController && previousController) {
+        // Another tab can activate the update. Offer an explicit reload here,
+        // preserving any work that this tab has not saved yet.
+        setNeedRefresh(true)
+      }
     }
     if (canRegister) {
       navigator.serviceWorker.addEventListener('controllerchange', controllerChanged)
@@ -123,8 +132,15 @@ export function usePwa() {
   }, [])
 
   const update = useCallback(() => {
-    const waiting = registration.current?.waiting
-    if (!waiting) return
+    const current = registration.current
+    if (!current) return
+    const waiting = current.waiting
+    if (!waiting) {
+      // A sibling tab may already have activated this version. The current
+      // document still needs to reload, even though there is no waiting worker.
+      if (current.active) window.location.reload()
+      return
+    }
     requestedUpdate.current = true
     waiting.postMessage({ type: 'SKIP_WAITING' })
   }, [])

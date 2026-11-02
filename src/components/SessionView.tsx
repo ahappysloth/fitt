@@ -35,6 +35,7 @@ interface SessionViewProps {
   onDiscard: () => void
   onSwap: (index: number) => void
   onInfo: (id: string) => void
+  onDirtyChange: (dirty: boolean) => void
 }
 interface TimerState {
   restEnd: number | null
@@ -116,6 +117,7 @@ function SessionContent({
   onDiscard,
   onSwap,
   onInfo,
+  onDirtyChange,
 }: SessionViewProps) {
   const [exerciseIndex, setExerciseIndex] = useState(() =>
     Math.max(
@@ -155,6 +157,16 @@ function SessionContent({
   const elapsed = Math.max(0, Math.floor((now - new Date(session.startedAt).getTime()) / 1000))
   const validReps = validNumber(draft.reps, 600, true)
   const validLoad = !weighted || validNumber(draft.load, 300)
+  // Valid pending inputs are persisted immediately. Corrections to logged sets
+  // and incomplete numeric inputs stay local until the user saves or fixes them.
+  const dirty =
+    !!current &&
+    (!validReps ||
+      !validLoad ||
+      (!!editing &&
+        (Number(draft.reps) !== current.reps ||
+          (weighted && Number(draft.load) !== current.load) ||
+          draft.effort !== current.effort)))
   const isFirstLog = !!current && !loggedIds.current.has(current.id)
   const nextIndex = session.exercises.findIndex(
     (item, index) => index > exerciseIndex && item.sets.some((set) => !set.done),
@@ -167,6 +179,11 @@ function SessionContent({
   useEffect(() => {
     lastSubmitted.current = null
   }, [selectionKey])
+
+  useEffect(() => {
+    onDirtyChange(dirty)
+  }, [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange(false), [onDirtyChange])
 
   useEffect(() => {
     const refresh = () => setNow(Date.now())

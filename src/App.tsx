@@ -87,10 +87,18 @@ export default function App() {
   const [toast, setToast] = useState('')
   const [builderInitial, setBuilderInitial] = useState<Workout | undefined>()
   const [builderDirty, setBuilderDirty] = useState(false)
+  const [sessionDirty, setSessionDirty] = useState(false)
   const pendingNavigation = useRef<(() => void) | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const finishing = useRef(false)
   const preferences = state.preferences || defaultPreferences
+  const updateBlockedReason = storageError
+    ? 'Back up your progress and resolve the storage warning before updating.'
+    : builderDirty
+      ? 'Save or leave your routine before updating.'
+      : sessionDirty
+        ? 'Save or cancel your workout edits before updating.'
+        : null
   const changeBodyModel = useCallback(
     (bodyModel: BodyModel) => {
       setState((previous) => {
@@ -139,14 +147,14 @@ export default function App() {
   }, [toast])
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
-      if (builderDirty) {
+      if (builderDirty || sessionDirty) {
         event.preventDefault()
         event.returnValue = ''
       }
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [builderDirty])
+  }, [builderDirty, sessionDirty])
 
   function showPage(next: Page) {
     setPage(next)
@@ -498,15 +506,19 @@ export default function App() {
               </div>
             )}
           {pwa.needRefresh && (
-            <div className="state-banner">
-              <p>
-                A fresh version of Fitt is ready.
-                {state.active ? ' Your session is saved; update when you’re ready.' : ''}
+            <div className="state-banner" role="status">
+              <p id="app-update-message">
+                A fresh version of Fitt is ready.{' '}
+                {updateBlockedReason ||
+                  (state.active ? 'Your workout is saved. Resume it after updating.' : '')}
               </p>
               <Button
                 variant="secondary"
-                onClick={pwa.update}
-                disabled={!!state.active || builderDirty || !!storageError}
+                onClick={() => {
+                  if (!updateBlockedReason) pwa.update()
+                }}
+                disabled={!!updateBlockedReason}
+                aria-describedby="app-update-message"
               >
                 Update app
               </Button>
@@ -522,6 +534,7 @@ export default function App() {
               <SessionView
                 session={state.active}
                 profile={state.profile}
+                onDirtyChange={setSessionDirty}
                 onChange={(active) => setState((previous) => ({ ...previous, active }))}
                 onBack={() => navigate('today')}
                 onFinish={() =>
