@@ -64,6 +64,11 @@ export async function buildServiceWorker({ root = projectRoot } = {}) {
     '/icon-192.png',
     '/icon-512.png',
     '/apple-touch-icon.png',
+    '/icons/fitt-mark.svg',
+    '/icons/fitt-mark-32.png',
+    '/icons/fitt-mark-180.png',
+    '/icons/fitt-mark-192.png',
+    '/icons/fitt-mark-512.png',
     ...staticFiles,
   ]
   const template = await readFile(resolve(root, 'scripts/service-worker-template.js'), 'utf8')

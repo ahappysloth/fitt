@@ -11,8 +11,11 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'Fitt', statusBarStyle: 'black-translucent' },
   icons: {
-    icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
-    apple: '/apple-touch-icon.png',
+    icon: [
+      { url: '/icons/fitt-mark.svg', type: 'image/svg+xml', sizes: 'any' },
+      { url: '/icons/fitt-mark-32.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: [{ url: '/icons/fitt-mark-180.png', type: 'image/png', sizes: '180x180' }],
   },
 }
 
