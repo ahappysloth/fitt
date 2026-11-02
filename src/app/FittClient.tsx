@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { StrictMode } from 'react'
 
 const FittApp = dynamic(() => import('../App'), {
   ssr: false,
@@ -17,5 +18,10 @@ const FittApp = dynamic(() => import('../App'), {
 
 // Device storage is hydrated in the client app, never during server rendering.
 export default function FittClient() {
-  return <FittApp />
+  // Vinext's App Router does not yet enable Next's development Strict Mode.
+  return (
+    <StrictMode>
+      <FittApp />
+    </StrictMode>
+  )
 }

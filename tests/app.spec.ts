@@ -205,7 +205,7 @@ test('uses its offline cache for guides and logging after a full reload', async 
   ).toBeVisible()
   expect((await readState(page)).active.exercises[0].sets[0].done).toBe(true)
   const manifest = await page.evaluate(async () => (await fetch('/manifest.webmanifest')).json())
-  expect(manifest.display).toBe('standalone')
+  expect(manifest).toHaveProperty('display', 'standalone')
 })
 
 test('exports unsaved progress after a quota failure and recovers on the next successful write', async ({

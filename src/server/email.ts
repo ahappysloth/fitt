@@ -49,8 +49,8 @@ export function createMailSender(env: FittEnv): SendEmail {
     const safe = safeEmailOptions(options)
     try {
       if (isWorkerRuntime()) {
-        // Keep cloudflare:sockets outside Next's Node server bundle. The custom
-        // Worker entry injects this adapter before OpenNext handles the request.
+        // The Worker context creates this adapter from native bindings. Node
+        // evaluation never loads the cloudflare:sockets implementation.
         const sender = env.__FITT_SEND_EMAIL
         if (!sender) throw new Error('Worker email delivery is unavailable')
         await boundedDelivery(() => sender(safe))

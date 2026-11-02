@@ -1,7 +1,13 @@
-import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { DurableObjectNamespace } from '@cloudflare/workers-types'
 import type { SendEmail } from './email'
+import { isWorkerRuntime } from './runtime'
 export { isWorkerRuntime } from './runtime'
+
+// Keep Workers-only builtins and SMTP transport out of Node test/development
+// evaluation. The Worker module reads bindings when a request asks for them.
+const getWorkerContext = isWorkerRuntime()
+  ? (await import('./worker-context')).getWorkerContext
+  : undefined
 
 const keys = [
   'DATABASE_URL',
@@ -20,7 +26,7 @@ export type FittEnv = Record<(typeof keys)[number], string> & {
   /** Comma-separated verified emails; absent means no administrator access. */
   FITT_ADMIN_EMAILS?: string
   WORKSPACE_DO?: DurableObjectNamespace
-  /** Request-local adapter supplied by worker.ts; not a configured secret. */
+  /** Request-local adapter supplied by the Worker context; not a configured secret. */
   __FITT_SEND_EMAIL?: SendEmail
 }
 export type WaitUntil = (promise: Promise<unknown>) => void
@@ -50,18 +56,10 @@ export function resolveServerEnv(
 }
 
 export function getServerContext(): { env: FittEnv; waitUntil?: WaitUntil } {
-  let worker: Record<string, unknown> = {}
-  let waitUntil: WaitUntil | undefined
-  try {
-    const context = getCloudflareContext()
-    worker = context.env as unknown as Record<string, unknown>
-    waitUntil = context.ctx.waitUntil.bind(context.ctx)
-  } catch {
-    // Ordinary Next development has no Worker execution context.
-  }
+  const context = getWorkerContext?.()
   return {
-    env: resolveServerEnv(worker, process.env, process.env.NODE_ENV === 'development'),
-    waitUntil,
+    env: resolveServerEnv(context?.env ?? {}, process.env, process.env.NODE_ENV === 'development'),
+    waitUntil: context?.waitUntil,
   }
 }
 

@@ -7,16 +7,25 @@
   "compatibility_date": "2026-10-30",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
-    "directory": ".open-next/assets",
     "binding": "ASSETS",
+    "not_found_handling": "none",
+    "html_handling": "none",
+    "run_worker_first": ["/*", "!/_next/static/*", "!/*/_next/static/*"],
   },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "fitt",
-    },
-  ],
   "observability": { "enabled": true },
+  "secrets": {
+    "required": [
+      "DATABASE_URL",
+      "BETTER_AUTH_SECRET",
+      "GOOGLE_CLIENT_ID",
+      "GOOGLE_CLIENT_SECRET",
+      "SMTP_HOST",
+      "SMTP_USER",
+      "SMTP_PASS",
+      "EMAIL_FROM",
+      "FITT_ADMIN_EMAILS",
+    ],
+  },
   "durable_objects": {
     "bindings": [{ "name": "WORKSPACE_DO", "class_name": "WorkspaceDO" }],
   },

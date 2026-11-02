@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "incremental": false },
-  "include": ["worker.ts", "src/server/realtime/**/*.ts"],
+  "include": ["cloudflare-env.d.ts", "worker.ts", "src/server/realtime/**/*.ts"],
   "exclude": ["node_modules", ".open-next", "src/**/*.test.ts"]
 }

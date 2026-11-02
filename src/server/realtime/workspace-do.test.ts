@@ -28,12 +28,17 @@ class Pair {
 }
 const NativeResponse = Response
 class WorkerResponse extends NativeResponse {
-  webSocket?: Socket
-  constructor(body?: BodyInit | null, init?: ResponseInit & { webSocket?: Socket }) {
-    super(body, init?.status === 101 ? { ...init, status: 200 } : init)
+  constructor(
+    body?: BodyInit | null,
+    init?: Omit<ResponseInit, 'webSocket'> & { webSocket?: Socket | null },
+  ) {
+    const { webSocket, ...responseInit } = init ?? {}
+    super(body, responseInit.status === 101 ? { ...responseInit, status: 200 } : responseInit)
+    Object.defineProperty(this, 'webSocket', {
+      value: init?.status === 101 ? (webSocket ?? null) : null,
+    })
     if (init?.status === 101) {
       Object.defineProperty(this, 'status', { value: 101 })
-      this.webSocket = init.webSocket
     }
   }
 }

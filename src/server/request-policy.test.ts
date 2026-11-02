@@ -1,13 +1,7 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { FittEnv } from './env'
 import { authIsConfigured, resolveServerEnv, validOrigin } from './env'
 import { boundedRequest, isTrustedRequestOrigin, privateResponse } from './request-policy'
-
-vi.mock('@opennextjs/cloudflare', () => ({
-  getCloudflareContext: () => {
-    throw new Error('Node')
-  },
-}))
 
 const env = {
   DATABASE_URL: 'postgresql://fixture:fixture@ep-fixture-pooler.example.neon.tech/test',

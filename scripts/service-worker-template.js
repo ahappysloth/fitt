@@ -1,4 +1,6 @@
 // Generated with the production build. Local workout data stays in app storage.
+// Keep the existing prefix so an activated vinext worker can still serve one
+// fully cached Next.js build to tabs that have not accepted the update yet.
 const CACHE_PREFIX = 'fitt-shell-'
 const CACHE_NAME = `${CACHE_PREFIX}__BUILD_VERSION__`
 const PRECACHE_URLS = __PRECACHE_URLS__
@@ -11,7 +13,9 @@ self.addEventListener('install', (event) => {
       try {
         // Completing installation means the full shell, including every lazy
         // client chunk and local font, can load without a network connection.
-        await cache.addAll(PRECACHE_URLS.map((url) => new Request(url, { cache: 'reload' })))
+        await cache.addAll(
+          PRECACHE_URLS.map((url) => new Request(url, { cache: 'reload', credentials: 'omit' })),
+        )
       } catch (error) {
         await caches.delete(CACHE_NAME)
         throw error
@@ -82,7 +86,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (request.method !== 'GET' || url.origin !== self.location.origin) return
   // RSC, API, authentication, and realtime requests always go to the network.
-  if (request.headers.has('RSC') || url.pathname.startsWith('/api/')) return
+  if (
+    request.headers.has('RSC') ||
+    request.headers.get('Accept')?.includes('text/x-component') ||
+    url.searchParams.has('_rsc') ||
+    url.pathname.startsWith('/api/')
+  )
+    return
   if (request.mode === 'navigate' && url.pathname === '/') {
     event.respondWith(rootNavigation(request))
   } else if (url.pathname.startsWith('/_next/static/') || PUBLIC_ASSETS.has(url.pathname)) {

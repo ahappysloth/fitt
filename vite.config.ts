@@ -1,9 +1,15 @@
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+import vinext from 'vinext'
+import { cloudflare } from '@cloudflare/vite-plugin'
 
-// Vite is retained for unit tests and the self-contained review artifact.
-// The production application is built and served by Next.js.
 export default defineConfig({
-  plugins: [react()],
-  test: { include: ['src/**/*.test.ts'], environment: 'node' },
+  plugins: [
+    vinext(),
+    cloudflare({
+      viteEnvironment: {
+        name: 'rsc',
+        childEnvironments: ['ssr'],
+      },
+    }),
+  ],
 })
