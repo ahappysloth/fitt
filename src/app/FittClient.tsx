@@ -1,7 +1,9 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { StrictMode } from 'react'
+import { usePathname } from 'next/navigation'
+import { StrictMode, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { BrowserNavigation } from '../lib/navigation'
 
 const FittApp = dynamic(() => import('../App'), {
   ssr: false,
@@ -18,10 +20,25 @@ const FittApp = dynamic(() => import('../App'), {
 
 // Device storage is hydrated in the client app, never during server rendering.
 export default function FittClient() {
+  const frameworkPathname = usePathname()
+  const [controller] = useState(() => new BrowserNavigation(frameworkPathname || '/'))
+  const pathname = useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+    controller.getSnapshot,
+  )
+  useEffect(() => controller.start(), [controller])
+  // The framework's pathname initializes this layout. Afterwards the controller
+  // owns the accepted view: vinext publishes a traversed URL before popstate
+  // blockers can reverse it, so mirroring that hook would discard dirty editors.
+  const navigation = useMemo(
+    () => ({ pathname, navigate: controller.navigate, setBlocker: controller.setBlocker }),
+    [pathname, controller],
+  )
   // Vinext's App Router does not yet enable Next's development Strict Mode.
   return (
     <StrictMode>
-      <FittApp />
+      <FittApp navigation={navigation} />
     </StrictMode>
   )
 }

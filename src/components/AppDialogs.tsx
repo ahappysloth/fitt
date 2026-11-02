@@ -25,7 +25,7 @@ import { InstallHelp, ProgressHelp } from './HelpDialogs'
 export type AppDialog =
   | { type: 'exercise'; id: string }
   | { type: 'swap'; index: number; active: boolean }
-  | { type: 'finish' | 'discard' | 'reset' | 'install' | 'how' | 'leave-builder' }
+  | { type: 'finish' | 'discard' | 'reset' | 'install' | 'how' | 'leave-builder' | 'leave-session' }
   | { type: 'import'; state: AppState }
   | { type: 'summary'; session: Session; celebrate?: boolean }
   | { type: 'award'; id: string }
@@ -52,7 +52,7 @@ export default function AppDialogs({
   onReset,
   onRestore,
   onDeleteRoutine,
-  onLeaveBuilder,
+  onLeaveUnsaved,
   onJourney,
   onExport,
 }: {
@@ -67,7 +67,7 @@ export default function AppDialogs({
   onReset: () => void
   onRestore: (state: AppState) => void
   onDeleteRoutine: (id: string) => void
-  onLeaveBuilder: () => void
+  onLeaveUnsaved: () => void
   onJourney: () => void
   onExport: () => void
 }) {
@@ -94,7 +94,7 @@ export default function AppDialogs({
                     ? 'A milestone that matters'
                     : dialog.type === 'delete-routine'
                       ? 'Delete this saved workout?'
-                      : dialog.type === 'leave-builder'
+                      : dialog.type === 'leave-builder' || dialog.type === 'leave-session'
                         ? 'Leave without saving?'
                         : dialog.type === 'install'
                           ? 'Take Fitt with you'
@@ -232,14 +232,18 @@ export default function AppDialogs({
           </div>
         </>
       )}
-      {dialog.type === 'leave-builder' && (
+      {(dialog.type === 'leave-builder' || dialog.type === 'leave-session') && (
         <>
-          <p className="dialog-copy">Your changes to this workout haven’t been saved.</p>
+          <p className="dialog-copy">
+            {dialog.type === 'leave-session'
+              ? 'Your latest set edits haven’t been saved. Your logged sets and the rest of your workout will stay here.'
+              : 'Your changes to this workout haven’t been saved.'}
+          </p>
           <div className="modal-actions">
             <Button variant="secondary" onClick={onClose}>
               Keep editing
             </Button>
-            <Button variant="danger" onClick={onLeaveBuilder}>
+            <Button variant="danger" onClick={onLeaveUnsaved}>
               Leave without saving
             </Button>
           </div>

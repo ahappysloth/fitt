@@ -9,8 +9,8 @@
   "scripts": {
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
-    "dev": "node scripts/build-admin-previews.mjs && BETTER_AUTH_URL=http://localhost:5173 TRUSTED_ORIGINS=http://localhost:5173 vite dev --host 0.0.0.0 --port 5173",
-    "build": "node scripts/build-admin-previews.mjs && node scripts/build-service-worker.mjs --prepare && vite build && node scripts/build-service-worker.mjs",
+    "dev": "BETTER_AUTH_URL=http://localhost:5173 TRUSTED_ORIGINS=http://localhost:5173 vite dev --host 0.0.0.0 --port 5173",
+    "build": "node scripts/build-service-worker.mjs --prepare && vite build && node scripts/build-service-worker.mjs",
     "build:preview": "node scripts/build-preview.mjs",
     "build:worker": "npm run build",
     "preview": "BETTER_AUTH_URL=http://127.0.0.1:4173 TRUSTED_ORIGINS=http://127.0.0.1:4173 wrangler dev --config dist/server/wrangler.json --ip 127.0.0.1 --port 4173 --var BETTER_AUTH_URL:http://127.0.0.1:4173 --var TRUSTED_ORIGINS:http://127.0.0.1:4173",
@@ -33,7 +33,6 @@
     "format:check": "prettier --check .",
     "build:form-preview": "node scripts/build-preview.mjs --form",
     "build:design-preview": "node scripts/build-preview.mjs --design",
-    "build:admin-previews": "node scripts/build-admin-previews.mjs",
     "check:compatibility": "vinext check"
   },
   "dependencies": {

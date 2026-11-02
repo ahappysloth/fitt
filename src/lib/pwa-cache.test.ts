@@ -3,6 +3,16 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import vm from 'node:vm'
+import appRoutes from './app-routes.json'
+
+const publicRoutes = [
+  appRoutes.today,
+  appRoutes.workout,
+  appRoutes.journey,
+  appRoutes.library,
+  appRoutes.settings,
+  appRoutes.builder,
+]
 import { describe, expect, it, vi } from 'vitest'
 import { buildServiceWorker, prepareServiceWorker } from '../../scripts/build-service-worker.mjs'
 
@@ -23,7 +33,9 @@ function workerFixture({ incompleteInstall = false } = {}) {
     new URL(typeof request === 'string' ? request : request.url, origin).href
   const fetch = vi.fn(async (_request?: Request) => {
     if (offline) throw new TypeError('Network unavailable')
-    return new Response(document, { headers: { 'Content-Type': 'text/html' } })
+    return new Response(document + ' ' + new URL(_request!.url).pathname, {
+      headers: { 'Content-Type': 'text/html' },
+    })
   })
   const caches = {
     async open(name: string) {
@@ -62,8 +74,12 @@ function workerFixture({ incompleteInstall = false } = {}) {
   const claim = vi.fn()
   const source = readFileSync('scripts/service-worker-template.js', 'utf8')
     .replace('__BUILD_VERSION__', 'current')
-    .replace('__PRECACHE_URLS__', JSON.stringify(['/', '/_next/static/app.js', '/icon.svg']))
-  vm.runInNewContext(source, {
+    .replace(
+      '__PRECACHE_URLS__',
+      JSON.stringify([...publicRoutes, '/_next/static/app.js', '/icon.svg']),
+    )
+  const compiled = source.replace('__PUBLIC_APP_ROUTES__', JSON.stringify(publicRoutes))
+  vm.runInNewContext(compiled, {
     self: {
       location: { origin },
       addEventListener: (name: string, handler: (event: WorkerEvent) => void) =>
@@ -90,8 +106,8 @@ function workerFixture({ incompleteInstall = false } = {}) {
     })
     return pending
   }
-  const navigate = () => {
-    const request = new Request(origin + '/')
+  const navigate = (path = '/') => {
+    const request = new Request(origin + path)
     Object.defineProperty(request, 'mode', { value: 'navigate' })
     return dispatch('fetch', { request }) as Promise<Response>
   }
@@ -112,9 +128,33 @@ describe('offline app shell', () => {
     const worker = workerFixture()
     await worker.dispatch('install')
     worker.serveNewBuild()
-    expect(await (await worker.navigate()).text()).toBe('new online shell')
+    expect(await (await worker.navigate()).text()).toBe('new online shell /')
     worker.goOffline()
-    expect(await (await worker.navigate()).text()).toBe('original complete shell')
+    expect(await (await worker.navigate()).text()).toBe('original complete shell /')
+  })
+
+  it('reopens each public route with its own shell, including callback query strings', async () => {
+    const worker = workerFixture()
+    await worker.dispatch('install')
+    worker.goOffline()
+    for (const path of publicRoutes) {
+      expect(await (await worker.navigate(path + '?account=return')).text()).toBe(
+        'original complete shell ' + path,
+      )
+    }
+  })
+
+  it('never caches private, unknown, or non-navigation HTML requests', async () => {
+    const worker = workerFixture()
+    await worker.dispatch('install')
+    for (const path of ['/admin', '/admin/components', '/not-a-page']) {
+      expect(worker.navigate(path)).toBeUndefined()
+    }
+    for (const path of publicRoutes) {
+      expect(
+        worker.dispatch('fetch', { request: new Request('https://fitt.example' + path) }),
+      ).toBeUndefined()
+    }
   })
 
   it('does not leave a partly cached build after an interrupted installation', async () => {
@@ -260,7 +300,7 @@ describe('vinext offline build', () => {
     await withBuildFixture(async (root) => {
       const { urls } = await buildServiceWorker({ root })
       expect(urls).toEqual([
-        '/',
+        ...publicRoutes,
         '/manifest.webmanifest',
         '/icon.svg',
         '/icon-192.png',
@@ -275,6 +315,9 @@ describe('vinext offline build', () => {
       expect(deployed).toBe(await readFile(join(root, 'public/sw.js'), 'utf8'))
       expect(deployed).not.toContain('__BUILD_VERSION__')
       expect(deployed).not.toContain('__PRECACHE_URLS__')
+      expect(deployed).not.toContain('__PUBLIC_APP_ROUTES__')
+      expect(urls).not.toContain('/admin')
+      expect(urls).not.toContain('/admin/components')
     })
   })
 

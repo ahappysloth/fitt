@@ -20,6 +20,7 @@ import {
 import type { AccountController, AccountStatus } from '../lib/cloud/types'
 import Modal from './Modal'
 import { Button } from './ui'
+import ActiveWorkoutNotice from './ActiveWorkoutNotice'
 import './account.css'
 
 type AccountDialog = 'import' | 'sign-out' | 'conflict' | null
@@ -79,7 +80,13 @@ function GoogleMark() {
   )
 }
 
-export default function AccountPanel({ account }: { account: AccountController }) {
+export default function AccountPanel({
+  account,
+  onGoToWorkout,
+}: {
+  account: AccountController
+  onGoToWorkout: () => void
+}) {
   const titleId = useId()
   const emailId = useId()
   const emailHintId = useId()
@@ -131,6 +138,17 @@ export default function AccountPanel({ account }: { account: AccountController }
     else void run(() => account.signOut())
   }
 
+  function goToWorkout() {
+    setDialog(null)
+    onGoToWorkout()
+  }
+
+  const activeWorkoutNotice = account.hasActiveWorkout ? (
+    <ActiveWorkoutNotice className="account-session-notice" onGoToWorkout={goToWorkout}>
+      Finish or discard your workout before changing accounts or importing device progress.
+    </ActiveWorkoutNotice>
+  ) : null
+
   return (
     <section className="panel account-panel" aria-labelledby={titleId}>
       <div className="account-intro">
@@ -168,11 +186,7 @@ export default function AccountPanel({ account }: { account: AccountController }
         </span>
       </div>
 
-      {account.hasActiveWorkout && (
-        <p className="account-session-notice" role="status">
-          Finish or discard your workout before changing accounts or importing device progress.
-        </p>
-      )}
+      {activeWorkoutNotice}
 
       {account.user && (
         <div className="account-member">
@@ -387,6 +401,7 @@ export default function AccountPanel({ account }: { account: AccountController }
 
       {dialog === 'import' && (
         <Modal title="Add this device’s progress?" onClose={closeDialog}>
+          {activeWorkoutNotice}
           <div className="account-dialog-copy">
             <p>
               Add <strong>{importedItems}</strong> to your signed-in account.
@@ -421,6 +436,7 @@ export default function AccountPanel({ account }: { account: AccountController }
 
       {dialog === 'sign-out' && (
         <Modal title="Some progress hasn’t synced yet." onClose={closeDialog}>
+          {activeWorkoutNotice}
           <div className="account-dialog-copy">
             <p>
               You can stay signed in to finish syncing, or sign out and keep these changes on this
@@ -456,6 +472,11 @@ export default function AccountPanel({ account }: { account: AccountController }
 
       {dialog === 'conflict' && account.conflict && (
         <Modal title="Choose which changes to keep." onClose={closeDialog}>
+          {account.hasActiveWorkout && (
+            <ActiveWorkoutNotice className="account-session-notice" onGoToWorkout={goToWorkout}>
+              Your workout is still in progress. Return to it to continue or discard it.
+            </ActiveWorkoutNotice>
+          )}
           <div className="account-dialog-copy">
             <p>These changed here and on another device:</p>
             <ul>

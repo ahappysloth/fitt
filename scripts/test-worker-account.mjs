@@ -129,37 +129,45 @@ test(
       },
     )
 
-    await t.test('keeps private Admin documents behind uncached route handlers', async () => {
-      const access = await runtime.dispatchFetch('https://fitt.example/api/admin/access')
-      assert.equal(access.status, 200)
-      assert.match(access.headers.get('cache-control'), /no-store/)
-      assert.deepEqual(await access.json(), { allowed: false })
-      for (const kind of ['form', 'components']) {
-        const response = await runtime.dispatchFetch(
-          `https://fitt.example/api/admin/previews/${kind}`,
-        )
-        assert.equal(response.status, 401, kind)
-        assert.match(response.headers.get('cache-control'), /no-store/)
-        assert.doesNotMatch(await response.text(), /__FITT_ADMIN_PREVIEW__/)
-      }
-      for (const path of [
-        '/preview/fitt-form-studio.html',
-        '/preview/fitt-redesign.html',
-        '/.generated/admin-previews.json',
-      ]) {
-        const response = await runtime.dispatchFetch(`https://fitt.example${path}`)
-        assert.equal(response.status, 404, path)
-        assert.doesNotMatch(await response.text(), /__FITT_ADMIN_PREVIEW__/)
-      }
-      for (const file of await filesIn(assetsDirectory)) {
-        if (!/\.(?:js|css|html|json|map)$/.test(file)) continue
-        assert.doesNotMatch(
-          await readFile(file, 'utf8'),
-          /__FITT_ADMIN_PREVIEW__/,
-          `Private preview source leaked into ${relative(assetsDirectory, file)}`,
-        )
-      }
-    })
+    await t.test(
+      'protects native Admin documents and RSC requests without caching them',
+      async () => {
+        const access = await runtime.dispatchFetch('https://fitt.example/api/admin/access')
+        assert.equal(access.status, 200)
+        assert.match(access.headers.get('cache-control'), /no-store/)
+        assert.deepEqual(await access.json(), { allowed: false })
+        for (const path of [
+          '/admin',
+          '/admin/components',
+          '/%61dmin',
+          '/%61dmin/components',
+          '//admin',
+        ]) {
+          for (const headers of [{}, { RSC: '1', Accept: 'text/x-component' }]) {
+            const response = await runtime.dispatchFetch(`https://fitt.example${path}`, {
+              headers,
+              redirect: 'manual',
+            })
+            assert.equal(response.status, 303, path)
+            assert.equal(
+              response.headers.get('location'),
+              'https://fitt.example/settings?admin=restricted',
+            )
+            assert.match(response.headers.get('cache-control'), /private, no-store/)
+          }
+        }
+        for (const path of [
+          '/api/admin/previews/form',
+          '/api/admin/previews/components',
+          '/preview/fitt-form-studio.html',
+          '/preview/fitt-redesign.html',
+          '/.generated/admin-previews.json',
+        ]) {
+          const response = await runtime.dispatchFetch(`https://fitt.example${path}`)
+          assert.equal(response.status, 404, path)
+        }
+      },
+    )
 
     await t.test(
       'routes realtime through origin and session checks before the Durable Object',
@@ -184,9 +192,13 @@ test(
     )
 
     await t.test('serves the shell, client chunks, and noncacheable service worker', async () => {
-      const shell = await runtime.dispatchFetch('https://fitt.example/')
-      assert.equal(shell.status, 200)
-      assert.match(await shell.text(), /Fitt/)
+      for (const path of ['/', '/workout', '/journey', '/library', '/settings', '/builder']) {
+        const shell = await runtime.dispatchFetch(`https://fitt.example${path}`)
+        assert.equal(shell.status, 200, path)
+        assert.match(await shell.text(), /Fitt/)
+      }
+      const missing = await runtime.dispatchFetch('https://fitt.example/not-a-fitt-page')
+      assert.equal(missing.status, 404)
       const clientScript = (await filesIn(assetsDirectory)).find(
         (file) =>
           relative(assetsDirectory, file).startsWith(`_next${sep}static${sep}`) &&

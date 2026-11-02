@@ -1,0 +1,159 @@
+.component-studio {
+  container: component-studio / inline-size;
+  min-width: 0;
+}
+.component-studio > .page-heading h2 {
+  font-size: clamp(1.5rem, 3cqi, 2rem);
+  line-height: 1.25;
+  letter-spacing: -0.04em;
+  margin: 7px 0 10px;
+}
+.component-studio .lab-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.component-studio .lab-section {
+  padding: 25px;
+}
+.component-studio .lab-section .section-title :is(h2, h3) {
+  font-size: 21px;
+}
+.component-studio .lab-copy {
+  font-size: var(--type-body);
+  line-height: 1.8;
+  color: var(--muted);
+}
+.component-studio .swatch-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 9px;
+  margin-top: 24px;
+}
+.component-studio .swatch-row > div > span {
+  height: 50px;
+  border-radius: 11px;
+  border: 1px solid #465438;
+  display: block;
+}
+.component-studio .swatch-row strong {
+  display: block;
+  font-size: var(--type-caption);
+  margin-top: 9px;
+  font-weight: 500;
+}
+.component-studio .swatch-row small {
+  display: block;
+  color: var(--muted);
+  font-size: var(--type-chip);
+  margin-top: 5px;
+}
+.component-studio .lab-personality {
+  display: flex;
+  align-items: center;
+  margin: 20px -8px -18px;
+}
+.component-studio .lab-personality > svg {
+  width: 33.33%;
+  height: auto;
+}
+.component-studio .reward-rule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 0;
+  border-bottom: 1px solid #34422a;
+  gap: 12px;
+  font-size: var(--type-body);
+}
+.component-studio .reward-rule > span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+}
+.component-studio .reward-rule svg {
+  color: var(--muted);
+}
+.component-studio .reward-rule strong {
+  color: var(--accent);
+  font-size: var(--type-body);
+  white-space: nowrap;
+}
+.component-studio .lab-note {
+  font-size: var(--type-caption);
+  line-height: 1.8;
+  color: var(--muted);
+  display: block;
+  margin-top: 17px;
+}
+.component-studio .button-samples {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+.component-studio .sample-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.component-studio .sample-pills .lime-pill {
+  font-size: var(--type-chip);
+}
+.component-studio .celebration-sample {
+  text-align: center;
+}
+.component-studio .celebration-sample .section-title {
+  text-align: left;
+}
+.component-studio .celebration-sample > .trophy-art {
+  width: 180px;
+  height: 180px;
+  margin: -14px auto -8px;
+}
+.component-studio .celebration-sample > p {
+  color: var(--muted);
+  font-size: var(--type-body);
+  line-height: 1.7;
+  max-width: 250px;
+  margin: 0 auto 19px;
+}
+.component-studio .celebration-sample > .primary-button {
+  margin-top: 15px;
+  width: 100%;
+}
+
+@container component-studio (max-width: 760px) {
+  .component-studio .lab-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .component-studio .lab-section {
+    padding: 20px;
+  }
+  .component-studio > .page-heading {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}
+@container component-studio (max-width: 420px) {
+  .component-studio .lab-section {
+    padding: 17px;
+  }
+  .component-studio .xp-heading {
+    flex-wrap: wrap;
+  }
+  .component-studio .xp-total {
+    margin-left: auto;
+  }
+  .component-studio .xp-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .component-studio .segmented.large {
+    flex-wrap: wrap;
+  }
+  .component-studio .segmented.large > button {
+    white-space: normal;
+    flex: 1 1 100px;
+  }
+}

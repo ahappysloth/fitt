@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   ArrowLeft,
@@ -39,16 +39,13 @@ import Modal from '../src/components/Modal'
 import { Tooltip } from '../src/components/ui/Tooltip'
 import { byId } from '../src/lib/catalog'
 import { FMark, SparkBuddy, TrophyArt } from './Artwork'
-import { CountUp, Confetti, Pill, ProgressBar, SectionTitle, Week, XPCard } from './components'
+import { Pill, ProgressBar, SectionTitle, Week, XPCard } from './components'
+import ComponentShowcase from '../src/components/admin/ComponentShowcase'
+import CelebrationPreview from '../src/components/admin/CelebrationPreview'
 import { BASE_XP, exercises } from './demo-data'
 import './styles.css'
 
 type View = 'today' | 'workout' | 'journey' | 'components'
-declare global {
-  interface Window {
-    __FITT_ADMIN_PREVIEW__?: 'form' | 'components'
-  }
-}
 type LoggedSet = { exerciseId: string; reps: number }
 const nav = [
   { id: 'today' as View, label: 'Today', icon: House },
@@ -57,9 +54,7 @@ const nav = [
 ]
 
 function App() {
-  const [view, setView] = useState<View>(() =>
-    window.__FITT_ADMIN_PREVIEW__ === 'components' ? 'components' : 'today',
-  )
+  const [view, setView] = useState<View>('today')
   const [mobile, setMobile] = useState(false)
   const [accent, setAccent] = useState<'lime' | 'mint'>('lime')
   const [calm, setCalm] = useState(false)
@@ -132,7 +127,7 @@ function App() {
     setFinished(true)
     setCelebrate(true)
   }
-  const demoFinish = useCallback(() => {
+  function demoFinish() {
     setQuick(false)
     setLogs(
       exercises.flatMap((e) =>
@@ -142,17 +137,7 @@ function App() {
     setFinished(true)
     setRest(0)
     setCelebrate(true)
-  }, [])
-  useEffect(() => {
-    if (window.__FITT_ADMIN_PREVIEW__ !== 'components' || window.parent === window) return
-    const receive = (event: MessageEvent) => {
-      if (event.source !== window.parent || event.data?.type !== 'fitt-admin-preview') return
-      if (event.data.command === 'celebrate') demoFinish()
-    }
-    window.addEventListener('message', receive)
-    window.parent.postMessage({ type: 'fitt-admin-preview-ready', kind: 'components' }, '*')
-    return () => window.removeEventListener('message', receive)
-  }, [demoFinish])
+  }
   function logSet() {
     if (finished || logs.length >= total) return
     const next = [...logs, { exerciseId: current.id, reps }]
@@ -921,152 +906,18 @@ function App() {
               )}
 
               {view === 'components' && (
-                <>
-                  <div className="page-heading">
-                    <div>
-                      <p className="eyebrow">DIRECTION 01 / MOMENTUM</p>
-                      <h1>
-                        The little things, considered<span className="greeting-dot">.</span>
-                      </h1>
-                      <p>A component playground. Try the states and tune the personality.</p>
-                    </div>
-                    <Pill>
-                      <Layers3 size={14} />
-                      Design lab
-                    </Pill>
-                  </div>
-                  <div className="lab-grid">
-                    <section className="panel lab-section">
-                      <SectionTitle eyebrow="01 / FEEL" title="Electric, with a human side" />
-                      <p className="lab-copy">
-                        Deep charcoal, warm type, an unmistakable lime. A friendly little spark adds
-                        personality when it matters.
-                      </p>
-                      <div className="swatch-row">
-                        {[
-                          ['Canvas', '#101010'],
-                          ['Surface', '#151515'],
-                          ['Accent', 'var(--accent)'],
-                          ['Type', '#f4f4ef'],
-                        ].map(([name, color]) => (
-                          <div key={name}>
-                            <span style={{ background: color }} />
-                            <strong>{name}</strong>
-                            <small>
-                              {color === 'var(--accent)'
-                                ? accent === 'lime'
-                                  ? '#C7FA53'
-                                  : '#8FEDB1'
-                                : color.toUpperCase()}
-                            </small>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="lab-personality">
-                        <SparkBuddy />
-                        <TrophyArt />
-                        <TrophyArt medal />
-                      </div>
-                    </section>
-                    <section className="panel lab-section">
-                      <SectionTitle eyebrow="02 / PROGRESS" title="A little more, every time" />
-                      <XPCard xp={xp} />
-                      <div className="reward-rule">
-                        <span>
-                          <Check size={16} />
-                          Log a set
-                        </span>
-                        <strong>+5 XP</strong>
-                      </div>
-                      <div className="reward-rule">
-                        <span>
-                          <Dumbbell size={16} />
-                          Save your workout
-                        </span>
-                        <strong>+35 XP</strong>
-                      </div>
-                      <div className="reward-rule">
-                        <span>
-                          <Trophy size={16} />
-                          Reach your weekly goal
-                        </span>
-                        <strong>+25 XP</strong>
-                      </div>
-                      <div className="reward-rule">
-                        <span>
-                          <TrendingUp size={16} />
-                          Set a personal best
-                        </span>
-                        <strong>+15 XP</strong>
-                      </div>
-                      <p className="lab-note">
-                        Proposed reward values. A smaller workout counts, earned XP stays yours, and
-                        the weekly goal leaves room for recovery.
-                      </p>
-                    </section>
-                    <section className="panel lab-section">
-                      <SectionTitle eyebrow="03 / INTERACTION" title="A satisfying little yes" />
-                      <div className="button-samples">
-                        <button
-                          className="primary-button"
-                          onClick={() => {
-                            setToast('+5 XP · Nice work. Every set adds up.')
-                            setSetPulse((v) => v + 1)
-                          }}
-                        >
-                          <Check size={17} />
-                          Log this set <span>+5 XP</span>
-                        </button>
-                        <button className="secondary-button" onClick={() => start(true)}>
-                          I have five minutes <ArrowRight size={15} />
-                        </button>
-                        <button className="secondary-button" disabled>
-                          Workout saved <Check size={15} />
-                        </button>
-                      </div>
-                      <div className="sample-pills">
-                        <Pill className="lime-pill">
-                          <TrendingUp size={12} />
-                          NEW PERSONAL BEST
-                        </Pill>
-                        <Pill>
-                          <Moon size={12} />
-                          Recovery day
-                        </Pill>
-                        <Pill>
-                          <Check size={12} />
-                          Saved on this device
-                        </Pill>
-                      </div>
-                      <p className="lab-note">
-                        44 px touch targets, visible keyboard focus, short labels, and clear
-                        feedback.
-                      </p>
-                    </section>
-                    <section className="panel lab-section celebration-sample">
-                      <SectionTitle eyebrow="04 / REWARD" title="Make the finish feel good" />
-                      <TrophyArt />
-                      <p>
-                        A bright little moment. A new milestone. A reason to feel proud of showing
-                        up.
-                      </p>
-                      <div className="segmented large">
-                        <button className={!calm ? 'active' : ''} onClick={() => setCalm(false)}>
-                          A little celebration
-                        </button>
-                        <button className={calm ? 'active' : ''} onClick={() => setCalm(true)}>
-                          Keep it calm
-                        </button>
-                      </div>
-                      <button className="primary-button" onClick={demoFinish}>
-                        Play the celebration <Sparkles size={17} />
-                      </button>
-                      <span className="lab-note">
-                        System reduced-motion preferences are respected.
-                      </span>
-                    </section>
-                  </div>
-                </>
+                <ComponentShowcase
+                  accent={accent}
+                  xp={xp}
+                  calm={calm}
+                  onCalmChange={setCalm}
+                  onLogSet={() => {
+                    setToast('+5 XP · Nice work. Every set adds up.')
+                    setSetPulse((v) => v + 1)
+                  }}
+                  onQuickWorkout={() => start(true)}
+                  onCelebrate={demoFinish}
+                />
               )}
               <footer className="app-footer">
                 <span>
@@ -1182,80 +1033,22 @@ function App() {
       )}
       {celebrate && (
         <Modal title="Your effort, celebrated" onClose={() => setCelebrate(false)}>
-          <div className="celebration-content">
-            <Confetti calm={calm} />
-            <Pill className="lime-pill">
-              <Check size={13} />
-              WORKOUT SAVED
-            </Pill>
-            <div className="celebration-trophy">
-              <TrophyArt />
-            </div>
-            <p className="eyebrow">YOU SHOWED UP FOR YOURSELF</p>
-            <h2>{logs.length === total ? 'Look at you go.' : 'Showing up counts.'}</h2>
-            <p>
-              {logs.length === total
-                ? 'A little stronger. A little more you.'
-                : 'A small session is still a step forward.'}
-            </p>
-            <div className="earned-xp">
-              <Zap size={27} fill="currentColor" />+<CountUp value={earnedXP} calm={calm} />
-              <span>XP</span>
-            </div>
-            <div className="celebration-stats">
-              <span>
-                <strong>{logs.length}</strong>sets logged
-              </span>
-              <span>
-                <strong>3 / 3</strong>weekly goal
-              </span>
-              <span>
-                <strong>{best ? '1' : '0'}</strong>personal best{best ? '' : 's'}
-              </span>
-            </div>
-            <div className="level-up-banner">
-              <span>
-                <Star size={21} fill="currentColor" />
-              </span>
-              <div>
-                <p>{level > 6 ? 'LEVEL UP' : 'KEEP BUILDING'}</p>
-                <strong>
-                  {level > 6 ? `Hello, level ${level}.` : `Level ${level} looks good on you.`}
-                </strong>
-              </div>
-              <span className="level-number">{String(level).padStart(2, '0')}</span>
-            </div>
-            <div className="unlocked-rewards">
-              <span>
-                <Trophy size={15} />
-                <strong>Week winner</strong>+25 XP
-              </span>
-              {best && (
-                <span>
-                  <TrendingUp size={15} />
-                  <strong>New personal best</strong>+15 XP
-                </span>
-              )}
-            </div>
-            <button
-              className="primary-button"
-              onClick={() => {
-                setCelebrate(false)
-                navigate('journey')
-              }}
-            >
-              See my journey <ArrowRight size={17} />
-            </button>
-            <button
-              className="celebration-close"
-              onClick={() => {
-                setCelebrate(false)
-                navigate('today')
-              }}
-            >
-              Take the good feeling with you <Heart size={13} />
-            </button>
-          </div>
+          <CelebrationPreview
+            calm={calm}
+            complete={logs.length === total}
+            setsLogged={logs.length}
+            earnedXP={earnedXP}
+            best={best}
+            level={level}
+            onPrimaryAction={() => {
+              setCelebrate(false)
+              navigate('journey')
+            }}
+            onClose={() => {
+              setCelebrate(false)
+              navigate('today')
+            }}
+          />
         </Modal>
       )}
     </>

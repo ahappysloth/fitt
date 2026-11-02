@@ -35,6 +35,10 @@
   color: var(--accent);
   border-color: #526737;
 }
+.admin-studios > button:hover {
+  color: var(--text);
+  background: var(--surface-raised);
+}
 .admin-preview-actions {
   display: flex;
   flex-wrap: wrap;
@@ -54,61 +58,175 @@
   color: var(--muted);
   font-size: var(--type-caption);
   line-height: 1.7;
-  margin: 15px 2px 20px;
+  margin: 15px 2px 28px;
 }
 .admin-demo-note > svg {
   flex: none;
   color: var(--accent);
   margin-top: 3px;
 }
-.admin-preview-stage {
-  min-height: 420px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: #0b0b0b;
-  display: flex;
-  justify-content: center;
+/* These variables belong to the demo subtree, never the app document. */
+.admin-demo-theme[data-accent='lime'] {
+  --accent: #c7fa53;
+  --accent-soft: #c7fa5314;
+  --accent-ink: #18210a;
 }
-.admin-preview-frame {
-  display: block;
+.admin-demo-theme[data-accent='mint'] {
+  --accent: #8fedb1;
+  --accent-soft: #8fedb114;
+  --accent-ink: #0b2515;
+}
+.admin-demo-theme[data-motion='calm'] * {
+  animation: none !important;
+  transition: none !important;
+}
+.admin-demo-theme[data-motion='calm'] .confetti {
+  display: none;
+}
+/* Width-only framing keeps the app's normal page scroll, including mobile previews. */
+.admin-studio-content {
+  container: admin-studio / inline-size;
   width: 100%;
   min-width: 0;
-  height: max(680px, calc(100dvh - 200px));
-  border: 1px solid #30332c;
-  border-radius: 12px;
-  background: var(--canvas);
-  color-scheme: dark;
+  margin-inline: auto;
 }
-.admin-preview-stage.is-mobile > .admin-preview-frame {
+.admin-studio-content.is-mobile {
   max-width: 390px;
-  height: 844px;
-  border-radius: 25px;
 }
-.admin-preview-state {
-  min-height: 420px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  text-align: center;
-  padding: 30px;
+.admin-demo-theme[data-mobile='true'] .modal {
+  width: min(390px, calc(100% - 32px));
+}
+.admin-studio-content .form-study--native {
+  max-width: none;
+  padding: 0;
+}
+.form-study--native .form-study__main {
+  padding: 0 0 40px;
+  gap: 4%;
+}
+.form-study--native .form-study__intro {
+  padding-top: 8px;
+}
+.form-study--native .form-study__headline {
+  font-size: clamp(2rem, 4.5cqi, 3rem);
+}
+.admin-sample-feedback {
+  color: var(--accent);
+  font-size: var(--type-caption);
+  line-height: 1.7;
+  margin-top: 16px;
+}
+.admin-tune-dialog > p,
+.admin-sample-workout > p {
   color: var(--muted);
   font-size: var(--type-body);
+  line-height: 1.8;
 }
-.admin-loading {
+.admin-tune-dialog h3 {
+  margin: 23px 0 13px;
+}
+.admin-tune-dialog > .segmented {
+  margin-bottom: 16px;
+}
+.admin-tune-dialog > .primary-button {
+  width: 100%;
+  margin-top: 20px;
+}
+.admin-accent-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.admin-accent-options button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 170px;
+  min-height: 48px;
+  padding: 12px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  font-size: var(--type-body);
+}
+.admin-accent-options button[aria-pressed='true'] {
+  border-color: var(--accent);
+}
+.admin-accent-options i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+.admin-accent-options svg {
+  margin-left: auto;
   color: var(--accent);
-  animation: admin-spin 1s linear infinite;
 }
-@keyframes admin-spin {
-  to {
-    transform: rotate(360deg);
+.admin-sample-workout {
+  display: grid;
+  gap: 18px;
+}
+.admin-sample-workout > .pill {
+  justify-self: start;
+}
+@container admin-studio (max-width: 820px) {
+  .form-study--native .form-study__main {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 30px;
+  }
+  .form-study--native .form-study__intro {
+    padding-top: 0;
+  }
+  .form-study--native .form-study__lead {
+    max-width: 540px;
+  }
+  .form-study--native .form-study__movement {
+    margin-top: 24px;
+  }
+  .form-study--native .form-study__cues,
+  .form-study--native .form-study__hint,
+  .form-study--native .form-study__status {
+    display: none;
+  }
+  .form-study--native .form-study__principles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-study--native .form-study__section-title > span {
+    display: none;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .admin-loading {
-    animation: none;
+@container admin-studio (max-width: 480px) {
+  .form-study--native .form-study__headline {
+    font-size: 2.5rem;
+  }
+  .form-study--native .form-study__viewer .form-3d__viewport {
+    height: 330px;
+  }
+  .form-study--native .model-inspector__viewport {
+    height: 460px;
+  }
+  .form-study--native .model-inspector__topbar {
+    padding: 13px 14px;
+    flex-wrap: wrap;
+  }
+  .form-study--native .model-inspector__controls {
+    padding: 0 14px;
+  }
+  .form-study--native .model-inspector__row {
+    gap: 10px;
+    padding: 13px 0;
+  }
+  .form-study--native .model-inspector__help {
+    padding: 14px;
+  }
+  .form-study--native .model-inspector__tools {
+    gap: 9px;
+  }
+  .form-study--native .model-inspector__stage-note {
+    left: 15px;
+    right: 15px;
+  }
+  .form-study--native .form-3d__topbar {
+    flex-wrap: wrap;
   }
 }
 @media (max-width: 600px) {
@@ -126,14 +244,5 @@
   }
   .admin-studios > button {
     padding-inline: 10px;
-  }
-  .admin-preview-stage {
-    padding: 0;
-    border-radius: 15px;
-  }
-  .admin-preview-frame,
-  .admin-preview-stage.is-mobile > .admin-preview-frame {
-    border-radius: 14px;
-    height: 780px;
   }
 }

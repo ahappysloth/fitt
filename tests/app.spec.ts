@@ -19,10 +19,10 @@ test('personalizes an equipment-aware plan, keeps existing guides, and filters t
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await boot(page)
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('textbox', { name: 'What should we call you?' }).fill('Alex')
   await page.getByRole('button', { name: /Pull-up bar Build/ }).click()
-  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Hey, Alex.' })).toBeVisible()
   await page
     .getByRole('button', { name: 'View Scapular pull-up instructions', exact: true })
@@ -33,7 +33,7 @@ test('personalizes an equipment-aware plan, keeps existing guides, and filters t
   await page.getByRole('button', { name: 'Play animation' }).click()
   await expect(page.getByRole('button', { name: 'Pause animation' })).toBeVisible()
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Library', exact: true }).click()
+  await page.getByRole('link', { name: 'Library', exact: true }).click()
   await page.getByRole('searchbox', { name: 'Search exercises' }).fill('plank')
   await page.getByRole('button', { name: 'View Forearm plank instructions', exact: true }).click()
   await expect(page.getByRole('img', { name: 'Muscles worked: Core, Shoulders' })).toBeVisible()
@@ -54,7 +54,7 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
   ).toHaveValue('3')
   await page.reload()
-  await page.getByRole('button', { name: 'Resume workout', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/workout$/)
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
   ).toHaveValue('3')
@@ -66,7 +66,7 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
   expect(saved.history).toHaveLength(1)
   expect(saved.history[0].exercises[0].sets[0].reps).toBe(4)
   expect(saved.active).toBeNull()
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   const pendingDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export backup', exact: true }).click()
   const download = await pendingDownload
@@ -79,7 +79,7 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
     .getByLabel('Import Fitt backup')
     .setInputFiles({ name: 'backup.json', mimeType: 'application/json', buffer: raw })
   await page.getByRole('button', { name: 'Restore backup', exact: true }).click()
-  await page.getByRole('button', { name: 'Journey', exact: true }).click()
+  await page.getByRole('link', { name: 'Journey', exact: true }).click()
   await expect(page.locator('.xp-total').first()).toContainText('40')
   expect((await readState(page)).history).toHaveLength(1)
 })
@@ -118,14 +118,14 @@ test('protects dirty builder changes, confirms reset, and respects calm celebrat
   await boot(page)
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Unsaved practice')
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toBeVisible()
   await page.getByRole('button', { name: 'Keep editing', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Routine name' })).toHaveValue('Unsaved practice')
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: 'Leave without saving', exact: true }).click()
   await page.getByRole('button', { name: /^Keep it calm/ }).click()
-  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.locator('.quick-start-strip').click()
   await expect(page.getByRole('heading', { name: 'A five-minute win.' })).toBeVisible()
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
@@ -133,7 +133,7 @@ test('protects dirty builder changes, confirms reset, and respects calm celebrat
   expect(await page.locator('.confetti').count()).toBe(0)
   expect((await readState(page)).history[0].duration).toBe(5)
   await page.getByRole('button', { name: 'Close dialog' }).click()
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: /Reset/ }).click()
   await page.getByRole('button', { name: 'Keep my data', exact: true }).click()
   expect((await readState(page)).history).toHaveLength(1)
@@ -143,7 +143,7 @@ test('rejects malformed imports and preserves corrupted original data while allo
   page,
 }) => {
   await boot(page)
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   const before = await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)
   await page.getByLabel('Import Fitt backup').setInputFiles({
     name: 'bad.json',
@@ -155,6 +155,7 @@ test('rejects malformed imports and preserves corrupted original data while allo
   await page.evaluate((storageKey) => localStorage.setItem(storageKey, '{malformed'), key)
   await page.reload()
   await expect(page.locator('.state-banner.warning')).toContainText('Automatic saving is paused')
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   expect(await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)).toBe(
@@ -293,17 +294,17 @@ test('keeps the quick-workout intent when leaving a dirty builder', async ({ pag
 
 test('requires explicit bodyweight conversion after removing a weighted vest', async ({ page }) => {
   await boot(page)
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: /Weighted vest Add/ }).click()
-  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Weighted push practice')
   await page.getByRole('button', { name: 'Add Push-up', exact: true }).click()
   await page.getByRole('spinbutton', { name: 'Push-up added load', exact: true }).fill('5')
   await page.getByRole('button', { name: 'Save routine', exact: true }).click()
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: /Weighted vest Add/ }).click()
-  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   const routine = page
     .locator('.routine-card')
     .filter({ has: page.getByRole('heading', { name: 'Weighted push practice', exact: true }) })

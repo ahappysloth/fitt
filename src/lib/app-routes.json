@@ -1,0 +1,10 @@
+{
+  "today": "/",
+  "workout": "/workout",
+  "journey": "/journey",
+  "library": "/library",
+  "settings": "/settings",
+  "builder": "/builder",
+  "admin": "/admin",
+  "adminComponents": "/admin/components"
+}

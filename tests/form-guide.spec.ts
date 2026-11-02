@@ -200,18 +200,18 @@ test('body model choice persists across guides, settings, and reloads without ch
     .click()
   await expect(guide).toHaveAttribute('data-model', 'female')
   expect(await savedTraining()).toEqual(before)
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('button', { name: /^Female model/ })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
   await page.reload()
-  await page.getByRole('button', { name: 'Resume workout', exact: true }).first().click()
+  await page.getByRole('link', { name: 'Workout', exact: true }).click()
   await expect(guide).toHaveAttribute('data-model', 'female')
   expect(await savedTraining()).toEqual(before)
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: /^Male model/ }).click()
-  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.getByRole('button', { name: 'View Knee push-up instructions', exact: true }).click()
   await expect(guide).toHaveAttribute('data-model', 'male')
   expect(await savedTraining()).toEqual(before)

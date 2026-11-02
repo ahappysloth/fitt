@@ -27,12 +27,12 @@ vi.mock('./request', () => ({
 }))
 
 import { isAdminIdentity, withAdminRequest } from './admin'
-import { serveAdminPreview } from './admin-preview'
+import { isAdminPagePath, serveAdminPage } from './admin-page'
 import { GET as access } from '../app/api/admin/access/route'
 
 const identity = { id: 'verified-owner', email: 'owner@example.test', emailVerified: true }
 const request = (headers: HeadersInit = {}) =>
-  new Request('https://fitt.example/api/admin/previews/form', {
+  new Request('https://fitt.example/admin', {
     headers: { Cookie: 'better-auth.session_token=fixture', ...headers },
   })
 
@@ -42,6 +42,28 @@ describe('private admin studio authorization', () => {
     state.env.FITT_ADMIN_EMAILS = 'owner@example.test'
     state.configured = true
     state.session.mockResolvedValue({ user: identity })
+  })
+
+  it('protects encoded and slash-normalized aliases of Admin routes', () => {
+    for (const path of [
+      '/admin',
+      '/admin/components',
+      '/%61dmin',
+      '/%61dmin/components',
+      '//admin',
+      '/public/../admin',
+      '/./admin/',
+    ])
+      expect(isAdminPagePath(path), path).toBe(true)
+    for (const path of [
+      '/settings',
+      '/api/admin/access',
+      '/adminish',
+      '/%2Fadmin',
+      '/%ZZ',
+      '/admin/../settings',
+    ])
+      expect(isAdminPagePath(path), path).toBe(false)
   })
 
   it('requires an exact verified email match and fails closed without configuration', () => {
@@ -56,14 +78,11 @@ describe('private admin studio authorization', () => {
     expect(isAdminIdentity(identity, 'someone-owner@example.test')).toBe(false)
   })
 
-  it('rejects guests before opening services or loading the preview bundle', async () => {
-    const load = vi.fn(() => 'private preview')
-    const response = await serveAdminPreview(
-      new Request('https://fitt.example/api/admin/previews/form'),
-      'form',
-      load,
-    )
-    expect(response.status).toBe(401)
+  it('redirects guests before opening services or rendering the studio', async () => {
+    const load = vi.fn(async () => new Response('private studio'))
+    const response = await serveAdminPage(new Request('https://fitt.example/admin'), load)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe('https://fitt.example/settings?admin=restricted')
     expect(response.headers.get('cache-control')).toContain('no-store')
     expect(load).not.toHaveBeenCalled()
     expect(state.services).not.toHaveBeenCalled()
@@ -95,56 +114,44 @@ describe('private admin studio authorization', () => {
   it.each([
     { ...identity, emailVerified: false },
     { ...identity, email: 'another@example.test' },
-  ])('prevents direct preview access by an unverified or non-admin user', async (user) => {
+  ])('prevents direct studio access by an unverified or non-admin user', async (user) => {
     state.session.mockResolvedValue({ user })
-    const load = vi.fn(() => 'private preview')
-    const response = await serveAdminPreview(request(), 'components', load)
-    expect(response.status).toBe(403)
+    const load = vi.fn(async () => new Response('private studio'))
+    const response = await serveAdminPage(request(), load)
+    expect(response.status).toBe(303)
     expect(load).not.toHaveBeenCalled()
     expect(await (await access(request())).json()).toEqual({ allowed: false })
   })
 
   it('rejects requests left over from a different signed-in account', async () => {
-    const load = vi.fn(() => 'private preview')
-    const response = await serveAdminPreview(
-      request({ 'X-Fitt-Account': 'previous-account' }),
-      'form',
-      load,
-    )
-    expect(response.status).toBe(403)
+    const load = vi.fn(async () => new Response('private studio'))
+    const response = await serveAdminPage(request({ 'X-Fitt-Account': 'previous-account' }), load)
+    expect(response.status).toBe(303)
     expect(load).not.toHaveBeenCalled()
   })
 
-  it('serves allowed previews uncached with both document and HTTP isolation', async () => {
-    const load = vi.fn(
-      () => '<!doctype html><html><head><title>Studio</title></head><body>Preview</body></html>',
-    )
-    const response = await serveAdminPreview(
-      request({ 'X-Fitt-Account': identity.id }),
-      'components',
-      load,
-    )
-    expect(response.status).toBe(200)
-    expect(load).toHaveBeenCalledExactlyOnceWith('components')
-    expect(response.headers.get('cache-control')).toContain('private, no-store')
-    expect(response.headers.get('content-security-policy')).toContain(
-      "frame-ancestors 'self'; sandbox allow-scripts",
-    )
-    expect(response.headers.get('content-security-policy')).not.toContain('allow-same-origin')
-    expect(response.headers.get('x-frame-options')).toBe('SAMEORIGIN')
-    const html = await response.text()
-    expect(html).toContain('http-equiv="Content-Security-Policy"')
-    expect(html).toContain("connect-src 'none'")
-    expect(html).toContain('window.__FITT_ADMIN_PREVIEW__="components"')
-    const metadata = await access(request())
-    expect(await metadata.json()).toEqual({ allowed: true, userId: identity.id })
-    expect(metadata.headers.get('cache-control')).toContain('no-store')
-  })
+  it.each<HeadersInit>([{}, { RSC: '1', Accept: 'text/x-component' }])(
+    'serves authorized document and RSC requests with private, uncached responses',
+    async (headers) => {
+      const render = vi.fn(async () => new Response('Native studio'))
+      const response = await serveAdminPage(request(headers), render)
+      expect(response.status).toBe(200)
+      expect(render).toHaveBeenCalledOnce()
+      expect(response.headers.get('cache-control')).toContain('private, no-store')
+      expect(response.headers.get('vary')).toContain('Cookie')
+      expect(await response.text()).toBe('Native studio')
+      const metadata = await access(request())
+      expect(await metadata.json()).toEqual({ allowed: true, userId: identity.id })
+      expect(metadata.headers.get('cache-control')).toContain('no-store')
+    },
+  )
 
-  it('only exposes the two known studio documents', async () => {
-    const load = vi.fn(() => 'private preview')
-    const response = await serveAdminPreview(request(), '../../.env', load)
-    expect(response.status).toBe(404)
-    expect(load).not.toHaveBeenCalled()
+  it('rechecks the live session for an RSC request and redirects an expired session', async () => {
+    state.session.mockResolvedValue(null)
+    const render = vi.fn(async () => new Response('Private studio'))
+    const response = await serveAdminPage(request({ RSC: '1' }), render)
+    expect(response.status).toBe(303)
+    expect(response.headers.get('cache-control')).toContain('no-store')
+    expect(render).not.toHaveBeenCalled()
   })
 })

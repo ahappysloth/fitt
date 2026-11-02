@@ -112,10 +112,12 @@ async function boot(page: Page, origin: string) {
 }
 
 async function updateAndReload(page: Page) {
+  const destination = page.url()
   const update = page.getByRole('button', { name: 'Update app', exact: true })
   await expect(update).toBeEnabled()
   await Promise.all([page.waitForEvent('load'), update.click()])
-  await expect(page.getByRole('heading', { name: 'Your next chapter.' })).toBeVisible()
+  await expect(page).toHaveURL(destination)
+  await expect(page.locator('#main-content')).toBeVisible()
   await expect(update).toHaveCount(0)
 }
 
@@ -143,7 +145,7 @@ test('updates a saved active workout and preserves pending inputs and its rest d
     page.getByText('Your workout is saved. Resume it after updating.', { exact: false }),
   ).toBeVisible()
   await updateAndReload(page)
-  await page.getByRole('button', { name: 'Resume workout', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/workout$/)
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
   ).toHaveValue('6')
@@ -159,7 +161,7 @@ test('updates a saved active workout and preserves pending inputs and its rest d
 
   await context.setOffline(true)
   await page.reload()
-  await page.getByRole('button', { name: 'Resume workout', exact: true }).first().click()
+  await expect(page).toHaveURL(/\/workout$/)
   expect((await readState(page)).active).toEqual(before)
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),

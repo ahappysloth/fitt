@@ -17,6 +17,7 @@ import type { Profile, UserPreferences } from '../lib/types'
 import { equipmentList } from '../lib/catalog'
 import { focusNames } from '../lib/workout'
 import { Select } from './ui'
+import ActiveWorkoutNotice from './ActiveWorkoutNotice'
 import './preferences.css'
 
 export interface SetupViewProps {
@@ -32,6 +33,7 @@ export interface SetupViewProps {
   onReset: () => void
   onInstall: () => void
   onHelp?: () => void
+  onGoToWorkout: () => void
 }
 
 export default function SetupView({
@@ -47,6 +49,7 @@ export default function SetupView({
   onReset,
   onInstall,
   onHelp,
+  onGoToWorkout,
 }: SetupViewProps) {
   const fileInput = useRef<HTMLInputElement>(null)
   const personal = preferences ?? {
@@ -71,10 +74,10 @@ export default function SetupView({
       </div>
       {accountPanel}
       {active && (
-        <p className="pref-notice" role="status">
+        <ActiveWorkoutNotice className="pref-notice" onGoToWorkout={onGoToWorkout}>
           Your workout is in progress. Finish or discard it before changing training preferences.
           You can still change your guide model, name, and celebrations.
-        </p>
+        </ActiveWorkoutNotice>
       )}
       <div className="pref-layout">
         <div className="pref-main">

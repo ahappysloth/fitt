@@ -43,13 +43,21 @@ describe('account callback navigation', () => {
 
   it('returns to account controls on every Better Auth outcome with no external redirect input', () => {
     expect(authCallbackURLs('https://fitt.example.test')).toEqual({
-      callbackURL: 'https://fitt.example.test/?account=return',
-      errorCallbackURL: 'https://fitt.example.test/?account=return',
-      newUserCallbackURL: 'https://fitt.example.test/?account=return',
+      callbackURL: 'https://fitt.example.test/settings?account=return',
+      errorCallbackURL: 'https://fitt.example.test/settings?account=return',
+      newUserCallbackURL: 'https://fitt.example.test/settings?account=return',
     })
     expect(
       parseAuthCallback('https://fitt.example.test/?account=return&theme=lime#details'),
     ).toEqual({ error: null, cleanedUrl: 'https://fitt.example.test/?theme=lime#details' })
     expect(parseAuthCallback('not a URL')).toBeNull()
+  })
+
+  it('cleans the Settings callback without changing the selected route', () => {
+    expect(
+      parseAuthCallback(
+        'https://fitt.example.test/settings?account=return&code=private&state=private#account',
+      ),
+    ).toEqual({ error: null, cleanedUrl: 'https://fitt.example.test/settings#account' })
   })
 })

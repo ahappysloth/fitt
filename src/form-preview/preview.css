@@ -69,13 +69,13 @@
   font-size: 0.6875rem;
   letter-spacing: 0.1em;
 }
-.form-study h1 {
+.form-study .form-study__headline {
   font-size: clamp(2.5rem, 4.1vw, 4rem);
   line-height: 1.13;
   letter-spacing: -0.06em;
   margin: 22px 0 23px;
 }
-.form-study h1 > span {
+.form-study .form-study__headline > span {
   color: #c7fa53;
 }
 .form-study__lead {
@@ -100,7 +100,7 @@
   color: #c7fa53;
   font-size: 0.75rem;
 }
-.form-study__movement h2 {
+.form-study__movement :is(h2, h3) {
   font-size: 1.25rem;
   letter-spacing: -0.03em;
   margin: 0 0 4px;
@@ -237,7 +237,7 @@
     gap: 4%;
     grid-template-columns: 0.8fr 1.2fr;
   }
-  .form-study h1 {
+  .form-study .form-study__headline {
     font-size: 2.6rem;
   }
 }
@@ -265,7 +265,7 @@
   .form-study__intro {
     padding-top: 8px;
   }
-  .form-study h1 {
+  .form-study .form-study__headline {
     font-size: 2.8rem;
     margin: 15px 0 19px;
   }

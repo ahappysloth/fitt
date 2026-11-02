@@ -1,3 +1,43 @@
+.workout-start {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(24px, 5vw, 48px);
+}
+.workout-start > svg {
+  color: var(--accent);
+}
+.workout-start h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: -0.04em;
+}
+.workout-start > p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.65;
+}
+.feedback-toast:has(> .secondary-button) {
+  display: grid;
+  grid-template-columns: 27px minmax(0, 1fr) 44px;
+  max-width: min(540px, calc(100% - 32px));
+}
+.feedback-toast > .secondary-button {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: start;
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 10px 14px;
+}
+.feedback-toast:has(> .secondary-button) > button:last-child {
+  grid-column: 3;
+  grid-row: 1;
+}
+
 .welcome-note,
 .state-banner {
   display: flex;
@@ -62,8 +102,69 @@
 }
 .app-topbar .xp-chip {
   min-height: 44px;
-  padding: 0;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 12px;
   white-space: nowrap;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+.app-topbar .avatar-button {
+  flex: 0 0 auto;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.app-topbar .xp-chip:focus-visible {
+  border-color: #536d30;
+  background: var(--accent-soft);
+}
+.app-topbar .avatar-button:focus-visible {
+  border-color: var(--accent);
+  background: #354522;
+  box-shadow: 0 0 0 4px #c7fe6918;
+}
+@media (hover: hover) {
+  .app-topbar .xp-chip:hover {
+    border-color: #536d30;
+    background: var(--accent-soft);
+  }
+  .app-topbar .avatar-button:hover {
+    border-color: var(--accent);
+    background: #354522;
+    box-shadow: 0 0 0 4px #c7fe6918;
+  }
+}
+/* This programmatic/skip-link target needs focus semantics, not a page-sized ring. */
+#main-content:focus {
+  outline: none;
+}
+.active-workout-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 18px;
+}
+.active-workout-notice > p {
+  flex: 1 1 250px;
+  min-width: 0;
+}
+.active-workout-notice > button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  font-size: var(--type-caption);
+}
+.routine-session-notice {
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: var(--type-caption);
+  line-height: 1.65;
 }
 .equipment-link {
   gap: 7px;
@@ -115,7 +216,7 @@
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 2px;
 }
-.bottom-nav.has-admin button {
+.bottom-nav.has-admin :is(a, button) {
   min-width: 0;
   flex: 1;
   padding-inline: 2px;

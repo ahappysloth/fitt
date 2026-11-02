@@ -171,6 +171,8 @@ em {
   font-size: var(--type-body);
   font-weight: 500;
   text-align: left;
+  text-decoration: none;
+  touch-action: manipulation;
 }
 .nav-item.active {
   background: #24291c;
@@ -2554,7 +2556,7 @@ h1 {
     backdrop-filter: blur(20px);
     z-index: 10;
   }
-  .bottom-nav button {
+  .bottom-nav :is(a, button) {
     min-height: 48px;
     min-width: 80px;
     color: var(--muted);
@@ -2565,8 +2567,10 @@ h1 {
     font-size: var(--type-caption);
     padding: 8px 14px;
     border-radius: 11px;
+    text-decoration: none;
+    touch-action: manipulation;
   }
-  .bottom-nav button.active {
+  .bottom-nav :is(a, button).active {
     color: var(--accent);
     background: #252c1d;
   }
@@ -3154,7 +3158,7 @@ h1 {
   .xp-meta {
     font-size: var(--type-caption);
   }
-  .bottom-nav button {
+  .bottom-nav :is(a, button) {
     min-width: 73px;
     font-size: var(--type-caption);
   }
@@ -3372,7 +3376,7 @@ h1 {
   font-size: var(--type-body);
 }
 @container (max-width: 760px) {
-  .bottom-nav button {
+  .bottom-nav :is(a, button) {
     font-size: var(--type-caption);
   }
   .hero-copy > .pill {
@@ -3736,17 +3740,17 @@ h1 {
     padding: 8px 8px max(8px, env(safe-area-inset-bottom));
     min-height: 76px;
   }
-  .bottom-nav button {
+  .bottom-nav :is(a, button) {
     min-width: 0;
     min-height: 52px;
     padding: 7px 3px;
     font-size: var(--type-chip);
     gap: 5px;
   }
-  .bottom-nav button > span {
+  .bottom-nav :is(a, button) > span {
     white-space: nowrap;
   }
-  .bottom-nav button > svg {
+  .bottom-nav :is(a, button) > svg {
     width: 21px;
     height: 21px;
   }

@@ -4,7 +4,8 @@
 const CACHE_PREFIX = 'fitt-shell-'
 const CACHE_NAME = `${CACHE_PREFIX}__BUILD_VERSION__`
 const PRECACHE_URLS = __PRECACHE_URLS__
-const PUBLIC_ASSETS = new Set(PRECACHE_URLS.filter((url) => url !== '/'))
+const PUBLIC_APP_ROUTES = new Set(__PUBLIC_APP_ROUTES__)
+const PUBLIC_ASSETS = new Set(PRECACHE_URLS.filter((url) => !PUBLIC_APP_ROUTES.has(url)))
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -63,7 +64,7 @@ async function cachedStatic(request) {
   return response
 }
 
-async function rootNavigation(request) {
+async function appNavigation(request) {
   const cache = await caches.open(CACHE_NAME)
   try {
     const response = await fetch(request)
@@ -72,7 +73,7 @@ async function rootNavigation(request) {
     // newer online document is cached only when its whole worker installs.
     return response
   } catch {
-    const shell = await cache.match('/')
+    const shell = await cache.match(new URL(request.url).pathname)
     if (shell) return shell
     return new Response(
       '<!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fitt</title><body style="background:#101010;color:#f4f4ef;font-family:system-ui;padding:2rem;line-height:1.6"><h1>You’re offline.</h1><p>Open Fitt once with an internet connection to prepare it for offline training.</p><button onclick="location.reload()">Try again</button></body></html>',
@@ -93,8 +94,8 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/api/')
   )
     return
-  if (request.mode === 'navigate' && url.pathname === '/') {
-    event.respondWith(rootNavigation(request))
+  if (request.mode === 'navigate' && PUBLIC_APP_ROUTES.has(url.pathname)) {
+    event.respondWith(appNavigation(request))
   } else if (url.pathname.startsWith('/_next/static/') || PUBLIC_ASSETS.has(url.pathname)) {
     event.respondWith(cachedStatic(request))
   }

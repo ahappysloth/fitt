@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 
 interface AccessResult {
   userId: string
+  entryKey: string
   allowed: boolean
+  verifiedForEntry: boolean
   checking: boolean
 }
 
-/** UI discovery only: every private preview request is also authorized by the server. */
-export function useAdminAccess(userId: string | null | undefined) {
+/** UI discovery only; direct admin requests are separately authorized by the Worker. */
+export function useAdminAccess(userId: string | null | undefined, entryKey = '') {
   const [result, setResult] = useState<AccessResult | null>(null)
   useEffect(() => {
     if (!userId) return
@@ -21,7 +23,12 @@ export function useAdminAccess(userId: string | null | undefined) {
       pending = controller
       setResult((previous) => ({
         userId,
+        entryKey,
         allowed: previous?.userId === userId && previous.allowed,
+        verifiedForEntry:
+          previous?.userId === userId &&
+          previous.entryKey === entryKey &&
+          previous.verifiedForEntry,
         checking: true,
       }))
       try {
@@ -39,10 +46,11 @@ export function useAdminAccess(userId: string | null | undefined) {
           data.allowed === true &&
           'userId' in data &&
           data.userId === userId
-        if (live && !controller.signal.aborted) setResult({ userId, allowed, checking: false })
+        if (live && !controller.signal.aborted)
+          setResult({ userId, entryKey, allowed, verifiedForEntry: allowed, checking: false })
       } catch {
         if (live && !controller.signal.aborted)
-          setResult({ userId, allowed: false, checking: false })
+          setResult({ userId, entryKey, allowed: false, verifiedForEntry: false, checking: false })
       }
     }
     const visible = () => {
@@ -57,10 +65,18 @@ export function useAdminAccess(userId: string | null | undefined) {
       window.removeEventListener('focus', visible)
       document.removeEventListener('visibilitychange', visible)
     }
-  }, [userId])
+  }, [userId, entryKey])
   return {
     // Never carry an affirmative role over a logout or account switch.
     allowed: !!userId && result?.userId === userId && result.allowed,
-    checking: !!userId && (result?.userId !== userId || result.checking),
+    // A fresh route entry waits for verification. Routine focus refreshes keep
+    // the already authorized playground mounted until a revocation is received.
+    verified:
+      !!userId &&
+      result?.userId === userId &&
+      result.entryKey === entryKey &&
+      result.verifiedForEntry,
+    checking:
+      !!userId && (result?.userId !== userId || result.entryKey !== entryKey || result.checking),
   }
 }

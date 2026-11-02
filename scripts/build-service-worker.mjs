@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import appRoutes from '../src/lib/app-routes.json' with { type: 'json' }
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -46,9 +47,18 @@ export async function buildServiceWorker({ root = projectRoot } = {}) {
 
   // Restrict discovery to the compiled client asset subtree. Server bundles,
   // private Admin documents, build manifests, and API responses never belong here.
-  // The root document is a generic loading shell; account state hydrates later.
+  // Each public route has its own anonymous HTML/RSC shell. Cache that exact
+  // shell for refreshes; never substitute the root's route tree for a deep link.
+  const publicAppRoutes = [
+    appRoutes.today,
+    appRoutes.workout,
+    appRoutes.journey,
+    appRoutes.library,
+    appRoutes.settings,
+    appRoutes.builder,
+  ]
   const urls = [
-    '/',
+    ...publicAppRoutes,
     '/manifest.webmanifest',
     '/icon.svg',
     '/icon-192.png',
@@ -64,6 +74,7 @@ export async function buildServiceWorker({ root = projectRoot } = {}) {
   const worker = template
     .replace('__BUILD_VERSION__', version)
     .replace('__PRECACHE_URLS__', JSON.stringify(urls, null, 2))
+    .replace('__PUBLIC_APP_ROUTES__', JSON.stringify(publicAppRoutes))
   // Vite has already copied public/ into dist/client/ by this postbuild step.
   // Update the deployed asset as well as the local public copy.
   await Promise.all(

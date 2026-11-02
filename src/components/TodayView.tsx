@@ -23,6 +23,7 @@ import { SparkBuddy, TrophyArt } from './FittArtwork'
 import { Button, IconButton, Pill, ProgressBar, SectionTitle, Select, Week, XPCard } from './ui'
 import { ExerciseThumbnail } from './ExerciseGuide'
 import { MuscleMap } from './Visuals'
+import ActiveWorkoutNotice from './ActiveWorkoutNotice'
 
 export default function TodayView({
   state,
@@ -319,6 +320,11 @@ export default function TodayView({
                 </Button>
               }
             />
+            {state.active && (
+              <ActiveWorkoutNotice className="routine-session-notice" onGoToWorkout={onStart}>
+                Finish or discard your current workout before creating or changing saved routines.
+              </ActiveWorkoutNotice>
+            )}
             {state.routines?.length ? (
               <div className="routine-grid">
                 {state.routines.map((routine) => (

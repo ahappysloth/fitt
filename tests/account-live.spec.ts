@@ -90,7 +90,7 @@ test('real account restores imported history on another device and syncs an offl
     })
     await first.addCookies([cookie(token)])
     await page.reload()
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(
       page.getByText(`fitt-browser-${ids[0]}@example.invalid`, { exact: true }).first(),
     ).toBeVisible()
@@ -134,7 +134,7 @@ test('real account restores imported history on another device and syncs an offl
       })
     })
     await secondPage.goto(origin)
-    await secondPage.getByRole('button', { name: 'Settings', exact: true }).click()
+    await secondPage.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(
       secondPage.getByText(`fitt-browser-${ids[0]}@example.invalid`, { exact: true }).first(),
     ).toBeVisible()
@@ -155,7 +155,7 @@ test('real account restores imported history on another device and syncs an offl
       await navigator.serviceWorker.ready
     })
     await first.setOffline(true)
-    await page.getByRole('button', { name: 'Today', exact: true }).click()
+    await page.getByRole('link', { name: 'Today', exact: true }).click()
     await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
     await page
       .getByRole('button', { name: /^Log .* set 1$/ })
@@ -165,7 +165,7 @@ test('real account restores imported history on another device and syncs an offl
     await page.getByRole('button', { name: 'Save workout', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Look at you go.' })).toBeVisible()
     await page.reload()
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await expect(page.locator('.account-status')).toContainText('Offline')
     await first.setOffline(false)
     await expect.poll(async () => (await cloud()).data.history.length, { timeout: 20_000 }).toBe(2)
@@ -203,7 +203,7 @@ test('real account restores imported history on another device and syncs an offl
     })
     expect(crossOrigin.status()).toBe(403)
 
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('link', { name: 'Settings', exact: true }).click()
     await page.getByRole('button', { name: 'Sign out', exact: true }).click()
     await expect(
       page.getByRole('button', { name: 'Continue with Google', exact: true }),

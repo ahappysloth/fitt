@@ -1,4 +1,5 @@
 import handler from 'vinext/server/app-router-entry'
+import { isAdminPagePath, serveAdminPage } from './src/server/admin-page'
 import type { FittEnv } from './src/server/env'
 import { authContextReady } from './src/server/realtime/auth-context'
 import { resolveRealtimeSession } from './src/server/realtime/session'
@@ -19,6 +20,10 @@ export default {
       return upgradeRealtime(request, env, context, resolveRealtimeSession)
     }
     await authContextReady
+    const pathname = new URL(request.url).pathname
+    if (isAdminPagePath(pathname)) {
+      return serveAdminPage(request, () => handler.fetch(request, env, context))
+    }
     return handler.fetch(request, env, context)
   },
 }

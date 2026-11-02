@@ -65,6 +65,6 @@ export function parseAuthCallback(href: string): AuthCallback | null {
 
 /** All three Better Auth outcomes return to the app's account controls. */
 export function authCallbackURLs(origin: string) {
-  const callbackURL = new URL('/?account=return', origin).href
+  const callbackURL = new URL('/settings?account=return', origin).href
   return { callbackURL, newUserCallbackURL: callbackURL, errorCallbackURL: callbackURL }
 }

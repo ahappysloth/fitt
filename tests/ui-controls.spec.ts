@@ -117,7 +117,7 @@ test('shared controls provide branded hover and focus tooltips without title att
 
 test('app dropdowns save preferences and close on an outside pointer press', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   const duration = page.getByRole('combobox', { name: 'Session length' })
   await duration.click()
   await page.getByRole('option', { name: '20 minutes' }).click()
@@ -141,12 +141,12 @@ test('app dropdowns save preferences and close on an outside pointer press', asy
   await page.mouse.click(outsidePoint!.x, outsidePoint!.y)
   await expect(page.getByRole('listbox')).toHaveCount(0)
   await page.reload()
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Session length' })).toHaveText('20 minutes')
-  await page.getByRole('button', { name: 'Today', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Workout duration' })).toHaveText('20 min')
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Session length' })).toBeDisabled()
   await expect(page.getByRole('combobox', { name: 'Default focus' })).toBeDisabled()
   await expect(page.getByRole('combobox', { name: 'Weekly goal' })).toBeDisabled()
@@ -154,7 +154,7 @@ test('app dropdowns save preferences and close on an outside pointer press', asy
 
 test('the library filter highlights and opens from its whole surface', async ({ page }, info) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Library', exact: true }).click()
+  await page.getByRole('link', { name: 'Library', exact: true }).click()
   const filter = page.locator('.library-muscle-filter')
   const select = page.getByRole('combobox', { name: 'Filter muscle group' })
   if (!info.project.use.isMobile) {

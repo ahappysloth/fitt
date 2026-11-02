@@ -1,79 +1,55 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
+  Check,
   Layers3,
-  LoaderCircle,
   Monitor,
   Move3D,
-  RotateCcw,
+  Settings2,
   ShieldCheck,
   Smartphone,
   Sparkles,
 } from 'lucide-react'
 import { Button, Pill } from '../ui'
+import Modal from '../Modal'
+import FormStudioContent from '../form-guide/FormStudioContent'
+import ComponentShowcase from './ComponentShowcase'
+import CelebrationPreview from './CelebrationPreview'
 import './admin.css'
 
-type Studio = 'form' | 'components'
-interface Preview {
-  key: string
-  html?: string
-  error?: string
+export type AdminStudio = 'form' | 'components'
+interface AdminViewProps {
+  userId: string
+  studio?: AdminStudio
+  onStudioChange?: (studio: AdminStudio) => void
 }
 
-export default function AdminView({ userId }: { userId: string }) {
-  const [studio, setStudio] = useState<Studio>('form')
+/** A different account always starts a fresh, memory-only playground. */
+export default function AdminView(props: AdminViewProps) {
+  return <AdminPlayground key={props.userId} {...props} />
+}
+
+function AdminPlayground({ studio: controlledStudio, onStudioChange }: AdminViewProps) {
+  const [localStudio, setLocalStudio] = useState<AdminStudio>('form')
   const [mobile, setMobile] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  const [preview, setPreview] = useState<Preview | null>(null)
-  const [readyKey, setReadyKey] = useState('')
-  const frame = useRef<HTMLIFrameElement>(null)
-  const key = `${userId}:${studio}:${attempt}`
-  const current = preview?.key === key ? preview : null
-  const ready = readyKey === key
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const load = async () => {
-      try {
-        const response = await fetch(`/api/admin/previews/${studio}`, {
-          cache: 'no-store',
-          credentials: 'same-origin',
-          headers: { 'X-Fitt-Account': userId },
-          signal: controller.signal,
-        })
-        if (!response.ok)
-          throw new Error(
-            response.status === 401 || response.status === 403
-              ? 'Sign in with your authorized account to open this studio.'
-              : 'The studio could not load. Try again when you’re online.',
-          )
-        if (!response.headers.get('content-type')?.includes('text/html'))
-          throw new Error('The studio returned an unexpected response. Please try again.')
-        const html = await response.text()
-        if (!controller.signal.aborted) setPreview({ key, html })
-      } catch (error) {
-        if (!controller.signal.aborted)
-          setPreview({
-            key,
-            error: error instanceof Error ? error.message : 'The studio could not load.',
-          })
-      }
-    }
-    void load()
-    return () => controller.abort()
-  }, [key, studio, userId])
-
-  useEffect(() => {
-    const receive = (event: MessageEvent) => {
-      if (event.source !== frame.current?.contentWindow || event.origin !== 'null') return
-      if (event.data?.type === 'fitt-admin-preview-ready' && event.data.kind === studio)
-        setReadyKey(key)
-    }
-    window.addEventListener('message', receive)
-    return () => window.removeEventListener('message', receive)
-  }, [key, studio])
-
+  const [accent, setAccent] = useState<'lime' | 'mint'>('lime')
+  const [calm, setCalm] = useState(false)
+  const [tuning, setTuning] = useState(false)
+  const [celebrate, setCelebrate] = useState(false)
+  const [sampleWorkout, setSampleWorkout] = useState(false)
+  const [sampleSets, setSampleSets] = useState(0)
+  const [sampleXP, setSampleXP] = useState(1430)
+  const [feedback, setFeedback] = useState('')
+  const studio = controlledStudio ?? localStudio
+  const selectStudio = (next: AdminStudio) => {
+    setLocalStudio(next)
+    onStudioChange?.(next)
+  }
+  const logSampleSet = () => {
+    setSampleXP((xp) => xp + 5)
+    setFeedback('+5 sample XP · Nice work. Every set adds up.')
+  }
   return (
     <div className="admin-view">
       <div className="page-heading">
@@ -91,14 +67,18 @@ export default function AdminView({ userId }: { userId: string }) {
       </div>
       <div className="admin-toolbar panel">
         <div className="admin-studios" role="group" aria-label="Admin studio">
-          <button type="button" aria-pressed={studio === 'form'} onClick={() => setStudio('form')}>
+          <button
+            type="button"
+            aria-pressed={studio === 'form'}
+            onClick={() => selectStudio('form')}
+          >
             <Move3D size={17} aria-hidden="true" />
             Form studio
           </button>
           <button
             type="button"
             aria-pressed={studio === 'components'}
-            onClick={() => setStudio('components')}
+            onClick={() => selectStudio('components')}
           >
             <Layers3 size={17} aria-hidden="true" />
             Components
@@ -106,19 +86,16 @@ export default function AdminView({ userId }: { userId: string }) {
         </div>
         <div className="admin-preview-actions">
           {studio === 'components' && (
-            <Button
-              variant="secondary"
-              disabled={!ready}
-              onClick={() =>
-                frame.current?.contentWindow?.postMessage(
-                  { type: 'fitt-admin-preview', command: 'celebrate' },
-                  '*',
-                )
-              }
-            >
-              <Sparkles size={16} aria-hidden="true" />
-              Test celebration
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => setTuning(true)}>
+                <Settings2 size={16} aria-hidden="true" />
+                Tune the feel
+              </Button>
+              <Button variant="secondary" onClick={() => setCelebrate(true)}>
+                <Sparkles size={16} aria-hidden="true" />
+                Test celebration
+              </Button>
+            </>
           )}
           <Button
             variant="secondary"
@@ -136,39 +113,153 @@ export default function AdminView({ userId }: { userId: string }) {
       </div>
       <p className="admin-demo-note">
         <ShieldCheck size={15} aria-hidden="true" />
-        An isolated preview. Trying a workout or celebration here won’t change your progress.
+        Sample data, real components. Your workouts and preferences stay yours.
       </p>
-      <section
-        className={`admin-preview-stage ${mobile ? 'is-mobile' : ''}`}
-        aria-label={studio === 'form' ? 'Form studio preview' : 'Component playground preview'}
+      <div
+        className="admin-demo-theme"
+        data-accent={accent}
+        data-mobile={mobile}
+        data-motion={calm ? 'calm' : 'playful'}
       >
-        {!current && (
-          <div className="admin-preview-state" role="status">
-            <LoaderCircle size={24} className="admin-loading" aria-hidden="true" />
-            <p>Opening your studio…</p>
-          </div>
+        <section
+          className={`admin-studio-content ${mobile ? 'is-mobile' : ''}`}
+          aria-label={studio === 'form' ? 'Form studio preview' : 'Component playground preview'}
+        >
+          {studio === 'form' ? (
+            <div className="form-study form-study--native">
+              <FormStudioContent embedded />
+            </div>
+          ) : (
+            <>
+              <ComponentShowcase
+                embedded
+                accent={accent}
+                xp={sampleXP}
+                calm={calm}
+                onCalmChange={setCalm}
+                onLogSet={logSampleSet}
+                feedback={feedback}
+                onQuickWorkout={() => {
+                  setSampleSets(0)
+                  setSampleWorkout(true)
+                }}
+                onCelebrate={() => setCelebrate(true)}
+              />
+            </>
+          )}
+        </section>
+        {tuning && (
+          <Modal title="Tune the feel" onClose={() => setTuning(false)}>
+            <div className="admin-tune-dialog">
+              <p>Try a variation in this studio. Your app settings won’t change.</p>
+              <h3>Accent color</h3>
+              <div className="admin-accent-options" role="group" aria-label="Sample accent color">
+                <button
+                  type="button"
+                  aria-pressed={accent === 'lime'}
+                  onClick={() => setAccent('lime')}
+                >
+                  <i style={{ background: '#c7fa53' }} aria-hidden="true" />
+                  Electric lime
+                  {accent === 'lime' && <Check size={16} aria-hidden="true" />}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={accent === 'mint'}
+                  onClick={() => setAccent('mint')}
+                >
+                  <i style={{ background: '#8fedb1' }} aria-hidden="true" />
+                  Fresh mint
+                  {accent === 'mint' && <Check size={16} aria-hidden="true" />}
+                </button>
+              </div>
+              <h3>Celebration style</h3>
+              <div className="segmented large" role="group" aria-label="Sample celebration style">
+                <button
+                  type="button"
+                  className={!calm ? 'active' : ''}
+                  aria-pressed={!calm}
+                  onClick={() => setCalm(false)}
+                >
+                  Playful
+                </button>
+                <button
+                  type="button"
+                  className={calm ? 'active' : ''}
+                  aria-pressed={calm}
+                  onClick={() => setCalm(true)}
+                >
+                  Calm
+                </button>
+              </div>
+              <p>
+                Calm removes decorative motion and confetti. System reduced-motion preferences also
+                apply.
+              </p>
+              <Button
+                onClick={() => {
+                  setTuning(false)
+                  setCelebrate(true)
+                }}
+              >
+                Try this celebration
+                <Sparkles size={16} aria-hidden="true" />
+              </Button>
+            </div>
+          </Modal>
         )}
-        {current?.error && (
-          <div className="admin-preview-state" role="alert">
-            <p>{current.error}</p>
-            <Button variant="secondary" onClick={() => setAttempt((value) => value + 1)}>
-              <RotateCcw size={16} aria-hidden="true" />
-              Try again
-            </Button>
-          </div>
+        {sampleWorkout && (
+          <Modal title="Five-minute sample" onClose={() => setSampleWorkout(false)}>
+            <div className="admin-sample-workout">
+              <Pill>
+                <ShieldCheck size={14} aria-hidden="true" />
+                Sample session
+              </Pill>
+              <h3>Knee push-up</h3>
+              <p>
+                8 reps · 3 sets. Hands just wider than your shoulders. Move your knees, hips, and
+                head together.
+              </p>
+              <p role="status">{sampleSets} of 3 sample sets logged</p>
+              <Button
+                disabled={sampleSets === 3}
+                onClick={() => {
+                  setSampleSets((sets) => sets + 1)
+                  logSampleSet()
+                }}
+              >
+                <Check size={16} aria-hidden="true" />
+                Log sample set<span>+5 XP</span>
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSampleWorkout(false)
+                  if (sampleSets > 0) setCelebrate(true)
+                }}
+              >
+                {sampleSets > 0 ? 'Preview the finish' : 'Back to components'}
+              </Button>
+            </div>
+          </Modal>
         )}
-        {current?.html && (
-          <iframe
-            key={key}
-            ref={frame}
-            sandbox="allow-scripts"
-            srcDoc={current.html}
-            title={studio === 'form' ? 'Fitt form studio preview' : 'Fitt component preview'}
-            className="admin-preview-frame"
-            data-ready={ready}
-          />
+        {celebrate && (
+          <Modal title="Your effort, celebrated" onClose={() => setCelebrate(false)}>
+            <CelebrationPreview
+              sample
+              calm={calm}
+              complete
+              setsLogged={15}
+              earnedXP={150}
+              best
+              level={7}
+              primaryLabel="Back to components"
+              onPrimaryAction={() => setCelebrate(false)}
+              onClose={() => setCelebrate(false)}
+            />
+          </Modal>
         )}
-      </section>
+      </div>
     </div>
   )
 }
