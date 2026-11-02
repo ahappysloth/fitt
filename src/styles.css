@@ -19,6 +19,10 @@
   --type-caption: 0.75rem;
   --type-label: 0.75rem;
   --type-body: 0.875rem;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
   font-family: 'DM Sans Variable', sans-serif;
   color: var(--text);
   background: #0b0b0b;
@@ -33,6 +37,16 @@ body {
   margin: 0;
   min-width: 320px;
   background: var(--canvas);
+}
+/* Keep scrolling content behind an opaque canvas under translucent iOS chrome. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--safe-area-top);
+  background: var(--canvas);
+  pointer-events: none;
+  z-index: 100;
 }
 button,
 input,
@@ -109,9 +123,10 @@ em {
   min-height: 100dvh;
   margin: 0 auto;
   background: var(--canvas);
+  padding-inline: var(--safe-area-left) var(--safe-area-right);
 }
 .sidebar {
-  padding: 29px 18px 20px;
+  padding: calc(29px + var(--safe-area-top)) 18px calc(20px + var(--safe-area-bottom));
   border-right: 1px solid #252525;
   position: sticky;
   top: 0;
@@ -290,8 +305,9 @@ em {
   flex-direction: column;
 }
 .app-topbar {
-  height: 76px;
-  padding: 0 33px;
+  height: calc(76px + var(--safe-area-top));
+  padding: var(--safe-area-top) 33px 0;
+  flex-shrink: 0;
   border-bottom: 1px solid #252525;
   display: flex;
   align-items: center;
@@ -1938,7 +1954,9 @@ h1 {
   border-radius: 26px;
   padding: 0;
   width: min(560px, calc(100% - 32px));
-  max-height: calc(100dvh - 40px);
+  max-width: calc(100vw - 24px - var(--safe-area-left) - var(--safe-area-right));
+  inset: var(--safe-area-top) var(--safe-area-right) var(--safe-area-bottom) var(--safe-area-left);
+  max-height: calc(100dvh - 40px - var(--safe-area-top) - var(--safe-area-bottom));
   overflow: auto;
   margin: auto;
   box-shadow: 0 30px 100px #000a;
@@ -2213,7 +2231,7 @@ h1 {
     padding: 27px 24px 0;
   }
   .app-topbar {
-    padding: 0 24px;
+    padding-inline: 24px;
   }
   .dashboard-grid {
     grid-template-columns: minmax(0, 1fr) 253px;
@@ -2481,8 +2499,8 @@ h1 {
     margin-left: 0;
   }
   .app-topbar {
-    height: 70px;
-    padding: 0 23px;
+    height: calc(70px + var(--safe-area-top));
+    padding: var(--safe-area-top) 23px 0;
   }
   .breadcrumbs {
     display: none;
@@ -2617,7 +2635,7 @@ h1 {
     padding: 25px 19px 0;
   }
   .app-topbar {
-    padding: 0 19px;
+    padding-inline: 19px;
   }
   .topbar-right {
     gap: 10px;
@@ -3075,7 +3093,7 @@ h1 {
     padding: 23px 14px 0;
   }
   .app-topbar {
-    padding: 0 14px;
+    padding-inline: 14px;
   }
   .hero-card {
     padding: 22px 17px;
@@ -3167,7 +3185,7 @@ h1 {
   .modal {
     width: calc(100% - 24px);
     border-radius: 23px;
-    max-height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px - var(--safe-area-top) - var(--safe-area-bottom));
   }
   .modal-inner {
     padding: 16px 20px 19px;
@@ -3654,7 +3672,7 @@ h1 {
 .skip-link {
   position: fixed;
   top: 12px;
-  left: 12px;
+  left: calc(12px + var(--safe-area-left));
   z-index: 100;
   transform: translateY(-160%);
   border-radius: 10px;
@@ -3665,6 +3683,7 @@ h1 {
   font-weight: 650;
 }
 .skip-link:focus {
+  top: calc(12px + var(--safe-area-top));
   transform: translateY(0);
 }
 .full {
