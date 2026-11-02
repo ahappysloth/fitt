@@ -27,7 +27,9 @@ test('personalizes an equipment-aware plan, keeps existing guides, and filters t
   await page
     .getByRole('button', { name: 'View Scapular pull-up instructions', exact: true })
     .click()
-  await expect(page.getByRole('img', { name: 'Muscles worked: Back, Shoulders' })).toBeVisible()
+  await expect(
+    page.getByRole('img', { name: 'Muscles worked: Upper back, Shoulders, Forearms' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Play animation' }).click()
   await expect(page.getByRole('button', { name: 'Pause animation' })).toBeVisible()
   await page.keyboard.press('Escape')

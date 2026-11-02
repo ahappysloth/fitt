@@ -13,6 +13,7 @@ import { byId } from '../lib/catalog'
 import type { Session } from '../lib/types'
 import { doneSets, localDay, sessionReps, totalSets, weekDays } from '../lib/workout'
 import { ExerciseThumbnail } from './ExerciseGuide'
+import { Select } from './ui'
 
 export default function ProgressView({
   history,
@@ -132,18 +133,14 @@ export default function ProgressView({
               <label className="field-label" htmlFor="trend-exercise">
                 Exercise
               </label>
-              <select
+              <Select
+                label="Exercise"
                 id="trend-exercise"
                 className="full-select"
                 value={selectedId}
-                onChange={(e) => setSelected(e.target.value)}
-              >
-                {logged.map((id) => (
-                  <option key={id} value={id}>
-                    {byId[id].name}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setSelected}
+                options={logged.map((value) => ({ value, label: byId[value].name }))}
+              />
               <div className="trend-list">
                 {trend.map((point, i) => (
                   <div key={i}>

@@ -16,6 +16,7 @@ import {
 import type { Profile, UserPreferences } from '../lib/types'
 import { equipmentList } from '../lib/catalog'
 import { focusNames } from '../lib/workout'
+import { Select } from './ui'
 import './preferences.css'
 
 export interface SetupViewProps {
@@ -167,51 +168,49 @@ export default function SetupView({
               <div className="pref-fields">
                 <label>
                   Session length
-                  <select
-                    value={profile.duration}
-                    onChange={(event) =>
+                  <Select
+                    label="Session length"
+                    disabled={active}
+                    value={String(profile.duration)}
+                    onValueChange={(value) =>
                       onChange({
                         ...profile,
-                        duration: Number(event.target.value) as Profile['duration'],
+                        duration: Number(value) as Profile['duration'],
                       })
                     }
-                  >
-                    {[20, 30, 45].map((n) => (
-                      <option key={n} value={n}>
-                        {n} minutes
-                      </option>
-                    ))}
-                  </select>
+                    options={[20, 30, 45].map((n) => ({
+                      value: String(n),
+                      label: `${n} minutes`,
+                    }))}
+                  />
                 </label>
                 <label>
                   Default focus
-                  <select
+                  <Select
+                    label="Default focus"
+                    disabled={active}
                     value={profile.focus}
-                    onChange={(event) =>
-                      onChange({ ...profile, focus: event.target.value as Profile['focus'] })
+                    onValueChange={(value) =>
+                      onChange({ ...profile, focus: value as Profile['focus'] })
                     }
-                  >
-                    {Object.entries(focusNames).map(([id, name]) => (
-                      <option key={id} value={id}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
+                    options={Object.entries(focusNames).map(([value, label]) => ({
+                      value,
+                      label,
+                    }))}
+                  />
                 </label>
                 <label>
                   Weekly goal
-                  <select
-                    value={profile.weeklyGoal}
-                    onChange={(event) =>
-                      onChange({ ...profile, weeklyGoal: Number(event.target.value) })
-                    }
-                  >
-                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                      <option key={n} value={n}>
-                        {n} {n === 1 ? 'session' : 'sessions'} / week
-                      </option>
-                    ))}
-                  </select>
+                  <Select
+                    label="Weekly goal"
+                    disabled={active}
+                    value={String(profile.weeklyGoal)}
+                    onValueChange={(value) => onChange({ ...profile, weeklyGoal: Number(value) })}
+                    options={[1, 2, 3, 4, 5, 6, 7].map((n) => ({
+                      value: String(n),
+                      label: `${n} ${n === 1 ? 'session' : 'sessions'} / week`,
+                    }))}
+                  />
                 </label>
               </div>
             </fieldset>

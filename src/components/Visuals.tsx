@@ -74,8 +74,12 @@ export function HeroArt() {
 
 export function MuscleMap({ muscles, small = false }: { muscles: Muscle[]; small?: boolean }) {
   const id = useId().replace(/:/g, '')
-  const fill = (muscle: Muscle) =>
-    muscles.includes(muscle) ? `url(#${id}-active)` : `url(#${id}-rest)`
+  const active = new Set(muscles)
+  const region = (muscle: Muscle) => ({
+    'data-muscle': muscle,
+    'data-active': active.has(muscle),
+    fill: `url(#${id}-${active.has(muscle) ? 'active' : 'rest'})`,
+  })
   const silhouette =
     'M49 42V48C42 49 34 50 29 55C24 60 23 69 24 80L20 102 14 126 13 139 9 151Q7 158 13 159L20 148 23 133 28 111 32 90 36 80C38 96 39 108 41 122L37 139C34 155 34 176 38 194L39 213 42 235 37 245Q35 249 41 250H51L52 237 52 213 56 196 57 164 58 196 62 213 62 237 63 250H73Q79 249 77 245L72 235 75 213 76 194C80 176 80 155 77 139L73 122C75 108 76 96 78 80L82 90 86 111 91 133 94 148 101 159Q107 158 105 151L101 139 100 126 94 102 90 80C91 69 90 60 85 55C80 50 72 49 65 48V42Z'
   return (
@@ -83,7 +87,7 @@ export function MuscleMap({ muscles, small = false }: { muscles: Muscle[]; small
       <svg
         viewBox="0 0 240 260"
         role="img"
-        aria-label={`Muscles worked: ${muscles.map((m) => muscleNames[m]).join(', ') || 'none yet'}`}
+        aria-label={`Muscles worked: ${[...active].map((m) => muscleNames[m]).join(', ') || 'none yet'}`}
       >
         <defs>
           <linearGradient id={`${id}-active`} x1="0" y1="0" x2="1" y2=".8">
@@ -97,7 +101,11 @@ export function MuscleMap({ muscles, small = false }: { muscles: Muscle[]; small
           </linearGradient>
         </defs>
         {[false, true].map((back, index) => (
-          <g key={String(back)} transform={`translate(${index * 125} 0)`}>
+          <g
+            key={String(back)}
+            data-view={back ? 'back' : 'front'}
+            transform={`translate(${index * 125} 0)`}
+          >
             <path d={silhouette} fill="#e9ede3" stroke="#cdd6c4" strokeWidth=".7" />
             <path
               d="M47 24C46 15 50 10 57 10S68 15 67 24L68 28 65 33Q64 41 57 43Q50 41 49 33L46 28Z"
@@ -120,28 +128,28 @@ export function MuscleMap({ muscles, small = false }: { muscles: Muscle[]; small
                 strokeWidth="1"
                 strokeLinejoin="round"
               >
-                <path d="M35 54C27 55 24 64 25 76Q31 79 36 73L41 60Z" fill={fill('shoulders')} />
+                <path d="M35 54C27 55 24 64 25 76Q31 79 36 73L41 60Z" {...region('shoulders')} />
                 <path
                   d={
                     back
                       ? 'M25 79Q30 80 33 76L30 98Q28 106 22 109L20 106Z'
                       : 'M25 79Q29 82 33 79L30 98Q28 106 23 108L21 104Z'
                   }
-                  fill={fill('arms')}
+                  {...region(back ? 'triceps' : 'biceps')}
                 />
-                <path d="M21 111Q25 111 27 108L21 133 16 140 16 130Z" fill={`url(#${id}-rest)`} />
+                <path d="M21 111Q25 111 27 108L21 133 16 140 16 130Z" {...region('forearms')} />
                 {back ? (
                   <>
-                    <path d="M49 46 55 47V73Q44 69 37 61L42 52Z" fill={fill('back')} />
-                    <path d="M37 75Q45 75 55 79L54 118 44 124 40 105Z" fill={fill('back')} />
-                    <path d="M47 122 55 118V135L42 136Z" fill={fill('back')} />
+                    <path d="M49 46 55 47V73Q44 69 37 61L42 52Z" {...region('upper-back')} />
+                    <path d="M37 75Q45 75 55 79L52 105 44 119 40 105Z" {...region('upper-back')} />
+                    <path d="M50 107 55 98V132L44 135 45 123Z" {...region('lower-back')} />
                     <path
                       d="M41 135Q47 131 55 135V153Q46 160 37 151Q36 142 41 135Z"
-                      fill={fill('glutes')}
+                      {...region('glutes')}
                     />
                     <path
                       d="M38 156Q46 161 54 156L52 183Q49 192 42 191C39 182 37 169 38 156Z"
-                      fill={fill('hamstrings')}
+                      {...region('hamstrings')}
                     />
                     <path
                       d="M47 162 45 183M43 84 50 110M44 61 51 66"
@@ -153,19 +161,19 @@ export function MuscleMap({ muscles, small = false }: { muscles: Muscle[]; small
                   </>
                 ) : (
                   <>
-                    <path d="M38 62Q46 58 55 62V82Q45 87 37 79Z" fill={fill('chest')} />
-                    <path d="M38 86 44 91V117L41 123 39 111Z" fill={fill('core')} />
+                    <path d="M38 62Q46 58 55 62V82Q45 87 37 79Z" {...region('chest')} />
+                    <path d="M38 86 44 91V117L41 123 39 111Z" {...region('core')} />
                     {[88, 98, 108].map((y) => (
                       <path
                         key={y}
                         d={`M47 ${y}Q51 ${y - 2} 55 ${y - 1}V${y + 6}Q51 ${y + 8} 47 ${y + 6}Z`}
-                        fill={fill('core')}
+                        {...region('core')}
                       />
                     ))}
-                    <path d="M46 119 55 118V132L48 128Z" fill={fill('core')} />
+                    <path d="M46 119 55 118V132L48 128Z" {...region('core')} />
                     <path
                       d="M38 156Q45 160 54 156L52 182Q48 194 42 190C39 182 37 168 38 156Z"
-                      fill={fill('quads')}
+                      {...region('quads')}
                     />
                     <path
                       d="M43 162Q42 177 46 186M41 65Q47 64 52 66"
@@ -176,7 +184,11 @@ export function MuscleMap({ muscles, small = false }: { muscles: Muscle[]; small
                     />
                   </>
                 )}
-                <path d="M41 203Q47 199 51 203L49 220Q47 228 44 229Z" fill={`url(#${id}-rest)`} />
+                {back ? (
+                  <path d="M41 203Q47 199 51 203L49 220Q47 228 44 229Z" {...region('calves')} />
+                ) : (
+                  <path d="M41 203Q47 199 51 203L49 220Q47 228 44 229Z" fill={`url(#${id}-rest)`} />
+                )}
                 <path
                   d="M42 195Q46 192 50 195M43 236 48 237M13 145 12 152"
                   fill="none"

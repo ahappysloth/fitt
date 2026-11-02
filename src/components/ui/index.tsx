@@ -10,6 +10,10 @@ import {
 import { ArrowUpRight, Check, Star } from 'lucide-react'
 import { getLevel } from '../../lib/rewards'
 import { localDay } from '../../lib/workout'
+import { Tooltip } from './Tooltip'
+
+export { Select } from './Select'
+export { Tooltip } from './Tooltip'
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -37,13 +41,9 @@ export function IconButton({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
   return (
-    <button
-      type={type}
-      aria-label={label}
-      title={label}
-      className={`icon-button ${className}`}
-      {...props}
-    />
+    <Tooltip content={label}>
+      <button type={type} aria-label={label} className={`icon-button ${className}`} {...props} />
+    </Tooltip>
   )
 }
 

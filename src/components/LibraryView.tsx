@@ -3,6 +3,7 @@ import { ArrowUpRight, BookOpen, Check, Search, SlidersHorizontal, X } from 'luc
 import { available, equipmentList, exercises, muscleNames } from '../lib/catalog'
 import type { Muscle, Profile } from '../lib/types'
 import { ExerciseThumbnail } from './ExerciseGuide'
+import { Select } from './ui'
 import './library.css'
 
 export interface LibraryViewProps {
@@ -61,18 +62,15 @@ export default function LibraryView({ profile, onInfo }: LibraryViewProps) {
         </label>
         <label className="library-muscle-filter">
           <SlidersHorizontal size={16} />
-          <select
-            aria-label="Filter muscle group"
+          <Select
+            label="Filter muscle group"
             value={muscle}
-            onChange={(event) => setMuscle(event.target.value as Muscle | 'all')}
-          >
-            <option value="all">All muscle groups</option>
-            {Object.entries(muscleNames).map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
+            onValueChange={(value) => setMuscle(value as Muscle | 'all')}
+            options={[
+              { value: 'all', label: 'All muscle groups' },
+              ...Object.entries(muscleNames).map(([value, label]) => ({ value, label })),
+            ]}
+          />
         </label>
         <button
           className={`library-available-toggle ${onlyAvailable ? 'is-selected' : ''}`}

@@ -65,6 +65,52 @@
   padding: 0;
   white-space: nowrap;
 }
+.equipment-link {
+  gap: 7px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: var(--type-caption);
+}
+.equipment-link:hover {
+  color: var(--text);
+  border-color: #5b6b42;
+  background: var(--surface-raised);
+}
+.today-muscles .muscle-map-note {
+  margin: 0 0 13px;
+  color: var(--muted);
+  font-size: var(--type-caption);
+  line-height: 1.6;
+}
+.today-muscles .muscle-legend {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 0;
+  margin: 0;
+}
+.muscle-legend > li {
+  display: flex;
+}
+.muscle-legend .pill {
+  padding: 5px 9px;
+}
+.muscle-legend .is-active {
+  color: #d5edae;
+  background: #202918;
+  border-color: #4d6034;
+}
+.muscle-legend .is-active > svg {
+  color: var(--accent);
+}
+.muscle-legend .is-inactive {
+  color: #a1a19c;
+  border-color: var(--line);
+}
 .plan-controls {
   display: flex;
   flex-wrap: wrap;

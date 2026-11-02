@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   ArrowRight,
   ArrowUpRight,
+  Check,
   Clock3,
   Dumbbell,
   Moon,
@@ -14,12 +15,12 @@ import {
   Trophy,
   Zap,
 } from 'lucide-react'
-import type { AppState, Focus, Profile, Workout } from '../lib/types'
+import type { AppState, Focus, Muscle, Profile, Workout } from '../lib/types'
 import { byId, muscleNames } from '../lib/catalog'
 import { doneSets, focusNames, localDay, totalSets, weekDays } from '../lib/workout'
 import { getRewards } from '../lib/rewards'
 import { SparkBuddy, TrophyArt } from './FittArtwork'
-import { Button, IconButton, Pill, ProgressBar, SectionTitle, Week, XPCard } from './ui'
+import { Button, IconButton, Pill, ProgressBar, SectionTitle, Select, Week, XPCard } from './ui'
 import { ExerciseThumbnail } from './ExerciseGuide'
 import { MuscleMap } from './Visuals'
 
@@ -217,9 +218,10 @@ export default function TodayView({
               eyebrow="YOUR PLAN, YOUR PACE"
               title={state.active ? 'Your session in progress' : plan.title}
               action={
-                <IconButton label="Training preferences" onClick={onSetup}>
-                  <Settings2 size={18} />
-                </IconButton>
+                <Button variant="ghost" className="equipment-link" onClick={onSetup}>
+                  <Settings2 size={16} aria-hidden="true" />
+                  Equipment
+                </Button>
               }
             />
             <div className="plan-controls">
@@ -237,21 +239,21 @@ export default function TodayView({
               </div>
               <label>
                 <span className="sr-only">Workout duration</span>
-                <select
-                  aria-label="Workout duration"
-                  value={state.profile.duration}
+                <Select
+                  label="Workout duration"
+                  value={String(state.profile.duration)}
                   disabled={!!state.active}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     onProfile({
                       ...state.profile,
-                      duration: Number(event.target.value) as Profile['duration'],
+                      duration: Number(value) as Profile['duration'],
                     })
                   }
-                >
-                  <option value={20}>20 min</option>
-                  <option value={30}>30 min</option>
-                  <option value={45}>45 min</option>
-                </select>
+                  options={[20, 30, 45].map((minutes) => ({
+                    value: String(minutes),
+                    label: `${minutes} min`,
+                  }))}
+                />
               </label>
             </div>
             <div className="plan-list">
@@ -411,11 +413,25 @@ export default function TodayView({
           <section className="panel today-muscles">
             <SectionTitle eyebrow="A FULL-BODY PICTURE" title="Muscles in your plan" />
             <MuscleMap muscles={muscles} small />
-            <div className="muscle-tags">
-              {muscles.map((muscle) => (
-                <Pill key={muscle}>{muscleNames[muscle]}</Pill>
-              ))}
-            </div>
+            <p className="muscle-map-note">
+              Main and supporting muscles. Highlighted groups are in this plan.
+            </p>
+            <ul className="muscle-tags muscle-legend" aria-label="Muscle groups">
+              {Object.entries(muscleNames).map(([muscle, label]) => {
+                const active = muscles.includes(muscle as Muscle)
+                return (
+                  <li key={muscle}>
+                    <Pill className={active ? 'is-active' : 'is-inactive'}>
+                      {active && <Check size={12} aria-hidden="true" />}
+                      {label}
+                      <span className="sr-only">
+                        {active ? ' — in this plan' : ' — not in this plan'}
+                      </span>
+                    </Pill>
+                  </li>
+                )
+              })}
+            </ul>
           </section>
           <div className="rest-note">
             <span>

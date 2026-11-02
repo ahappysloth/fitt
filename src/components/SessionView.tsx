@@ -15,7 +15,7 @@ import {
   RotateCcw,
   Sparkles,
   Timer,
-  X,
+  Trash2,
   Zap,
 } from 'lucide-react'
 import { byId, muscleNames } from '../lib/catalog'
@@ -23,6 +23,7 @@ import type { Effort, Profile, Session, WorkoutExercise, WorkoutSet } from '../l
 import { completeSet, doneSets, totalSets, uid } from '../lib/workout'
 import ExerciseGuide from './ExerciseGuide'
 import { MuscleMap } from './Visuals'
+import { Tooltip } from './ui'
 import './session.css'
 
 interface SessionViewProps {
@@ -452,19 +453,23 @@ function SessionContent({
               <Clock3 size={15} />
               {exercise.rest}s rest between sets
             </span>
-            <button
-              className="workout-session__text-button"
-              disabled={exerciseDone > 0}
-              title={
+            <Tooltip
+              content={
                 exerciseDone > 0
                   ? 'Keep logged sets intact. Swap before logging this movement.'
                   : 'Choose another variation'
               }
-              onClick={() => onSwap(exerciseIndex)}
             >
-              <RotateCcw size={14} />
-              Swap exercise
-            </button>
+              <button
+                className="workout-session__text-button"
+                aria-label="Swap exercise"
+                disabled={exerciseDone > 0}
+                onClick={() => onSwap(exerciseIndex)}
+              >
+                <RotateCcw size={14} />
+                Swap exercise
+              </button>
+            </Tooltip>
           </div>
         </section>
 
@@ -794,8 +799,8 @@ function SessionContent({
           <Heart size={15} />
           Finish with a little recovery.
         </span>
-        <button className="workout-session__text-button" onClick={onDiscard}>
-          <X size={14} />
+        <button type="button" className="workout-session__discard" onClick={onDiscard}>
+          <Trash2 size={16} aria-hidden="true" />
           Discard session
         </button>
       </div>

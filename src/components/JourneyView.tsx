@@ -25,7 +25,7 @@ import { getRewards, type AwardId } from '../lib/rewards'
 import type { Profile, Session, UserPreferences } from '../lib/types'
 import { localDay, weekDays } from '../lib/workout'
 import { SparkBuddy } from './FittArtwork'
-import { Button, Pill, ProgressBar, SectionTitle, Week, XPCard } from './ui'
+import { Button, Pill, ProgressBar, SectionTitle, Select, Week, XPCard } from './ui'
 import './journey.css'
 
 const awardIcons = {
@@ -360,20 +360,18 @@ export default function JourneyView({
             action={
               <label className="journey-record-filter">
                 <span className="sr-only">Filter records by exercise</span>
-                <select
+                <Select
+                  label="Filter records by exercise"
                   value={recordFilter}
-                  onChange={(event) => {
-                    setRecordFilter(event.target.value)
+                  onValueChange={(value) => {
+                    setRecordFilter(value)
                     setRecordLimit(6)
                   }}
-                >
-                  <option value="all">All movements</option>
-                  {recordExercises.map((id) => (
-                    <option key={id} value={id}>
-                      {byId[id].name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: 'all', label: 'All movements' },
+                    ...recordExercises.map((value) => ({ value, label: byId[value].name })),
+                  ]}
+                />
               </label>
             }
           />

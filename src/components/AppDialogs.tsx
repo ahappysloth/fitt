@@ -20,6 +20,7 @@ import ExerciseGuide from './ExerciseGuide'
 import { MuscleMap } from './Visuals'
 import { TrophyArt } from './FittArtwork'
 import { Button, Confetti, CountUp, Pill, ProgressBar } from './ui'
+import { InstallHelp, ProgressHelp } from './HelpDialogs'
 
 export type AppDialog =
   | { type: 'exercise'; id: string }
@@ -283,71 +284,8 @@ export default function AppDialogs({
           </Button>
         </div>
       )}
-      {dialog.type === 'install' && (
-        <div className="install-copy">
-          <p>Keep Fitt on your home screen for a focused training space.</p>
-          <ul>
-            <li>
-              <strong>iPhone or iPad:</strong> open this site in Safari, tap Share, then Add to Home
-              Screen.
-            </li>
-            <li>
-              <strong>Android or desktop:</strong> use your browser’s Install app or Add to Home
-              Screen option.
-            </li>
-          </ul>
-          <p>
-            Load the app online once so it can save its offline files.{' '}
-            {accountMode
-              ? 'Wait for your account to finish syncing before changing devices. Active workouts and unsynced changes stay in this browser; export a backup to keep them.'
-              : 'Your workouts are saved in this browser; export a backup before changing devices or domains.'}
-          </p>
-        </div>
-      )}
-      {dialog.type === 'how' && (
-        <div className="how-copy">
-          <p>
-            Small steps are enough. Fitt rewards showing up, honest effort, and your own progress.
-          </p>
-          <ol>
-            <li>
-              <strong>Start with what you have.</strong>
-              <p>
-                Plans use your equipment and experience. Swap variations or build your own workout
-                whenever you need to.
-              </p>
-            </li>
-            <li>
-              <strong>Log what really happened.</strong>
-              <p>
-                Change reps, hold seconds, and added load. A hard or incomplete set adjusts your
-                remaining targets.
-              </p>
-            </li>
-            <li>
-              <strong>Earn your next step.</strong>
-              <p>
-                Two complete, controlled sessions at your target unlock a small increase: one rep or
-                five seconds. At the top of the range, Fitt may introduce a harder available
-                variation or added load.
-              </p>
-            </li>
-            <li>
-              <strong>Keep your momentum.</strong>
-              <p>
-                Earn 5 XP per logged set, 35 for saving a workout, 15 for a new comparable personal
-                best, and 25 for your weekly goal. Each 250 XP earns a level. Rest never takes
-                earned XP away.
-              </p>
-            </li>
-          </ol>
-          <p className="quiet-copy">
-            Your first saved workout fixes this week’s goal; changes apply to the next fresh week.
-            Five-minute sessions count. Move with control, allow recovery, and stop if something
-            hurts.
-          </p>
-        </div>
-      )}
+      {dialog.type === 'install' && <InstallHelp accountMode={accountMode} onClose={onClose} />}
+      {dialog.type === 'how' && <ProgressHelp onClose={onClose} />}
     </Modal>
   )
 }

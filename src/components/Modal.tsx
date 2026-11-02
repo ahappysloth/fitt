@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import { X } from 'lucide-react'
+import './modal.css'
 
 export default function Modal({
   title,
@@ -54,7 +55,9 @@ export default function Modal({
             <X size={20} />
           </button>
         </div>
-        {children}
+        <div className="modal-content" tabIndex={0} role="region" aria-label={`${title} content`}>
+          {children}
+        </div>
       </div>
     </dialog>
   )

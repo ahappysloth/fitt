@@ -14,7 +14,7 @@
   --accent-soft: #c7fa5314;
   --accent-ink: #18210a;
   --radius: 22px;
-  --type-chip: 0.625rem;
+  --type-chip: 0.75rem;
   --type-meta: 0.6875rem;
   --type-caption: 0.75rem;
   --type-label: 0.75rem;
@@ -382,8 +382,8 @@ h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 4px 8px;
+  gap: 6px;
+  padding: 5px 10px;
   border: 1px solid #383b33;
   border-radius: 30px;
   font-size: var(--type-chip);
@@ -393,8 +393,9 @@ h1 {
   line-height: 1.4;
 }
 .pill > svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 .lime-pill {
   color: var(--accent);
@@ -1074,6 +1075,7 @@ h1 {
   border-top: 1px solid #292929;
   color: var(--muted);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 15px;
@@ -1081,8 +1083,26 @@ h1 {
 }
 .app-footer > span {
   display: flex;
+  flex: 1 1 200px;
   align-items: center;
   gap: 8px;
+}
+.app-footer > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-height: 36px;
+  padding: 4px 0;
+  color: inherit;
+  font-size: inherit;
+  text-align: right;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.app-footer > button svg {
+  flex-shrink: 0;
 }
 .app-footer svg {
   width: 14px;

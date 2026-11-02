@@ -1,0 +1,222 @@
+.help-dialog {
+  color: var(--muted);
+  font-size: var(--type-body);
+  line-height: 1.7;
+}
+.help-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 3px 0 24px;
+}
+.help-symbol,
+.help-app-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 56px;
+  height: 56px;
+  border: 1px solid #475631;
+  border-radius: 17px;
+  background: #242d19;
+  color: var(--accent);
+}
+.help-intro .eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.07em;
+  margin-bottom: 7px;
+}
+.help-intro h3 {
+  color: var(--text);
+  font-size: 1.25rem;
+  line-height: 1.35;
+  letter-spacing: -0.035em;
+  margin: 0 0 9px;
+}
+.help-intro p:not(.eyebrow) {
+  font-size: 0.8125rem;
+}
+.help-steps {
+  list-style: none;
+  margin: 0 0 24px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.help-steps > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--canvas);
+}
+.help-step-icon {
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  flex: 0 0 32px;
+  color: var(--accent);
+  padding-top: 3px;
+}
+.help-step-icon > span {
+  color: var(--quiet);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+.help-dialog h4 {
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  font-weight: 650;
+  margin: 0 0 5px;
+}
+.help-steps p {
+  font-size: 0.8125rem;
+}
+.help-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 15px;
+  border-radius: 14px;
+  background: #1c2217;
+  font-size: 0.8125rem;
+}
+.help-note > svg {
+  flex-shrink: 0;
+  color: #c0d4a0;
+  margin-top: 3px;
+}
+.help-dialog strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.help-note strong {
+  display: block;
+  margin-bottom: 2px;
+}
+.help-details {
+  margin-top: 18px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.help-details > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 1px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+.help-details > summary::-webkit-details-marker {
+  display: none;
+}
+.help-details > summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.help-details > summary > svg {
+  flex-shrink: 0;
+  color: var(--quiet);
+}
+.help-details[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.help-details > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
+.help-details > div {
+  padding: 3px 0 15px;
+  font-size: 0.8125rem;
+}
+.help-details p + p {
+  margin-top: 10px;
+}
+.help-done {
+  width: 100%;
+  margin-top: 22px;
+}
+.help-app-icon {
+  background: linear-gradient(140deg, #e1ff99, var(--accent) 60%, #9bc83c);
+  color: var(--accent-ink);
+  border-color: #d6fc85;
+  box-shadow: 0 6px 25px #b1ef3212;
+}
+.help-app-icon svg {
+  width: 32px;
+  height: 32px;
+}
+.install-benefits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -5px 0 22px;
+}
+.install-benefits .pill {
+  color: #d0dfb5;
+  background: #1b2116;
+}
+.install-platform {
+  padding: 18px;
+  margin-bottom: 12px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.install-platform h4 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.install-platform h4 svg {
+  color: var(--accent);
+}
+.install-platform ol {
+  margin: 0;
+  padding-left: 21px;
+  list-style: decimal;
+  font-size: 0.8125rem;
+}
+.install-platform li {
+  padding-left: 4px;
+  margin-top: 8px;
+}
+.install-platform li::marker {
+  color: var(--quiet);
+  font-size: 0.75rem;
+}
+.install-platform li svg {
+  display: inline-block;
+  vertical-align: -3px;
+  margin: 0 2px;
+  color: var(--accent);
+}
+@media (max-width: 400px) {
+  .help-intro {
+    gap: 12px;
+  }
+  .help-symbol,
+  .help-app-icon {
+    flex-basis: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+  .help-intro h3 {
+    font-size: 1.125rem;
+  }
+  .help-steps > li {
+    gap: 11px;
+    padding: 13px;
+  }
+}

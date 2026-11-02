@@ -718,6 +718,24 @@
   color: var(--session-muted);
   font-size: 0.75rem;
 }
+.workout-session__discard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 1px solid #735047;
+  border-radius: 12px;
+  background: #2b1d1a;
+  color: #f4c1b1;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.workout-session__discard:hover {
+  border-color: #b27d6c;
+  background: #3a241e;
+}
 @container (max-width: 1120px) {
   .workout-session__grid {
     grid-template-columns: minmax(0, 1fr) minmax(280px, 0.85fr);

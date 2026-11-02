@@ -18,6 +18,7 @@ import type { Muscle, Profile, Session, Workout, WorkoutExercise } from '../lib/
 import { prescribe, uid } from '../lib/workout'
 import { ExerciseThumbnail } from './ExerciseGuide'
 import Modal from './Modal'
+import { Select, Tooltip } from './ui'
 import './builder.css'
 
 export interface WorkoutBuilderProps {
@@ -263,19 +264,15 @@ export default function WorkoutBuilder({
               <Clock3 size={14} />
               Time to set aside
             </span>
-            <select
+            <Select
+              label="Time to set aside"
               value={duration}
-              onChange={(event) => {
-                setDuration(event.target.value)
+              onValueChange={(value) => {
+                setDuration(value)
                 setDirty(true)
               }}
-            >
-              {durations.map((n) => (
-                <option key={n} value={n}>
-                  {n} minutes
-                </option>
-              ))}
-            </select>
+              options={durations.map((n) => ({ value: String(n), label: `${n} minutes` }))}
+            />
           </label>
         </section>
         <div className="builder-layout">
@@ -347,39 +344,42 @@ export default function WorkoutBuilder({
                         <small>{exercise.muscles.map((id) => muscleNames[id]).join(' · ')}</small>
                       </button>
                       <div className="builder-entry-actions">
-                        <button
-                          type="button"
-                          title="Move up"
-                          aria-label={`Move ${exercise.name} up`}
-                          disabled={index === 0}
-                          onClick={() => move(index, -1)}
-                        >
-                          <ArrowUp size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Move down"
-                          aria-label={`Move ${exercise.name} down`}
-                          disabled={index === entries.length - 1}
-                          onClick={() => move(index, 1)}
-                        >
-                          <ArrowDown size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="builder-remove"
-                          title="Remove movement"
-                          aria-label={`Remove ${exercise.name}`}
-                          onClick={() => {
-                            setEntries((current) =>
-                              current.filter((item) => item.key !== entry.key),
-                            )
-                            setDirty(true)
-                            setNotice(`${exercise.name} removed.`)
-                          }}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <Tooltip content="Move up">
+                          <button
+                            type="button"
+                            aria-label={`Move ${exercise.name} up`}
+                            disabled={index === 0}
+                            onClick={() => move(index, -1)}
+                          >
+                            <ArrowUp size={16} />
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Move down">
+                          <button
+                            type="button"
+                            aria-label={`Move ${exercise.name} down`}
+                            disabled={index === entries.length - 1}
+                            onClick={() => move(index, 1)}
+                          >
+                            <ArrowDown size={16} />
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Remove movement">
+                          <button
+                            type="button"
+                            className="builder-remove"
+                            aria-label={`Remove ${exercise.name}`}
+                            onClick={() => {
+                              setEntries((current) =>
+                                current.filter((item) => item.key !== entry.key),
+                              )
+                              setDirty(true)
+                              setNotice(`${exercise.name} removed.`)
+                            }}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
                     <div className={`builder-entry-fields ${showLoad ? 'with-load' : ''}`}>
@@ -517,19 +517,16 @@ export default function WorkoutBuilder({
                 </button>
               )}
             </label>
-            <select
+            <Select
               className="builder-muscle-filter"
-              aria-label="Filter routine movements by muscle"
+              label="Filter routine movements by muscle"
               value={muscle}
-              onChange={(event) => setMuscle(event.target.value as Muscle | 'all')}
-            >
-              <option value="all">All muscle groups</option>
-              {Object.entries(muscleNames).map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setMuscle(value as Muscle | 'all')}
+              options={[
+                { value: 'all', label: 'All muscle groups' },
+                ...Object.entries(muscleNames).map(([value, label]) => ({ value, label })),
+              ]}
+            />
             <div className="builder-choices">
               {choices.map((exercise) => (
                 <div className="builder-choice-row" key={exercise.id}>
@@ -556,15 +553,16 @@ export default function WorkoutBuilder({
                     </span>
                     {selected.has(exercise.id) ? <Check size={15} /> : <Plus size={17} />}
                   </button>
-                  <button
-                    type="button"
-                    className="builder-info"
-                    aria-label={`View ${exercise.name} instructions`}
-                    title="View instructions"
-                    onClick={() => onInfo(exercise.id)}
-                  >
-                    <Info size={17} />
-                  </button>
+                  <Tooltip content="View instructions">
+                    <button
+                      type="button"
+                      className="builder-info"
+                      aria-label={`View ${exercise.name} instructions`}
+                      onClick={() => onInfo(exercise.id)}
+                    >
+                      <Info size={17} />
+                    </button>
+                  </Tooltip>
                 </div>
               ))}
               {!choices.length && (
