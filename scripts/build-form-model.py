@@ -297,12 +297,14 @@ def sculpt_surface(surface, model):
                 dz -= .0015*abdominal*gaussian(oy, level, .011)
 
         else:
-            # Raise the visual center of the chest volume and round the upper
-            # curve without adding size or stretching a long conical lower tip.
+            # A slightly higher, fuller curve gives the side profile a supported
+            # round contour. Lift the existing volume through the same smooth
+            # chest support so the upper and lower transitions stay continuous.
             chest = (smoothstep(.018, .045, ax)*(1-smoothstep(.13, .17, ax))
                      *smoothstep(.30, .34, oy)*(1-smoothstep(.45, .50, oy))*front)
-            chest_curve = .106+.059*math.exp(-((ax-.078)/.070)**2-((oy-.395)/.068)**2)
+            chest_curve = .106+.071*math.exp(-((ax-.078)/.070)**2-((oy-.405)/.072)**2)
             dz += .65*chest*(chest_curve-z)
+            dy += .007*chest*gaussian(oy, .375, .065)
             # Athletic midline and oblique definition stay softer than the male.
             dz += .0035*gaussian(ax, .042, .03)*gaussian(oy, .285, .095)*front
             dz -= .0018*gaussian(ox, 0., .012)*gaussian(oy, .29, .10)*front
@@ -469,7 +471,7 @@ female_variant = {
     'version': 1,
     'source': 'MakeHuman hm08 adult female muscle/lean and head shape / CC0, with Fitt athletic surface sculpt',
     'retargeting': variant['retargeting'],
-    'surfaceSculpt': {**variant['surfaceSculpt'], 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6)},
+    'surfaceSculpt': {**variant['surfaceSculpt'], 'revision': 'athletic-2-chest-profile', 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6)},
     'lowerLegPreservation': {'blendSourceY': [-.35, -.23], 'surface': 'canonical'},
     'sourcesSha256': {**result['sourcesSha256'], **{
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in [p for p, _ in chest_targets] + [female_muscle_target_path, female_lean_muscle_target_path, female_shape_target_path]}},
