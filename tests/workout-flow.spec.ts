@@ -98,6 +98,8 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
 test('keeps logging first, preserves edits between tabs, and adapts a good20 squat to18', async ({
   page,
 }) => {
+  if (test.info().project.name.startsWith('mobile'))
+    await page.setViewportSize({ width: 393, height: 727 })
   await seed(page, activeWith('squat', 'plank'))
   await page.goto('/workout')
   await expect(page.getByText('Log at least one set to save your workout.')).toBeVisible()
@@ -108,7 +110,7 @@ test('keeps logging first, preserves edits between tabs, and adapts a good20 squ
       .boundingBox()
     const nav = await page.getByRole('navigation', { name: 'Mobile navigation' }).boundingBox()
     expect(log!.y).toBeGreaterThan(0)
-    expect(log!.y + log!.height).toBeLessThanOrEqual(nav!.y)
+    expect(log!.y + log!.height).toBeLessThanOrEqual(nav!.y - 16)
   }
   const input = page.getByRole('spinbutton', { name: 'Bodyweight squat set 1 reps', exact: true })
   await input.fill('20')
