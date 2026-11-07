@@ -80,7 +80,7 @@ export function prescribe(
   const last = previous[0]
   if (last) {
     const done = completed(last)
-    target = Math.min(
+    const plannedTarget = Math.min(
       exercise.max,
       Math.max(1, Math.round(done.reduce((n, s) => n + s.target, 0) / done.length)),
     )
@@ -88,6 +88,16 @@ export function prescribe(
       exercise.weighted && profile.equipment.includes('vest')
         ? Math.min(...done.map((s) => s.load))
         : 0
+    // A full, comfortable exercise can reveal that the original target was too
+    // low. Keep partial work and changed loads from inflating the next plan.
+    const canCalibrate =
+      successful(last) && done.every((s) => s.load === load && s.load === s.targetLoad)
+    target = canCalibrate
+      ? Math.min(
+          exercise.max,
+          Math.max(1, Math.round(done.reduce((n, s) => n + s.reps, 0) / done.length)),
+        )
+      : plannedTarget
     const struggled = done.some(
       (s) => s.reps < s.target || s.load < s.targetLoad || s.effort === 'hard',
     )
@@ -113,6 +123,10 @@ export function prescribe(
         )
         note = 'Target adjusted down to match your last session.'
       }
+    } else if (target > plannedTarget) {
+      // Calibrating an underestimated target is separate from earning a new
+      // variation or added load through the existing two-session progression.
+      note = 'Target calibrated to your completed sets. Build consistency here.'
     } else if (previous.length > 1 && successful(last) && successful(previous[1])) {
       if (target >= exercise.max) {
         const harder = exercise.harder && byId[exercise.harder]
@@ -249,32 +263,58 @@ export function replaceExercise(entry: WorkoutExercise, exercise: Exercise): Wor
 }
 
 export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise {
-  const set = entry.sets.find((s) => s.id === id)!
+  const index = entry.sets.findIndex((s) => s.id === id)
+  const set = entry.sets[index]
+  if (!set) return entry
   if (set.done)
     return { ...entry, sets: entry.sets.map((s) => (s.id === id ? { ...s, done: false } : s)) }
   const exercise = byId[entry.exerciseId]
-  const needsAdjustment =
-    set.reps < set.target || set.effort === 'hard' || set.load < set.targetLoad
-  const target = Math.max(
-    1,
-    Math.min(
-      set.target,
-      set.reps - (set.effort === 'hard' && set.reps > 1 ? (exercise.unit === 'sec' ? 5 : 1) : 0),
+  const struggled = set.reps < set.target || set.effort === 'hard' || set.load < set.targetLoad
+  // Comfortable extra reps calibrate an underestimated target. Leave some
+  // headroom for fatigue after a "good" set; an easy set can repeat its result.
+  const target = Math.min(
+    600,
+    Math.max(
+      1,
+      struggled
+        ? Math.min(
+            set.target,
+            set.reps - (set.effort === 'hard' ? (exercise.unit === 'sec' ? 5 : 1) : 0),
+          )
+        : Math.max(set.target, set.effort === 'easy' ? set.reps : Math.round(set.reps * 0.9)),
     ),
   )
-  const load = Math.max(0, set.load - (set.effort === 'hard' && set.load > 0 ? 2.5 : 0))
+  const load = exercise.weighted
+    ? Math.min(
+        MAX_ADDED_LOAD_KG,
+        Math.max(0, set.load - (set.effort === 'hard' && set.load > 0 ? 2.5 : 0)),
+      )
+    : 0
+  const nextCompleted = entry.sets.findIndex((s, i) => i > index && s.done)
+  let adjusted = false
+  const sets = entry.sets.map((s, i) => {
+    if (i === index) return { ...s, done: true }
+    // Only later, untouched sets are recommendations. Preserve manual input,
+    // completed work, and earlier sets when a user logs out of order.
+    if (
+      i < index ||
+      (nextCompleted !== -1 && i > nextCompleted) ||
+      s.done ||
+      s.reps !== s.target ||
+      s.load !== s.targetLoad ||
+      s.effort !== 'good' ||
+      (s.target === target && s.targetLoad === load)
+    )
+      return s
+    adjusted = true
+    return { ...s, target, reps: target, load, targetLoad: load }
+  })
   return {
     ...entry,
-    note: needsAdjustment
-      ? `Remaining sets adjusted to ${target} ${exercise.unit}${load > 0 ? ` + ${load} kg` : ''}. Quality comes first.`
+    note: adjusted
+      ? `Next suggested target: ${target} ${exercise.unit}${load > 0 ? ` + ${load} kg` : ''}. Quality comes first.`
       : entry.note,
-    sets: entry.sets.map((s) =>
-      s.id === id
-        ? { ...s, done: true }
-        : !s.done && needsAdjustment
-          ? { ...s, target, reps: target, load, targetLoad: load }
-          : s,
-    ),
+    sets,
   }
 }
 
