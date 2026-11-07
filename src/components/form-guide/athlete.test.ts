@@ -12,55 +12,78 @@ describe('body surface quality', () => {
   const canonical = new Float32Array(raw.buffer)
   const restVertex = (index: number) => new Vector3().fromArray(canonical, index * 3)
 
-  it('preserves local facial proportions instead of stretching tiny features across the head', () => {
-    const athlete = createAthlete('male')
-    try {
-      const { position } = athlete.mesh.geometry.attributes
-      const triangles = athlete.mesh.geometry.index!
-      let largestStretch = 0
-      let checked = 0
-      for (let index = 0; index < triangles.count; index += 3) {
-        const vertices = [0, 1, 2].map((offset) => triangles.getX(index + offset))
-        if (!vertices.every((vertex) => canonical[vertex * 3 + 1] > 0.67)) continue
-        for (let edge = 0; edge < 3; edge++) {
-          const start = vertices[edge],
-            end = vertices[(edge + 1) % 3]
-          const originalLength = restVertex(start).distanceTo(restVertex(end))
-          const length = new Vector3()
-            .fromBufferAttribute(position, start)
-            .distanceTo(new Vector3().fromBufferAttribute(position, end))
-          largestStretch = Math.max(largestStretch, length / originalLength)
+  it.each(['male', 'female'] as const)(
+    'preserves local %s facial proportions instead of stretching tiny features across the head',
+    (model) => {
+      const athlete = createAthlete(model)
+      try {
+        const { position } = athlete.mesh.geometry.attributes
+        const triangles = athlete.mesh.geometry.index!
+        let largestStretch = 0
+        let checked = 0
+        for (let index = 0; index < triangles.count; index += 3) {
+          const vertices = [0, 1, 2].map((offset) => triangles.getX(index + offset))
+          if (!vertices.every((vertex) => canonical[vertex * 3 + 1] > 0.67)) continue
+          for (let edge = 0; edge < 3; edge++) {
+            const start = vertices[edge],
+              end = vertices[(edge + 1) % 3]
+            const originalLength = restVertex(start).distanceTo(restVertex(end))
+            const length = new Vector3()
+              .fromBufferAttribute(position, start)
+              .distanceTo(new Vector3().fromBufferAttribute(position, end))
+            largestStretch = Math.max(largestStretch, length / originalLength)
+            checked++
+          }
+        }
+        // Different facial features are allowed. The broken per-feature retarget
+        // stretched some adjacent vertices 20× apart and visibly tore the eyelids.
+        expect(checked).toBeGreaterThan(10000)
+        expect(largestStretch).toBeLessThan(4)
+      } finally {
+        athlete.dispose()
+      }
+    },
+  )
+
+  it.each(['male', 'female'] as const)(
+    'preserves canonical %s palm and knee contact surfaces after sculpting',
+    (model) => {
+      const athlete = createAthlete(model)
+      try {
+        const { position, skinIndex, skinWeight } = athlete.mesh.geometry.attributes
+        let checked = 0
+        for (let index = 0; index < position.count; index++) {
+          const original = restVertex(index)
+          const names = [0, 1, 2, 3]
+            .filter((slot) => skinWeight.getComponent(index, slot) > 0)
+            .map((slot) => data.bones[skinIndex.getComponent(index, slot)].name)
+          const palm = names.every((name) => /^(wrist|metacarpal|finger)/.test(name))
+          const knee = ['L', 'R'].some(
+            (side) => original.distanceTo(point(`lowerleg01.${side}`)) < 0.075,
+          )
+          if (!palm && !knee) continue
+          expect(new Vector3().fromBufferAttribute(position, index).distanceTo(original)).toBe(0)
           checked++
         }
+        expect(checked).toBeGreaterThan(1000)
+      } finally {
+        athlete.dispose()
       }
-      // Different facial features are allowed. The broken per-feature retarget
-      // stretched some adjacent vertices 20× apart and visibly tore the eyelids.
-      expect(checked).toBeGreaterThan(10000)
-      expect(largestStretch).toBeLessThan(4)
-    } finally {
-      athlete.dispose()
-    }
-  })
+    },
+  )
 
-  it('keeps the female adjustment modest and confined to the chest', () => {
+  it('keeps the female athletic refinement bounded and preserves her reviewed lower legs and feet', () => {
     const athlete = createAthlete('female')
     try {
       const { position } = athlete.mesh.geometry.attributes
-      let changed = 0,
-        largestDisplacement = 0
+      let largestDisplacement = 0
       for (let index = 0; index < position.count; index++) {
         const original = restVertex(index)
         const distance = original.distanceTo(new Vector3().fromBufferAttribute(position, index))
-        if (distance === 0) continue
-        changed++
         largestDisplacement = Math.max(largestDisplacement, distance)
-        expect(Math.abs(original.x)).toBeLessThan(0.15)
-        expect(original.y).toBeGreaterThan(0.22)
-        expect(original.y).toBeLessThan(0.53)
-        expect(original.z).toBeGreaterThan(0.05)
+        if (original.y < -0.35) expect(distance).toBe(0)
       }
-      expect(changed).toBeGreaterThan(0)
-      expect(largestDisplacement).toBeLessThan(0.035)
+      expect(largestDisplacement).toBeLessThan(0.05)
     } finally {
       athlete.dispose()
     }
