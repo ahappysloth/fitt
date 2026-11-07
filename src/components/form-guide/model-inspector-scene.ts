@@ -94,7 +94,7 @@ export function createModelInspectorScene(
     // where a middle press normally starts page auto-scrolling.
     canvas.addEventListener('mousedown', preventMiddleDefault)
     cleanups.push(() => canvas.removeEventListener('mousedown', preventMiddleDefault))
-    scene.add(new THREE.HemisphereLight('#e8ecf0', '#252525', 1.4))
+    scene.add(new THREE.HemisphereLight('#e8ecf0', '#4a4f4e', 1.4))
     const key = new THREE.DirectionalLight('#fffaf3', 2.6)
     key.position.set(2.3, 3.8, 2.3)
     // Even studio lighting makes the surface readable. Cast shadows from hands

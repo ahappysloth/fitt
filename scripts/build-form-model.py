@@ -273,11 +273,11 @@ def sculpt_surface(surface, model):
         # The trunk field excludes arms, and fades before the pelvis and neck.
         trunk = 1-smoothstep(.16, .23, ax)
         waist = gaussian(oy, .225, .105)*trunk
-        dx -= x*(.105 if male else .075)*waist
-        dz -= (z-.005)*(.10 if male else .065)*waist
+        dx -= x*(.105 if male else .18)*waist
+        dz -= (z-.005)*(.10 if male else .14)*waist
         # Lats widen the upper trunk while the waist narrows below them.
         lat = gaussian(oy, .40, .095)*smoothstep(.07, .135, ax)*trunk
-        dx += side*(.014*(1-.45*smoothstep(.025, .075, oz)) if male else .004)*lat
+        dx += side*(.014*(1-.45*smoothstep(.025, .075, oz)) if male else -.003)*lat
         front = smoothstep(.025, .075, oz)
         if male:
             # A broad pectoral plate with a higher, flatter lower edge. The
@@ -297,21 +297,23 @@ def sculpt_surface(surface, model):
                 dz -= .0015*abdominal*gaussian(oy, level, .011)
 
         else:
-            # A slightly higher, fuller curve gives the side profile a supported
-            # round contour. Lift the existing volume through the same smooth
-            # chest support so the upper and lower transitions stay continuous.
-            chest = (smoothstep(.018, .045, ax)*(1-smoothstep(.13, .17, ax))
-                     *smoothstep(.30, .34, oy)*(1-smoothstep(.45, .50, oy))*front)
-            chest_curve = .106+.071*math.exp(-((ax-.078)/.070)**2-((oy-.405)/.072)**2)
-            dz += .65*chest*(chest_curve-z)
-            dy += .007*chest*gaussian(oy, .375, .065)
-            # Athletic midline and oblique definition stay softer than the male.
-            dz += .0035*gaussian(ax, .042, .03)*gaussian(oy, .285, .095)*front
-            dz -= .0018*gaussian(ox, 0., .012)*gaussian(oy, .29, .10)*front
-            # Glute volume and lateral hip transition, without shifting the pelvis.
-            glute = gaussian(oy, .015, .10)*gaussian(ax, .105, .075)
-            dz -= .014*glute*(1-smoothstep(-.035, .015, oz))
-            dx += side*.006*glute*smoothstep(.07, .15, ax)
+            # A smooth adult mannequin silhouette: high, rounded chest volumes,
+            # softly tapered ribcage and waist, and a continuous hip/glute curve.
+            # A smooth front chart carries paired rounded volumes and a shallow
+            # abdomen, while the lateral support fades into the original ribs.
+            chest = ((1-smoothstep(.10, .165, ax))*smoothstep(.025, .065, oz)
+                     *smoothstep(.12, .20, oy)*(1-smoothstep(.49, .55, oy)))
+            vertical_radius = .065+.008*smoothstep(.412, .438, oy)
+            radius = ((ax-.078)/.060)**2+((oy-.425)/vertical_radius)**2
+            dome = math.exp(-.5*radius-.28*radius*radius)
+            chest_curve = .120-2.5*ax*ax+.100*dome
+            dz += chest*(chest_curve-z)
+            glute = gaussian(oy, -.005, .15)*gaussian(ax, .105, .085)
+            dz -= .024*glute*(1-smoothstep(-.035, .015, oz))
+            dx += side*.012*glute*smoothstep(.07, .15, ax)
+            # Reduce shoulder caps while keeping each joint fixed.
+            shoulder = gaussian(ax, .19, .065)*gaussian(oy, .525, .07)
+            dy -= .012*shoulder
         # Upper arm volumes follow the fixed shoulder/elbow line rather than
         # axis-aligned lobes, so the deltoid and triceps remain coherent in motion.
         arm_side = 'L' if ox >= 0 else 'R'
@@ -324,15 +326,15 @@ def sculpt_surface(surface, model):
                          if names[skin_indices[index*4+k]].startswith('upperarm'))
         if arm_weight:
             center = [shoulder[a]+t*axis[a] for a in range(3)]
-            volume = ((.25 if male else .12)*gaussian(t, .15, .35)
-                      +(.20 if male else .08)*gaussian(t, .62, .28))*arm_weight
+            volume = ((.25 if male else -.12)*gaussian(t, .15, .35)
+                      +(.20 if male else -.13)*gaussian(t, .62, .28))*arm_weight
             dx += (x-center[0])*volume
             dy += (y-center[1])*volume
             dz += (z-center[2])*volume
         # Thigh definition follows the authored contour; no change below the
         # knee envelope, preserving the reviewed calf and relaxed-foot anatomy.
         thigh = gaussian(oy, -.155, .13)*gaussian(ax, .13, .065)
-        dz += (.007 if male else .005)*thigh*smoothstep(.015, .06, oz)
+        dz += (.007 if male else -.003)*thigh*smoothstep(.015, .06, oz)
         # One smooth jaw/cheek field, applied equally to head and eye surfaces.
         # The authored adult face carries the features; this only polishes the
         # outer jaw taper and cheek contour by at most a few millimetres.
@@ -355,7 +357,7 @@ def sculpt_surface(surface, model):
         if old in eye_vertices:
             dz -= .0012
         largest_offset = max(largest_offset, length([dx*fade, dy*fade, dz*fade]))
-        assert length([dx*fade, dy*fade, dz*fade]) < .050, f'Sculpt exceeds the 50 mm refinement envelope: {old}, {x,y,z}, {dx,dy,dz}'
+        assert length([dx*fade, dy*fade, dz*fade]) < (.050 if male else .090), f'Sculpt exceeds its model refinement envelope: {old}, {x,y,z}, {dx,dy,dz}'
         sculpted.extend((x+dx*fade, y+dy*fade, z+dz*fade))
     sculpt_maximum_offsets[model] = largest_offset
     return sculpted
@@ -377,8 +379,9 @@ def polish_surface(surface, model):
         skull = .52*smoothstep(.765, .81, y)
         cheek = .32*gaussian(ax, .065, .028)*gaussian(y, .695, .027)*smoothstep(.02, .06, z)
         shoulder = .50*gaussian(ax, .185, .07)*gaussian(y, .53, .055)
-        chest = (.28 if model == 'male' else .18)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
-        strengths.append(max(skull, cheek, shoulder, chest))
+        chest = (.28 if model == 'male' else .25)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
+        hip = .35*gaussian(ax, .145, .06)*gaussian(y, .08, .11) if model == 'female' else 0.
+        strengths.append(max(skull, cheek, shoulder, chest, hip))
     for _ in range(3):
         relaxed = surface[:]
         for index, strength in enumerate(strengths):
@@ -426,9 +429,9 @@ print(f'Male surface: {variant_output.stat().st_size // 1024} KiB; shares canoni
 # lower silhouette. The missing average-size/average-firmness corner is the base.
 # A restrained upper-volume target fills out the upper curve of the chest.
 # This separate surface keeps the canonical rig, contact envelope and masks intact.
-chest_strength = .30
+chest_strength = .12
 firmness_strength = .95
-upper_volume_strength = .18
+upper_volume_strength = .30
 chest_targets = [
     (chest_target_path, chest_strength * (1-firmness_strength)),
     (firmness_target_path, (1-chest_strength) * firmness_strength),
@@ -455,8 +458,8 @@ for _ in range(3):
             average = sum(female_vertices[other][axis] for other in adjacent)/len(adjacent)
             relaxed[old][axis] += strength*(average-female_vertices[old][axis])
     female_vertices = relaxed
-female_muscle_strength = .65
-female_lean_muscle_strength = .10
+female_muscle_strength = .18
+female_lean_muscle_strength = .05
 female_shape_strength = .30
 female_vertices = apply_target(female_muscle_target_path, female_muscle_strength, female_vertices)
 female_vertices = apply_target(female_lean_muscle_target_path, female_lean_muscle_strength, female_vertices)
@@ -465,13 +468,60 @@ for index, point in enumerate(female_vertices):
     blend = smoothstep(.54, .66, vertices[index][1])
     female_vertices[index] = [value+(female_shape[index][axis]-vertices[index][axis])*blend
                               for axis, value in enumerate(point)]
-female_positions = polish_surface(sculpt_surface(fit_surface(female_vertices), 'female'), 'female')
+def female_chest_chart(surface):
+    # The source breast has a folded under-pole and dense nipple loops. A
+    # harmonic front chart untangles those local x/y coordinates before the
+    # rounded depth is sampled; z and all boundary vertices remain fixed here.
+    # This moves existing vertices only, retaining topology and skin weights.
+    strengths = []
+    for index in range(len(used)):
+        x, y, z = surface[index*3:index*3+3]
+        strength = (smoothstep(.005, .030, abs(x))*(1-smoothstep(.12, .17, abs(x)))
+                    *smoothstep(.27, .32, y)*(1-smoothstep(.47, .52, y))
+                    *smoothstep(.045, .085, z))
+        strengths.append(strength)
+    for _ in range(100):
+        relaxed = surface[:]
+        for index, strength in enumerate(strengths):
+            if strength < 1e-6:
+                continue
+            adjacent = neighbors[index]
+            for axis in (0, 1):
+                average = sum(surface[other*3+axis] for other in adjacent)/len(adjacent)
+                relaxed[index*3+axis] += .7*strength*(average-surface[index*3+axis])
+        surface = relaxed
+    return surface
+
+def round_female_lower_chest(surface):
+    # Lift the rib attachment while keeping the projecting lobe fixed. This
+    # vertical shear is evaluated in final sculpt coordinates, not source Y.
+    # x/z are unchanged and its Jacobian determinant is bounded below by
+    # 1 - .055*pi/.25 > .30, so the continuous warp is one-to-one.
+    amplitude, start, span = .055, .18, .25
+    minimum_jacobian = 1.
+    warped = surface[:]
+    for index in range(len(used)):
+        x, y, z = surface[index*3:index*3+3]
+        t = max(0., min(1., (y-start)/span))
+        support = ((1-smoothstep(.12, .20, abs(x)))*smoothstep(.015, .060, z)
+                   *(1-smoothstep(.105, .190, z)))
+        warped[index*3+1] += amplitude*math.sin(math.pi*t)**2*support
+        jacobian = 1+amplitude*math.pi/span*math.sin(2*math.pi*t)*support
+        minimum_jacobian = min(minimum_jacobian, jacobian)
+    assert minimum_jacobian > .30, 'Lower chest warp must remain invertible'
+    return warped
+
+female_positions = sculpt_surface(female_chest_chart(fit_surface(female_vertices)), 'female')
+female_positions = polish_surface(round_female_lower_chest(female_positions), 'female')
 female_positions = preserve_lower_legs(female_positions, positions)
+female_total_offset = max(length(sub(female_positions[i:i+3], positions[i:i+3]))
+                          for i in range(0, len(positions), 3))
+assert female_total_offset < .09, 'Final female silhouette exceeds its 90 mm envelope'
 female_variant = {
     'version': 1,
     'source': 'MakeHuman hm08 adult female muscle/lean and head shape / CC0, with Fitt athletic surface sculpt',
     'retargeting': variant['retargeting'],
-    'surfaceSculpt': {**variant['surfaceSculpt'], 'revision': 'athletic-2-chest-profile', 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6)},
+    'surfaceSculpt': {**variant['surfaceSculpt'], 'revision': 'reference-silhouette-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6), 'maximumAllowedOffsetMeters': .09},
     'lowerLegPreservation': {'blendSourceY': [-.35, -.23], 'surface': 'canonical'},
     'sourcesSha256': {**result['sourcesSha256'], **{
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in [p for p, _ in chest_targets] + [female_muscle_target_path, female_lean_muscle_target_path, female_shape_target_path]}},
@@ -482,6 +532,10 @@ female_variant = {
     'chestFirmnessStrength': firmness_strength,
     'chestUpperVolumeStrength': upper_volume_strength,
     'chestSurfaceRelaxation': {'iterations': 3, 'strength': .32, 'boundaryFadeMeters': .008},
+    'chestFrontChart': {'iterations': 100, 'strength': .70, 'axes': ['x', 'y']},
+    'lowerChestWarp': {'maximumLiftMeters': .055, 'inputYRange': [.18, .43],
+                       'minimumJacobianBound': round(1-.055*math.pi/.25, 6)},
+    'maximumCanonicalDisplacementMeters': round(female_total_offset, 6),
     'positions': encode('f', female_positions),
 }
 female_output = root / 'src/components/form-guide/female-body-data.json'

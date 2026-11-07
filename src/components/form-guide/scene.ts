@@ -110,7 +110,7 @@ export function createGuideScene(
     controls.minPolarAngle = 0.18
     controls.maxPolarAngle = Math.PI / 2 - 0.09
     controls.rotateSpeed = 0.7
-    scene.add(new THREE.HemisphereLight('#e8ecf0', '#252525', 1.4))
+    scene.add(new THREE.HemisphereLight('#e8ecf0', '#4a4f4e', 1.4))
     const key = new THREE.DirectionalLight('#fffaf3', 2.6)
     cleanups.push(() => key.shadow.dispose())
     key.position.set(2.3, 3.8, 2.3)

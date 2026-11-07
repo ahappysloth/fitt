@@ -72,7 +72,57 @@ describe('body surface quality', () => {
     },
   )
 
-  it('keeps the female athletic refinement bounded and preserves her reviewed lower legs and feet', () => {
+  it('keeps the rounded female chest continuous without collapsed triangles', () => {
+    const athlete = createAthlete('female')
+    try {
+      const { position } = athlete.mesh.geometry.attributes
+      const triangles = athlete.mesh.geometry.index!
+      const adjacentNormals = new Map<string, Vector3>()
+      let checked = 0
+      for (let index = 0; index < triangles.count; index += 3) {
+        const ids = [0, 1, 2].map((offset) => triangles.getX(index + offset))
+        const original = ids.map(restVertex)
+        const center = original
+          .reduce((sum, point) => sum.add(point), new Vector3())
+          .divideScalar(3)
+        if (
+          Math.abs(center.x) <= 0.03 ||
+          Math.abs(center.x) >= 0.13 ||
+          center.y <= 0.32 ||
+          center.y >= 0.47 ||
+          center.z <= 0.08
+        )
+          continue
+        const current = ids.map((id) => new Vector3().fromBufferAttribute(position, id))
+        const normal = new Vector3().crossVectors(
+          current[1].clone().sub(current[0]),
+          current[2].clone().sub(current[0]),
+        )
+        const originalArea = new Vector3()
+          .crossVectors(original[1].clone().sub(original[0]), original[2].clone().sub(original[0]))
+          .length()
+        expect(normal.length() / originalArea).toBeGreaterThan(0.04)
+        normal.normalize()
+        // The rounded underside may face backward in Z, but must face down.
+        // Adjacent faces must turn continuously rather than fold or flip.
+        if (normal.z < 0) expect(normal.y).toBeLessThan(-0.5)
+        for (let edge = 0; edge < 3; edge++) {
+          const start = ids[edge],
+            end = ids[(edge + 1) % 3]
+          const key = `${Math.min(start, end)}:${Math.max(start, end)}`
+          const adjacent = adjacentNormals.get(key)
+          if (adjacent) expect(normal.dot(adjacent)).toBeGreaterThan(0.5)
+          else adjacentNormals.set(key, normal)
+        }
+        checked++
+      }
+      expect(checked).toBeGreaterThan(500)
+    } finally {
+      athlete.dispose()
+    }
+  })
+
+  it('keeps the female reference silhouette bounded and preserves her reviewed lower legs and feet', () => {
     const athlete = createAthlete('female')
     try {
       const { position } = athlete.mesh.geometry.attributes
@@ -83,7 +133,9 @@ describe('body surface quality', () => {
         largestDisplacement = Math.max(largestDisplacement, distance)
         if (original.y < -0.35) expect(distance).toBe(0)
       }
-      expect(largestDisplacement).toBeLessThan(0.05)
+      // The full silhouette pass lifts and rounds the chest beyond the old
+      // 50 mm refinement budget; contacts and lower legs remain exact above.
+      expect(largestDisplacement).toBeLessThan(0.09)
     } finally {
       athlete.dispose()
     }

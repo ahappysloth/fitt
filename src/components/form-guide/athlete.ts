@@ -63,8 +63,8 @@ export function createAthlete(initialModel: BodyModel = 'male') {
   const masks = muscleMasks(positions)
   geometry.setAttribute('muscleWeight', new THREE.BufferAttribute(selectedWeights, 1))
   const material = new THREE.MeshStandardMaterial({
-    color: '#858b8a',
-    roughness: 0.52,
+    color: '#929898',
+    roughness: 0.46,
     metalness: 0.18,
   })
   const activeColor = { value: new THREE.Color('#c7fa53') }
@@ -118,7 +118,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     inverse = new THREE.Matrix4(),
     position = new THREE.Vector3(),
     scale = new THREE.Vector3(1, 1, 1)
-  const baseColor = new THREE.Color('#858b8a'),
+  const baseColor = new THREE.Color('#929898'),
     subtle = new THREE.Color('#59605c')
   function highlight(regions: readonly Muscle[]) {
     for (let i = 0; i < data.vertices; i++) {
