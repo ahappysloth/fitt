@@ -1,3 +1,4 @@
+import { continueReviewedWorkout, addBuilderMovement } from './helpers/workout'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -128,6 +129,7 @@ test('updates a saved active workout and preserves pending inputs and its rest d
 }) => {
   await boot(page, release.origin)
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }).fill('4')
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }).fill('6')
@@ -174,6 +176,7 @@ test('explains and protects unsaved workout edits and storage failures until res
 }) => {
   await boot(page, release.origin)
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   const originalReps = (await readState(page)).active!.exercises[0].sets[0].reps
   await release.publish(page)
@@ -234,8 +237,9 @@ test('another tab can activate an update without reloading a dirty routine, then
 }) => {
   await boot(page, release.origin)
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
+  await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Keep this routine')
-  await page.getByRole('button', { name: 'Add Knee push-up', exact: true }).click()
+  await addBuilderMovement(page, 'Knee push-up')
   const other = await context.newPage()
   await boot(other, release.origin)
   await release.publish(other)
@@ -268,7 +272,9 @@ test('another tab can activate an update without reloading a dirty routine, then
   expect(await page.evaluate(() => performance.timeOrigin)).toBe(firstDocumentStarted)
   await expect(update).toBeDisabled()
 
+  await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await page.getByRole('button', { name: 'Save routine', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await expect(update).toBeEnabled()
   await updateAndReload(page)
   expect(firstLoads).toBe(1)

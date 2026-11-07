@@ -17,7 +17,7 @@ import type { Profile, UserPreferences } from '../lib/types'
 import { equipmentList } from '../lib/catalog'
 import { focusNames } from '../lib/workout'
 import { Select } from './ui'
-import ActiveWorkoutNotice from './ActiveWorkoutNotice'
+import TrainingLockNote from './TrainingLockNote'
 import './preferences.css'
 
 export interface SetupViewProps {
@@ -33,7 +33,6 @@ export interface SetupViewProps {
   onReset: () => void
   onInstall: () => void
   onHelp?: () => void
-  onGoToWorkout: () => void
 }
 
 export default function SetupView({
@@ -49,7 +48,6 @@ export default function SetupView({
   onReset,
   onInstall,
   onHelp,
-  onGoToWorkout,
 }: SetupViewProps) {
   const fileInput = useRef<HTMLInputElement>(null)
   const personal = preferences ?? {
@@ -73,12 +71,6 @@ export default function SetupView({
         </span>
       </div>
       {accountPanel}
-      {active && (
-        <ActiveWorkoutNotice className="pref-notice" onGoToWorkout={onGoToWorkout}>
-          Your workout is in progress. Finish or discard it before changing training preferences.
-          You can still change your guide model, name, and celebrations.
-        </ActiveWorkoutNotice>
-      )}
       <div className="pref-layout">
         <div className="pref-main">
           <section className="panel pref-panel">
@@ -89,6 +81,11 @@ export default function SetupView({
                 <p>Choose the equipment you can use. Bodyweight is always included.</p>
               </div>
             </div>
+            {active && (
+              <TrainingLockNote id="training-preferences-locked">
+                Finish or discard your workout to change equipment and training preferences.
+              </TrainingLockNote>
+            )}
             <div className="pref-bodyweight">
               <span className="pref-check">
                 <Check size={16} />
@@ -99,7 +96,10 @@ export default function SetupView({
               </div>
               <span className="pill">Included</span>
             </div>
-            <div className="pref-equipment-grid">
+            <div
+              className="pref-equipment-grid"
+              aria-describedby={active ? 'training-preferences-locked' : undefined}
+            >
               {equipmentList.map((item) => {
                 const selected = profile.equipment.includes(item.id)
                 return (
@@ -145,7 +145,11 @@ export default function SetupView({
                 <p>Choose a starting point. You can adjust it as you grow.</p>
               </div>
             </div>
-            <fieldset className="pref-fieldset" disabled={active}>
+            <fieldset
+              className="pref-fieldset"
+              disabled={active}
+              aria-describedby={active ? 'training-preferences-locked' : undefined}
+            >
               <legend>Experience</legend>
               <div className="pref-levels">
                 {(['beginner', 'intermediate'] as const).map((level) => (

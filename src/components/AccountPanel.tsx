@@ -20,7 +20,7 @@ import {
 import type { AccountController, AccountStatus } from '../lib/cloud/types'
 import Modal from './Modal'
 import { Button } from './ui'
-import ActiveWorkoutNotice from './ActiveWorkoutNotice'
+import TrainingLockNote from './TrainingLockNote'
 import './account.css'
 
 type AccountDialog = 'import' | 'sign-out' | 'conflict' | null
@@ -80,13 +80,7 @@ function GoogleMark() {
   )
 }
 
-export default function AccountPanel({
-  account,
-  onGoToWorkout,
-}: {
-  account: AccountController
-  onGoToWorkout: () => void
-}) {
+export default function AccountPanel({ account }: { account: AccountController }) {
   const titleId = useId()
   const emailId = useId()
   const emailHintId = useId()
@@ -138,17 +132,6 @@ export default function AccountPanel({
     else void run(() => account.signOut())
   }
 
-  function goToWorkout() {
-    setDialog(null)
-    onGoToWorkout()
-  }
-
-  const activeWorkoutNotice = account.hasActiveWorkout ? (
-    <ActiveWorkoutNotice className="account-session-notice" onGoToWorkout={goToWorkout}>
-      Finish or discard your workout before changing accounts or importing device progress.
-    </ActiveWorkoutNotice>
-  ) : null
-
   return (
     <section className="panel account-panel" aria-labelledby={titleId}>
       <div className="account-intro">
@@ -186,8 +169,6 @@ export default function AccountPanel({
         </span>
       </div>
 
-      {activeWorkoutNotice}
-
       {account.user && (
         <div className="account-member">
           <div className="account-identity">
@@ -208,6 +189,11 @@ export default function AccountPanel({
             <LogOut size={15} aria-hidden="true" />
             Sign out
           </Button>
+          {account.hasActiveWorkout && (
+            <TrainingLockNote>
+              Finish or discard your workout to sign out or import device progress.
+            </TrainingLockNote>
+          )}
           <div className="account-sync-detail" aria-live="polite">
             <p>{syncDetail(account)}</p>
             {syncedAt && (
@@ -267,6 +253,9 @@ export default function AccountPanel({
             </div>
           </div>
           <div className="account-signin">
+            {account.hasActiveWorkout && providersAvailable && account.status !== 'unavailable' && (
+              <TrainingLockNote>Finish or discard your workout to sign in.</TrainingLockNote>
+            )}
             {checking ? (
               <p className="account-availability" role="status">
                 Checking sign-in options…
@@ -401,7 +390,11 @@ export default function AccountPanel({
 
       {dialog === 'import' && (
         <Modal title="Add this device’s progress?" onClose={closeDialog}>
-          {activeWorkoutNotice}
+          {account.hasActiveWorkout && (
+            <TrainingLockNote>
+              Finish or discard your workout before changing accounts or importing device progress.
+            </TrainingLockNote>
+          )}
           <div className="account-dialog-copy">
             <p>
               Add <strong>{importedItems}</strong> to your signed-in account.
@@ -436,7 +429,11 @@ export default function AccountPanel({
 
       {dialog === 'sign-out' && (
         <Modal title="Some progress hasn’t synced yet." onClose={closeDialog}>
-          {activeWorkoutNotice}
+          {account.hasActiveWorkout && (
+            <TrainingLockNote>
+              Finish or discard your workout before changing accounts or importing device progress.
+            </TrainingLockNote>
+          )}
           <div className="account-dialog-copy">
             <p>
               You can stay signed in to finish syncing, or sign out and keep these changes on this
@@ -472,11 +469,6 @@ export default function AccountPanel({
 
       {dialog === 'conflict' && account.conflict && (
         <Modal title="Choose which changes to keep." onClose={closeDialog}>
-          {account.hasActiveWorkout && (
-            <ActiveWorkoutNotice className="account-session-notice" onGoToWorkout={goToWorkout}>
-              Your workout is still in progress. Return to it to continue or discard it.
-            </ActiveWorkoutNotice>
-          )}
           <div className="account-dialog-copy">
             <p>These changed here and on another device:</p>
             <ul>

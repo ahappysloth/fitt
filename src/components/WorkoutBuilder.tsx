@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowDown,
   ArrowLeft,
@@ -7,15 +7,24 @@ import {
   Clock3,
   Info,
   Plus,
-  Save,
+  ArrowRight,
+  RotateCcw,
   Search,
   Trash2,
   X,
 } from 'lucide-react'
 import { available, byId, exercises, muscleNames } from '../lib/catalog'
 import { MAX_ADDED_LOAD_KG } from '../lib/limits'
-import type { Muscle, Profile, Session, Workout, WorkoutExercise } from '../lib/types'
-import { prescribe, uid } from '../lib/workout'
+import type {
+  Focus,
+  Muscle,
+  Pattern,
+  Profile,
+  Session,
+  Workout,
+  WorkoutExercise,
+} from '../lib/types'
+import { focusNames, generateWorkout, prescribe, uid } from '../lib/workout'
 import { ExerciseThumbnail } from './ExerciseGuide'
 import Modal from './Modal'
 import { Select, Tooltip } from './ui'
@@ -25,6 +34,8 @@ export interface WorkoutBuilderProps {
   profile: Profile
   history: Session[]
   initial?: Workout
+  initialFocus?: Focus
+  onFocusChange?: (focus: Focus) => void
   onSave: (workout: Workout) => void
   onCancel: () => void
   onInfo: (exerciseId: string) => void
@@ -64,20 +75,28 @@ export default function WorkoutBuilder({
   profile,
   history,
   initial,
+  initialFocus = profile.focus,
+  onFocusChange,
   onSave,
   onCancel,
   onInfo,
   onDirtyChange,
 }: WorkoutBuilderProps) {
-  const [title, setTitle] = useState(initial?.title ?? '')
+  const [suggestion] = useState(() => initial ?? generateWorkout(profile, history))
+  const [title, setTitle] = useState(suggestion.title)
+  const [focus, setFocus] = useState<Focus>(initialFocus)
+  const [pickerFocus, setPickerFocus] = useState<Focus | 'all'>(initialFocus)
+  const [category, setCategory] = useState<Pattern | 'all'>('all')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [swapKey, setSwapKey] = useState<string | null>(null)
   const [duration, setDuration] = useState(String(initial?.duration ?? profile.duration))
-  const [entries, setEntries] = useState<DraftEntry[]>(() => initial?.exercises.map(toDraft) ?? [])
+  const [entries, setEntries] = useState<DraftEntry[]>(() => suggestion.exercises.map(toDraft))
   const [search, setSearch] = useState('')
   const [muscle, setMuscle] = useState<Muscle | 'all'>('all')
   const [dirty, setDirty] = useState(false)
+  const [pendingPreset, setPendingPreset] = useState<Focus | 'empty' | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [notice, setNotice] = useState('')
-  const picker = useRef<HTMLDivElement>(null)
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
@@ -98,6 +117,18 @@ export default function WorkoutBuilder({
   const choices = exercises.filter(
     (exercise) =>
       available(exercise, profile.equipment) &&
+      (pickerFocus === 'all' ||
+        pickerFocus === 'full' ||
+        (pickerFocus === 'upper' &&
+          exercise.muscles.some((id) =>
+            ['chest', 'upper-back', 'shoulders', 'biceps', 'triceps', 'forearms'].includes(id),
+          )) ||
+        (pickerFocus === 'lower' &&
+          exercise.muscles.some((id) =>
+            ['quads', 'glutes', 'hamstrings', 'calves'].includes(id),
+          )) ||
+        (pickerFocus === 'core' && exercise.muscles.includes('core'))) &&
+      (category === 'all' || exercise.pattern === category) &&
       (muscle === 'all' || exercise.muscles.includes(muscle)) &&
       (!query ||
         `${exercise.name} ${exercise.muscles.map((id) => muscleNames[id]).join(' ')}`
@@ -143,7 +174,7 @@ export default function WorkoutBuilder({
     setDirty(true)
   }
   function add(exerciseId: string) {
-    if (selected.has(exerciseId) || entries.length >= limit) return
+    if (selected.has(exerciseId) || (!swapKey && entries.length >= limit)) return
     const prescribed = prescribe(byId[exerciseId], profile, history)
     // The selected movement stays the user's choice; prescribe may recommend a different variation.
     const entry =
@@ -166,9 +197,46 @@ export default function WorkoutBuilder({
           }
     const draft = toDraft(entry)
     if (prescribed.exerciseId !== exerciseId) draft.count = profile.duration === 20 ? '2' : '3'
-    setEntries((current) => [...current, draft])
+    setEntries((current) =>
+      swapKey ? current.map((item) => (item.key === swapKey ? draft : item)) : [...current, draft],
+    )
     setDirty(true)
-    setNotice(`${byId[exerciseId].name} added to your routine.`)
+    setNotice(`${byId[exerciseId].name} ${swapKey ? 'swapped into' : 'added to'} your routine.`)
+    if (swapKey) setPickerOpen(false)
+    setSwapKey(null)
+  }
+  function choosePreset(nextFocus: Focus) {
+    const next = generateWorkout({ ...profile, focus: nextFocus }, history)
+    setFocus(nextFocus)
+    onFocusChange?.(nextFocus)
+    setPickerFocus(nextFocus)
+    setTitle(next.title)
+    setEntries(next.exercises.map(toDraft))
+    setDirty(true)
+    setNotice(`${focusNames[nextFocus]} preset selected. You can edit every target.`)
+  }
+  function requestPreset(next: Focus | 'empty') {
+    if (dirty && entries.length > 0) {
+      setPendingPreset(next)
+      return
+    }
+    applyPreset(next)
+  }
+  function applyPreset(next: Focus | 'empty') {
+    if (next === 'empty') {
+      setEntries([])
+      setTitle('My workout')
+      setDirty(true)
+    } else choosePreset(next)
+    setPendingPreset(null)
+  }
+  function openPicker(key: string | null = null) {
+    setSwapKey(key)
+    setPickerFocus(focus)
+    setCategory('all')
+    setMuscle('all')
+    setSearch('')
+    setPickerOpen(true)
   }
   function move(index: number, direction: -1 | 1) {
     const destination = index + direction
@@ -222,7 +290,7 @@ export default function WorkoutBuilder({
         <div>
           <p className="eyebrow">MAKE A PLAN THAT FEELS LIKE YOU</p>
           <h1>
-            {initial ? 'Refine your routine' : 'Your workout. Your way'}
+            Your workout. Your way
             <span className="greeting-dot">.</span>
           </h1>
           <p>Pick your movements, set your targets, and make it yours.</p>
@@ -230,6 +298,35 @@ export default function WorkoutBuilder({
         <span className="pill">
           {entries.length} / {limit} movements
         </span>
+      </div>
+      <div className="builder-presets" role="group" aria-label="Suggested workout presets">
+        {(['full', 'upper', 'lower', 'core'] as const).map((id) => (
+          <button
+            type="button"
+            key={id}
+            aria-pressed={focus === id}
+            onClick={() => requestPreset(id)}
+          >
+            <strong>{id === 'lower' ? 'Legs' : id === 'core' ? 'Core' : focusNames[id]}</strong>
+            <small>
+              {id === 'full'
+                ? 'A little of everything'
+                : id === 'upper'
+                  ? 'Push, pull & shoulders'
+                  : id === 'lower'
+                    ? 'Legs, glutes & balance'
+                    : 'Stability & control'}
+            </small>
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-pressed={entries.length === 0}
+          onClick={() => requestPreset('empty')}
+        >
+          <strong>Start empty</strong>
+          <small>Build from scratch</small>
+        </button>
       </div>
       <form
         onSubmit={(event) => {
@@ -247,7 +344,6 @@ export default function WorkoutBuilder({
           <label>
             Routine name
             <input
-              autoFocus
               type="text"
               maxLength={60}
               value={title}
@@ -282,21 +378,7 @@ export default function WorkoutBuilder({
                 <p className="eyebrow">YOUR LINEUP</p>
                 <h2 id="builder-plan-heading">One movement at a time.</h2>
               </div>
-              <button
-                type="button"
-                className="builder-add-link"
-                onClick={() => {
-                  picker.current?.scrollIntoView({
-                    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches
-                      ? 'instant'
-                      : 'smooth',
-                    block: 'start',
-                  })
-                  picker.current
-                    ?.querySelector<HTMLInputElement>('input')
-                    ?.focus({ preventScroll: true })
-                }}
-              >
+              <button type="button" className="builder-add-link" onClick={() => openPicker()}>
                 <Plus size={16} />
                 Add movement
               </button>
@@ -344,6 +426,15 @@ export default function WorkoutBuilder({
                         <small>{exercise.muscles.map((id) => muscleNames[id]).join(' · ')}</small>
                       </button>
                       <div className="builder-entry-actions">
+                        <Tooltip content="Swap movement">
+                          <button
+                            type="button"
+                            aria-label={`Swap ${exercise.name}`}
+                            onClick={() => openPicker(entry.key)}
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                        </Tooltip>
                         <Tooltip content="Move up">
                           <button
                             type="button"
@@ -488,15 +579,45 @@ export default function WorkoutBuilder({
               </div>
             )}
           </section>
-          <aside
-            className="panel builder-picker"
-            ref={picker}
-            aria-labelledby="builder-picker-heading"
-          >
+        </div>
+        <div className="builder-save-bar">
+          <div>
+            <strong>Ready for a quick review?</strong>
+            <p>
+              {!entries.length
+                ? 'Add a movement to get started.'
+                : !title.trim()
+                  ? 'Give your routine a name.'
+                  : errors.some(Boolean)
+                    ? 'Review the highlighted targets before continuing.'
+                    : 'Review your plan next. Your timer has not started.'}
+            </p>
+          </div>
+          <div>
+            <button type="button" className="secondary-button" onClick={requestCancel}>
+              Cancel
+            </button>
+            <button type="submit" className="primary-button" disabled={!ready}>
+              Review workout
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      </form>
+      <p className="sr-only" role="status" aria-live="polite">
+        {notice}
+      </p>
+      {pickerOpen && (
+        <Modal
+          title={swapKey ? 'Swap movement' : 'Add exercises'}
+          onClose={() => setPickerOpen(false)}
+          wide
+        >
+          <div className="builder-picker" aria-labelledby="builder-picker-heading">
             <div className="builder-picker-heading">
               <p className="eyebrow">YOUR MOVEMENT LIBRARY</p>
               <h2 id="builder-picker-heading">Find your next move.</h2>
-              <p>Available with your selected equipment.</p>
+              <p>Choose any movement available with your equipment.</p>
             </div>
             <label className="builder-search">
               <Search size={17} />
@@ -517,16 +638,46 @@ export default function WorkoutBuilder({
                 </button>
               )}
             </label>
-            <Select
-              className="builder-muscle-filter"
-              label="Filter routine movements by muscle"
-              value={muscle}
-              onValueChange={(value) => setMuscle(value as Muscle | 'all')}
-              options={[
-                { value: 'all', label: 'All muscle groups' },
-                ...Object.entries(muscleNames).map(([value, label]) => ({ value, label })),
-              ]}
-            />
+            <div className="builder-picker-filters">
+              <Select
+                label="Filter movements by workout focus"
+                value={pickerFocus}
+                onValueChange={(value) => setPickerFocus(value as Focus | 'all')}
+                options={[
+                  { value: 'all', label: 'Any focus' },
+                  ...Object.entries(focusNames).map(([value, label]) => ({ value, label })),
+                ]}
+              />
+              <Select
+                label="Filter movements by category"
+                value={category}
+                onValueChange={(value) => setCategory(value as Pattern | 'all')}
+                options={[
+                  { value: 'all', label: 'All categories' },
+                  { value: 'push', label: 'Push' },
+                  { value: 'pull', label: 'Pull' },
+                  { value: 'squat', label: 'Squat & lunge' },
+                  { value: 'hinge', label: 'Hinge & glutes' },
+                  { value: 'core', label: 'Core' },
+                  { value: 'shoulder', label: 'Shoulders' },
+                ]}
+              />
+              <Select
+                className="builder-muscle-filter"
+                label="Filter routine movements by muscle"
+                value={muscle}
+                onValueChange={(value) => setMuscle(value as Muscle | 'all')}
+                options={[
+                  { value: 'all', label: 'All muscle groups' },
+                  ...Object.entries(muscleNames).map(([value, label]) => ({ value, label })),
+                ]}
+              />
+            </div>
+            <p className="builder-picker-note">
+              {swapKey
+                ? 'Choose a replacement movement.'
+                : `${choices.length} movements · choose Any focus to explore outside your preset.`}
+            </p>
             <div className="builder-choices">
               {choices.map((exercise) => (
                 <div className="builder-choice-row" key={exercise.id}>
@@ -534,7 +685,7 @@ export default function WorkoutBuilder({
                     type="button"
                     className={`builder-choice ${selected.has(exercise.id) ? 'is-added' : ''}`}
                     aria-label={`${selected.has(exercise.id) ? 'Added' : 'Add'} ${exercise.name}`}
-                    disabled={selected.has(exercise.id) || entries.length >= limit}
+                    disabled={selected.has(exercise.id) || (!swapKey && entries.length >= limit)}
                     onClick={() => add(exercise.id)}
                   >
                     <span className="builder-choice-art">
@@ -558,7 +709,10 @@ export default function WorkoutBuilder({
                       type="button"
                       className="builder-info"
                       aria-label={`View ${exercise.name} instructions`}
-                      onClick={() => onInfo(exercise.id)}
+                      onClick={() => {
+                        setPickerOpen(false)
+                        onInfo(exercise.id)
+                      }}
                     >
                       <Info size={17} />
                     </button>
@@ -573,6 +727,8 @@ export default function WorkoutBuilder({
                     onClick={() => {
                       setSearch('')
                       setMuscle('all')
+                      setPickerFocus('all')
+                      setCategory('all')
                     }}
                   >
                     Clear filters
@@ -585,37 +741,25 @@ export default function WorkoutBuilder({
                 Your routine has {limit} movements. Remove one to make room for another.
               </p>
             )}
-          </aside>
-        </div>
-        <div className="builder-save-bar">
-          <div>
-            <strong>
-              {initial ? 'Ready to save your changes?' : 'A plan you can look forward to.'}
-            </strong>
-            <p>
-              {!entries.length
-                ? 'Add a movement to get started.'
-                : !title.trim()
-                  ? 'Give your routine a name.'
-                  : errors.some(Boolean)
-                    ? 'Review the highlighted targets before saving.'
-                    : 'Your routine will be saved on this device.'}
-            </p>
           </div>
-          <div>
-            <button type="button" className="secondary-button" onClick={requestCancel}>
-              Cancel
+        </Modal>
+      )}
+      {pendingPreset && (
+        <Modal title="Replace your lineup?" onClose={() => setPendingPreset(null)}>
+          <p className="modal-description">
+            Your current movements and targets will be replaced. You can edit the new lineup before
+            starting.
+          </p>
+          <div className="modal-actions">
+            <button className="secondary-button" onClick={() => setPendingPreset(null)}>
+              Keep my lineup
             </button>
-            <button type="submit" className="primary-button" disabled={!ready}>
-              <Save size={16} />
-              Save routine
+            <button className="primary-button" onClick={() => applyPreset(pendingPreset)}>
+              Replace lineup
             </button>
           </div>
-        </div>
-      </form>
-      <p className="sr-only" role="status" aria-live="polite">
-        {notice}
-      </p>
+        </Modal>
+      )}
       {confirmCancel && (
         <Modal title="Leave this routine?" onClose={() => setConfirmCancel(false)}>
           <p className="modal-description">

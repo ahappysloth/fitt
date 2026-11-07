@@ -1,3 +1,4 @@
+import { continueReviewedWorkout } from './helpers/workout'
 import { test, expect, type Page } from '@playwright/test'
 import { build } from 'esbuild'
 
@@ -146,6 +147,7 @@ test('app dropdowns save preferences and close on an outside pointer press', asy
   await page.getByRole('link', { name: 'Today', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Workout duration' })).toHaveText('20 min')
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Session length' })).toBeDisabled()
   await expect(page.getByRole('combobox', { name: 'Default focus' })).toBeDisabled()

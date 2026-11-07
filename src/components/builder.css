@@ -573,3 +573,171 @@
     gap: 10px;
   }
 }
+
+/* Build a short lineup first; open the library only when choosing a movement. */
+.builder-view,
+.workout-review {
+  max-width: 900px;
+  margin-inline: auto;
+}
+.builder-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+  margin-bottom: 24px;
+}
+.builder-presets button {
+  min-height: 80px;
+  padding: 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  text-align: left;
+}
+.builder-presets button[aria-pressed='true'] {
+  border-color: #8aab54;
+  background: #27331b;
+}
+.builder-presets strong,
+.builder-presets small {
+  display: block;
+}
+.builder-presets strong {
+  font-size: 0.8125rem;
+}
+.builder-presets small {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+.builder-layout {
+  display: block;
+}
+.builder-add-link {
+  display: inline-flex;
+}
+.builder-entry-heading {
+  flex-wrap: wrap;
+}
+.builder-entry-name {
+  flex-basis: calc(100% - 42px);
+}
+.builder-entry-actions {
+  margin-left: auto;
+}
+.builder-picker {
+  position: static;
+  padding: 0;
+}
+.builder-picker-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+  margin: 15px 0 7px;
+}
+.builder-picker-filters .builder-muscle-filter {
+  margin: 0;
+}
+.builder-picker .builder-choices {
+  max-height: 46vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.workout-review__plan {
+  padding: 26px;
+}
+.workout-review__plan h2 {
+  font-size: 1.4rem;
+}
+.workout-review__meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  margin-top: 12px;
+}
+.workout-review__plan ol {
+  list-style: none;
+  margin: 20px 0 25px;
+  padding: 0;
+}
+.workout-review__plan li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 17px 0;
+  border-top: 1px solid var(--line);
+}
+.workout-review__plan li > span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.workout-review__plan li > div {
+  flex: 1;
+  min-width: 0;
+}
+.workout-review__plan li strong,
+.workout-review__plan li small {
+  display: block;
+  line-height: 1.5;
+}
+.workout-review__plan li strong {
+  font-size: 0.9375rem;
+}
+.workout-review__plan li small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+.workout-review__plan li button {
+  min-height: 44px;
+}
+.workout-review__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.workout-review__note {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 17px;
+}
+@container (max-width: 580px) {
+  .builder-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .builder-presets button:last-child {
+    grid-column: 1 / -1;
+    min-height: 56px;
+  }
+  .builder-presets button:last-child small {
+    display: inline;
+    margin-left: 8px;
+  }
+  .builder-presets button:last-child strong {
+    display: inline;
+  }
+  .builder-picker-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .builder-picker .builder-choices {
+    max-height: 37vh;
+  }
+  .workout-review__plan {
+    padding: 21px 18px;
+  }
+  .workout-review__actions {
+    flex-direction: column;
+  }
+  .workout-review__meta {
+    align-items: flex-start;
+  }
+  .workout-review__meta svg {
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+}

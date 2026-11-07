@@ -75,6 +75,9 @@
 .state-banner p {
   color: var(--muted);
 }
+#app-update-message {
+  font-size: var(--type-body);
+}
 .welcome-note > .text-button,
 .state-banner > .text-button {
   font-size: var(--type-caption);
@@ -140,31 +143,6 @@
 /* This programmatic/skip-link target needs focus semantics, not a page-sized ring. */
 #main-content:focus {
   outline: none;
-}
-.active-workout-notice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 18px;
-}
-.active-workout-notice > p {
-  flex: 1 1 250px;
-  min-width: 0;
-}
-.active-workout-notice > button {
-  flex: 0 0 auto;
-  min-height: 44px;
-  font-size: var(--type-caption);
-}
-.routine-session-notice {
-  margin-bottom: 18px;
-  padding: 16px 18px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: var(--type-caption);
-  line-height: 1.65;
 }
 .equipment-link {
   gap: 7px;
@@ -699,5 +677,115 @@
   .offline-pill {
     font-size: 0;
     gap: 0;
+  }
+}
+
+.active-session-strip {
+  position: fixed;
+  left: max(270px, calc(50% - 210px));
+  right: 26px;
+  bottom: 22px;
+  max-width: 620px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 17px;
+  border: 1px solid #617e38;
+  border-radius: 16px;
+  background: #25321bf5;
+  box-shadow: 0 6px 30px #0005;
+  z-index: 9;
+  text-align: left;
+  backdrop-filter: blur(18px);
+}
+.active-session-strip__icon {
+  color: var(--accent);
+}
+.active-session-strip__title {
+  flex: 1;
+  min-width: 0;
+}
+.active-session-strip__title strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+.active-session-strip__title small {
+  display: block;
+  font-size: 0.6875rem;
+  color: #b8c5a8;
+  margin-top: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.active-session-strip__resume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #deedca;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.has-active-session-strip .main-content {
+  padding-bottom: 92px;
+}
+.app-footer {
+  gap: 6px 16px;
+}
+.app-footer > span {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+}
+.app-footer > button {
+  font-size: 0.6875rem;
+  min-height: 32px;
+}
+@container (max-width: 760px) {
+  .active-session-strip {
+    left: 12px;
+    right: 12px;
+    bottom: calc(83px + env(safe-area-inset-bottom));
+    border-radius: 13px;
+    padding: 12px;
+  }
+  .app-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 17px 0;
+    gap: 3px;
+  }
+  .app-footer > span {
+    flex: none;
+  }
+  .app-footer > button {
+    margin-left: 0;
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
+@container (max-width: 760px) {
+  .app-shell .app-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-content: start;
+    gap: 3px;
+    padding-block: 14px;
+  }
+  .app-shell .app-footer > span {
+    min-height: 0;
+  }
+  .app-shell .app-footer > button {
+    margin-left: 0;
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+@container (max-width: 580px) {
+  .app-shell .app-footer > span {
+    display: none;
   }
 }

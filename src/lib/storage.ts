@@ -25,6 +25,14 @@ function workout(x: unknown, session = false, finished = false): boolean {
   )
     return false
   if (session && !date(x.startedAt)) return false
+  if (x.pausedSeconds !== undefined && !numberIn(x.pausedSeconds, 0, 315360000)) return false
+  if (
+    x.pausedAt !== undefined &&
+    (!session ||
+      !date(x.pausedAt) ||
+      Date.parse(x.pausedAt as string) < Date.parse(x.startedAt as string))
+  )
+    return false
   if (finished && (!date(x.completedAt) || !numberIn(x.elapsedSeconds, 0, 604800))) return false
   if (finished && Date.parse(x.completedAt as string) < Date.parse(x.startedAt as string))
     return false

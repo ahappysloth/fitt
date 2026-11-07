@@ -23,7 +23,7 @@ import { SparkBuddy, TrophyArt } from './FittArtwork'
 import { Button, IconButton, Pill, ProgressBar, SectionTitle, Select, Week, XPCard } from './ui'
 import { ExerciseThumbnail } from './ExerciseGuide'
 import { MuscleMap } from './Visuals'
-import ActiveWorkoutNotice from './ActiveWorkoutNotice'
+import TrainingLockNote from './TrainingLockNote'
 
 export default function TodayView({
   state,
@@ -257,6 +257,11 @@ export default function TodayView({
                 />
               </label>
             </div>
+            {state.active && (
+              <TrainingLockNote>
+                Focus, duration, and plan changes unlock after your workout.
+              </TrainingLockNote>
+            )}
             <div className="plan-list">
               {plan.exercises.map((entry, index) => {
                 const exercise = byId[entry.exerciseId]
@@ -299,10 +304,12 @@ export default function TodayView({
               Clean reps first. Adjust every set as you go.
             </div>
             <div className="plan-actions">
-              <Button onClick={onStart}>
-                {state.active ? 'Resume workout' : 'Start this workout'}
-                <ArrowRight size={17} />
-              </Button>
+              {!state.active && (
+                <Button onClick={onStart}>
+                  Start this workout
+                  <ArrowRight size={17} />
+                </Button>
+              )}
               <Button variant="ghost" disabled={!!state.active} onClick={onRegenerate}>
                 <RotateCcw size={15} />
                 Refresh plan
@@ -321,9 +328,9 @@ export default function TodayView({
               }
             />
             {state.active && (
-              <ActiveWorkoutNotice className="routine-session-notice" onGoToWorkout={onStart}>
-                Finish or discard your current workout before creating or changing saved routines.
-              </ActiveWorkoutNotice>
+              <TrainingLockNote>
+                Finish or discard your workout to create, edit, or start a saved routine.
+              </TrainingLockNote>
             )}
             {state.routines?.length ? (
               <div className="routine-grid">

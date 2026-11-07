@@ -1,3 +1,4 @@
+import { continueReviewedWorkout, addBuilderMovement } from './helpers/workout'
 import { test, expect, type Page } from '@playwright/test'
 
 const key = 'form.training.v1'
@@ -47,6 +48,7 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
 }) => {
   await boot(page)
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }).fill('4')
   await page.getByRole('button', { name: 'Challenging', exact: true }).click()
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
@@ -87,15 +89,19 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
 test('creates and reuses custom workouts with independent session IDs', async ({ page }) => {
   await boot(page)
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
+  await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('My push practice')
-  await page.getByRole('button', { name: 'Add Knee push-up', exact: true }).click()
+  await addBuilderMovement(page, 'Knee push-up')
   await page.getByRole('spinbutton', { name: 'Knee push-up sets', exact: true }).fill('1')
   await page.getByRole('spinbutton', { name: 'Knee push-up target reps', exact: true }).fill('8')
+  await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await page.getByRole('button', { name: 'Save routine', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   const routine = page
     .locator('.routine-card')
     .filter({ has: page.getByRole('heading', { name: 'My push practice', exact: true }) })
   await routine.getByRole('button', { name: 'Start', exact: true }).click()
+  await continueReviewedWorkout(page)
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }),
   ).toHaveValue('8')
@@ -107,9 +113,56 @@ test('creates and reuses custom workouts with independent session IDs', async ({
   expect(first.routines).toHaveLength(1)
   expect(first.routines[0].exercises[0].sets[0].done).toBe(false)
   await routine.getByRole('button', { name: 'Start', exact: true }).click()
+  await continueReviewedWorkout(page)
   const second = await readState(page)
   expect(second.active.id).not.toBe(first.history[0].id)
   expect(second.active.exercises[0].sets[0].id).not.toBe(first.history[0].exercises[0].sets[0].id)
+})
+
+test('creating a workout after reviewing a saved routine preserves the original routine', async ({
+  page,
+}) => {
+  await boot(page)
+  const saveNewRoutine = async (title: string) => {
+    await page.getByRole('button', { name: 'Create workout', exact: true }).click()
+    await page.getByRole('button', { name: /^Start empty/ }).click()
+    await page.getByRole('textbox', { name: 'Routine name', exact: true }).fill(title)
+    await addBuilderMovement(page, 'Knee push-up')
+    await page.getByRole('button', { name: 'Review workout', exact: true }).click()
+    await page.getByRole('button', { name: 'Save routine', exact: true }).click()
+    await page.getByRole('link', { name: 'Today', exact: true }).click()
+  }
+  await saveNewRoutine('Keep routine A')
+  const original = (await readState(page)).routines[0]
+  await page
+    .locator('.routine-card')
+    .filter({ has: page.getByRole('heading', { name: 'Keep routine A', exact: true }) })
+    .getByRole('button', { name: 'Start', exact: true })
+    .click()
+  await expect(
+    page.getByRole('heading', { name: 'Make it a good one.', exact: true }),
+  ).toBeVisible()
+  expect((await readState(page)).active).toBeNull()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
+  await saveNewRoutine('Independent routine B')
+  const saved = await readState(page)
+  expect(saved.active).toBeNull()
+  expect(saved.routines).toHaveLength(2)
+  expect(saved.routines.find((routine: { id: string }) => routine.id === original.id)).toEqual(
+    original,
+  )
+  const added = saved.routines.find(
+    (routine: { title: string }) => routine.title === 'Independent routine B',
+  )
+  expect(added.id).not.toBe(original.id)
+  await expect(
+    page.locator('.routine-card').getByRole('heading', { name: 'Keep routine A', exact: true }),
+  ).toBeVisible()
+  await expect(
+    page
+      .locator('.routine-card')
+      .getByRole('heading', { name: 'Independent routine B', exact: true }),
+  ).toBeVisible()
 })
 
 test('protects dirty builder changes, confirms reset, and respects calm celebrations', async ({
@@ -117,6 +170,7 @@ test('protects dirty builder changes, confirms reset, and respects calm celebrat
 }) => {
   await boot(page)
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
+  await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Unsaved practice')
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toBeVisible()
@@ -127,7 +181,8 @@ test('protects dirty builder changes, confirms reset, and respects calm celebrat
   await page.getByRole('button', { name: /^Keep it calm/ }).click()
   await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.locator('.quick-start-strip').click()
-  await expect(page.getByRole('heading', { name: 'A five-minute win.' })).toBeVisible()
+  await continueReviewedWorkout(page)
+  await expect(page.getByRole('heading', { name: 'Your workout.' })).toBeVisible()
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await finishPartial(page)
   expect(await page.locator('.confetti').count()).toBe(0)
@@ -157,6 +212,7 @@ test('rejects malformed imports and preserves corrupted original data while allo
   await expect(page.locator('.state-banner.warning')).toContainText('Automatic saving is paused')
   await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   expect(await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)).toBe(
     '{malformed',
@@ -168,6 +224,7 @@ test('rejects malformed imports and preserves corrupted original data while allo
 test('pauses writes when another tab updates training data', async ({ page }) => {
   await boot(page)
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   const original = await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)
   await page.evaluate(
     (storageKey) =>
@@ -200,6 +257,7 @@ test('uses its offline cache for guides and logging after a full reload', async 
   await expect(page.getByRole('button', { name: 'Pause animation' })).toBeVisible()
   await page.getByRole('button', { name: 'Close dialog' }).click()
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
@@ -214,6 +272,7 @@ test('exports unsaved progress after a quota failure and recovers on the next su
 }) => {
   await boot(page)
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.evaluate(() => {
     const native = Storage.prototype.setItem
     ;(window as unknown as { blockWrites: boolean }).blockWrites = true
@@ -248,9 +307,11 @@ test('a second real tab cannot overwrite a session created by the first tab', as
   const other = await context.newPage()
   await boot(other)
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   const saved = await readState(page)
   await expect(other.locator('.state-banner.warning')).toContainText('Another tab changed')
   await other.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(other)
   await other.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   expect((await readState(page)).active.id).toBe(saved.active.id)
   expect((await readState(page)).active.exercises[0].sets[0].done).toBe(false)
@@ -260,6 +321,7 @@ test('a second real tab cannot overwrite a session created by the first tab', as
 test('preserves legacy saved workouts through migration and a second reload', async ({ page }) => {
   await boot(page)
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await finishPartial(page)
   const legacy = await readState(page)
@@ -285,10 +347,12 @@ test('keeps the quick-workout intent when leaving a dirty builder', async ({ pag
   test.skip(testInfo.project.name.includes('mobile'), 'Quick action is in the desktop sidebar.')
   await boot(page)
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
+  await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Unsaved practice')
   await page.locator('.sidebar-challenge').click()
   await page.getByRole('button', { name: 'Leave without saving', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'A five-minute win.' })).toBeVisible()
+  await continueReviewedWorkout(page)
+  await expect(page.getByRole('heading', { name: 'Your workout.' })).toBeVisible()
   expect((await readState(page)).active.duration).toBe(5)
 })
 
@@ -298,10 +362,13 @@ test('requires explicit bodyweight conversion after removing a weighted vest', a
   await page.getByRole('button', { name: /Weighted vest Add/ }).click()
   await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
+  await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Weighted push practice')
-  await page.getByRole('button', { name: 'Add Push-up', exact: true }).click()
+  await addBuilderMovement(page, 'Push-up')
   await page.getByRole('spinbutton', { name: 'Push-up added load', exact: true }).fill('5')
+  await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await page.getByRole('button', { name: 'Save routine', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await page.getByRole('button', { name: /Weighted vest Add/ }).click()
   await page.getByRole('link', { name: 'Today', exact: true }).click()
@@ -309,12 +376,19 @@ test('requires explicit bodyweight conversion after removing a weighted vest', a
     .locator('.routine-card')
     .filter({ has: page.getByRole('heading', { name: 'Weighted push practice', exact: true }) })
   await routine.getByRole('button', { name: 'Start', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: 'Make it a good one.', exact: true }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Continue to workout', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('includes added weight')
   expect((await readState(page)).active).toBeNull()
-  await routine.getByRole('button', { name: 'Edit', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Save routine', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Edit workout', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Review workout', exact: true })).toBeDisabled()
   await page.getByRole('button', { name: 'Use bodyweight', exact: true }).click()
+  await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await page.getByRole('button', { name: 'Save routine', exact: true }).click()
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await routine.getByRole('button', { name: 'Start', exact: true }).click()
+  await continueReviewedWorkout(page)
   expect((await readState(page)).active.exercises[0].sets[0].targetLoad).toBe(0)
 })

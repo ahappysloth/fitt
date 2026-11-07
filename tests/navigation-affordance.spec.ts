@@ -1,6 +1,7 @@
+import { continueReviewedWorkout } from './helpers/workout'
 import { test, expect } from '@playwright/test'
 
-test('blocked account and preference actions lead directly to the saved workout', async ({
+test('blocked actions explain their controls and share one return to the saved workout', async ({
   page,
 }) => {
   await page.route('**/api/account', (route) =>
@@ -14,6 +15,7 @@ test('blocked account and preference actions lead directly to the saved workout'
   )
   await page.goto('/')
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }).fill('4')
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   const savedId = await page.evaluate(
@@ -22,13 +24,17 @@ test('blocked account and preference actions lead directly to the saved workout'
 
   await page.getByRole('link', { name: 'Today', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Create workout', exact: true })).toBeDisabled()
-  await page.locator('.routine-session-notice').screenshot({
+  await expect(
+    page.getByText('Finish or discard your workout to create, edit, or start a saved routine.', {
+      exact: true,
+    }),
+  ).toBeVisible()
+  const strip = page.getByRole('button', { name: /^Return to active workout:/ })
+  await expect(strip).toHaveCount(1)
+  await strip.screenshot({
     path: `preview/workout-shortcut-${test.info().project.name}.png`,
   })
-  await page
-    .locator('.routine-session-notice')
-    .getByRole('button', { name: 'Go to workout', exact: true })
-    .click()
+  await strip.click()
   await expect(page).toHaveURL(/\/workout$/)
 
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
@@ -37,10 +43,18 @@ test('blocked account and preference actions lead directly to the saved workout'
     page.getByRole('button', { name: 'Continue with Google', exact: true }),
   ).toBeDisabled()
   await expect(page.getByRole('combobox', { name: 'Session length' })).toBeDisabled()
-  await page
-    .locator('.account-session-notice')
-    .getByRole('button', { name: 'Go to workout', exact: true })
-    .click()
+  await expect(
+    page.getByText('Finish or discard your workout to sign in.', { exact: true }),
+  ).toBeVisible()
+  await expect(
+    page.getByText('Finish or discard your workout to change equipment and training preferences.', {
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(page.locator('.active-workout-notice')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Go to workout', exact: true })).toHaveCount(0)
+  await expect(strip).toHaveCount(1)
+  await strip.click()
   await expect(page).toHaveURL(/\/workout$/)
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
@@ -57,11 +71,10 @@ test('blocked account and preference actions lead directly to the saved workout'
   ).toEqual({ id: savedId, reps: 4, done: true })
 
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
-  await page
-    .locator('.pref-notice')
-    .getByRole('button', { name: 'Go to workout', exact: true })
-    .click()
+  await expect(strip).toHaveCount(1)
+  await strip.click()
   await expect(page).toHaveURL(/\/workout$/)
+  await page.getByLabel('Session options', { exact: true }).click()
   await page.getByRole('button', { name: 'Discard session', exact: true }).click()
   await page
     .getByRole('dialog')
@@ -69,6 +82,7 @@ test('blocked account and preference actions lead directly to the saved workout'
     .click()
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Session length' })).toBeEnabled()
+  await expect(strip).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Go to workout', exact: true })).toHaveCount(0)
 })
 

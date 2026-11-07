@@ -1,3 +1,4 @@
+import { continueReviewedWorkout } from './helpers/workout'
 import { randomBytes, randomUUID, createHmac } from 'node:crypto'
 import { test, expect, type BrowserContext } from '@playwright/test'
 import { inArray } from 'drizzle-orm'
@@ -157,6 +158,7 @@ test('real account restores imported history on another device and syncs an offl
     await first.setOffline(true)
     await page.getByRole('link', { name: 'Today', exact: true }).click()
     await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+    await continueReviewedWorkout(page)
     await page
       .getByRole('button', { name: /^Log .* set 1$/ })
       .first()

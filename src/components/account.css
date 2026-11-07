@@ -76,16 +76,6 @@
   border-radius: 50%;
   background: currentColor;
 }
-.account-session-notice {
-  margin-top: 20px;
-  padding: 13px 15px;
-  border: 1px solid #4c5639;
-  border-radius: 12px;
-  background: #1b2115;
-  color: #d3debf;
-  font-size: var(--type-body);
-  line-height: 1.7;
-}
 .account-signin-area {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(260px, 0.9fr);

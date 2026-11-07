@@ -1,3 +1,4 @@
+import { continueReviewedWorkout } from './helpers/workout'
 import { test, expect } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -18,6 +19,7 @@ test('standalone full app renders without network dependencies', async ({ page, 
   await expect(page.getByRole('button', { name: 'Pause animation' })).toBeVisible()
   await page.getByRole('button', { name: 'Close dialog' }).click()
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
@@ -46,6 +48,7 @@ test('sandboxed embedded preview supports session-only workouts and the UUID fal
   await expect(frame.getByRole('heading', { name: 'Your next chapter.' })).toBeVisible()
   await expect(frame.getByRole('alert')).toContainText('This preview cannot save data')
   await frame.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(frame)
   await frame.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await frame.getByRole('button', { name: 'Save & finish workout', exact: true }).click()
   await frame.getByRole('button', { name: 'Save workout', exact: true }).click()

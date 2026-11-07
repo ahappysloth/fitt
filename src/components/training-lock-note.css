@@ -1,0 +1,13 @@
+.training-lock-note {
+  color: var(--muted);
+  font-size: var(--type-caption);
+  line-height: 1.65;
+  margin: 10px 0 16px;
+}
+.account-member > .training-lock-note {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+}
+.account-dialog-copy + .training-lock-note {
+  margin-bottom: 0;
+}

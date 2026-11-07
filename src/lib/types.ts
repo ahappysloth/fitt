@@ -64,6 +64,8 @@ export interface Workout {
 }
 export interface Session extends Workout {
   startedAt: string
+  pausedAt?: string
+  pausedSeconds?: number
   completedAt?: string
   elapsedSeconds?: number
   rewardContext?: {

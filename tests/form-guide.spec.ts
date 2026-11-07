@@ -1,3 +1,4 @@
+import { continueReviewedWorkout, openWorkoutFormGuide } from './helpers/workout'
 import { test, expect, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 import { mountSandboxedPreview, openPreviewHost } from './helpers/embedded-preview'
@@ -184,6 +185,9 @@ test('body model choice persists across guides, settings, and reloads without ch
 }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
+  await expect(page.locator('canvas')).toHaveCount(0)
+  await openWorkoutFormGuide(page)
   const guide = page.locator('.form-3d[data-ready=true]')
   await expect(guide).toHaveAttribute('data-model', 'male')
   const savedTraining = () =>
@@ -207,6 +211,7 @@ test('body model choice persists across guides, settings, and reloads without ch
   )
   await page.reload()
   await page.getByRole('link', { name: 'Workout', exact: true }).click()
+  await openWorkoutFormGuide(page)
   await expect(guide).toHaveAttribute('data-model', 'female')
   expect(await savedTraining()).toEqual(before)
   await page.getByRole('link', { name: 'Settings', exact: true }).click()
@@ -231,7 +236,14 @@ test('opening and closing the integrated Knee Push-up guide releases its canvas'
     await expect(page.locator('canvas')).toHaveCount(0)
   }
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
+  await continueReviewedWorkout(page)
+  await expect(page.locator('canvas')).toHaveCount(0)
+  await page.getByRole('tab', { name: 'Log sets', exact: true }).press('ArrowRight')
+  await expect(page.getByRole('tab', { name: 'Form guide', exact: true })).toBeFocused()
   await expect(page.locator('.form-3d[data-ready=true]')).toBeVisible()
+  await page.getByRole('tab', { name: 'Form guide', exact: true }).press('Home')
+  await expect(page.getByRole('tab', { name: 'Log sets', exact: true })).toBeFocused()
+  await expect(page.locator('canvas')).toHaveCount(0)
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   expect(errors).toEqual([])
 })

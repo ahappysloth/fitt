@@ -21,6 +21,7 @@ import type {
   AppState,
   BodyModel,
   Exercise,
+  Focus,
   Profile,
   Session,
   UserPreferences,
@@ -57,8 +58,11 @@ import JourneyView from './components/JourneyView'
 import LibraryView from './components/LibraryView'
 import SetupView from './components/SetupView'
 import AccountPanel from './components/AccountPanel'
-import ActiveWorkoutNotice from './components/ActiveWorkoutNotice'
+import TrainingLockNote from './components/TrainingLockNote'
 import WorkoutBuilder from './components/WorkoutBuilder'
+import WorkoutReview from './components/WorkoutReview'
+import ActiveSessionStrip from './components/ActiveSessionStrip'
+import { sessionElapsedSeconds, toggleSessionPause } from './lib/session-clock'
 import AppDialogs, { type AppDialog } from './components/AppDialogs'
 import { useAdminAccess } from './components/admin/useAdminAccess'
 import './app-experience.css'
@@ -111,6 +115,9 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
   const [toast, setToastMessage] = useState('')
   const [toastDestination, setToastDestination] = useState<Page | null>(null)
   const [builderInitial, setBuilderInitial] = useState<Workout | undefined>()
+  const [reviewWorkout, setReviewWorkout] = useState<Workout | null>(null)
+  const [builderFocus, setBuilderFocus] = useState<Focus | undefined>()
+  const [builderVersion, setBuilderVersion] = useState(0)
   const [builderDirty, setBuilderDirty] = useState(false)
   const [sessionDirty, setSessionDirty] = useState(false)
   const pendingNavigation = useRef<(() => void) | null>(null)
@@ -189,7 +196,7 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
   useEffect(
     () =>
       routeNavigation?.setBlocker((action) => {
-        if (page === 'builder' && builderDirty) {
+        if ((page === 'builder' || page === 'workout') && builderDirty) {
           pendingNavigation.current = action
           setDialog({ type: 'leave-builder' })
           return true
@@ -218,7 +225,7 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
     )
   }
   function requestNavigation(action: () => void) {
-    if (page === 'builder' && builderDirty) {
+    if ((page === 'builder' || page === 'workout') && builderDirty) {
       pendingNavigation.current = action
       setDialog({ type: 'leave-builder' })
       return
@@ -231,8 +238,21 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
     action()
   }
   function navigate(next: Page) {
-    if (next === page && (next !== 'workout' || state.active)) return
-    requestNavigation(() => (next === 'workout' ? start() : showPage(next)))
+    if (next === page && (next !== 'workout' || state.active || !reviewWorkout)) return
+    requestNavigation(() => {
+      if (next === 'workout' && !state.active) {
+        setReviewWorkout(null)
+        setBuilderInitial(undefined)
+        setBuilderFocus(undefined)
+        setBuilderVersion((version) => version + 1)
+        setBuilderDirty(false)
+        setState((previous) => ({
+          ...previous,
+          plan: generateWorkout(previous.profile, previous.history),
+        }))
+      }
+      showPage(next)
+    })
   }
   function followLink(event: MouseEvent<HTMLAnchorElement>, next: Page) {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
@@ -275,6 +295,9 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
         return
       }
       finishing.current = false
+      setReviewWorkout(null)
+      setBuilderInitial(undefined)
+      setBuilderFocus(undefined)
       setState((previous) =>
         previous.active
           ? previous
@@ -289,8 +312,18 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
     }
     showPage('workout')
   }
+  function review(workout: Workout = state.plan!) {
+    if (state.active) {
+      showPage('workout')
+      return
+    }
+    setReviewWorkout(workout)
+    setBuilderDirty(false)
+    setState((previous) => ({ ...previous, plan: workout }))
+    showPage('workout')
+  }
   function startQuick() {
-    start(quickWorkout(state.profile, state.history))
+    review(quickWorkout(state.profile, state.history))
   }
   function clearSessionUI(id?: string) {
     if (!id) return
@@ -308,10 +341,7 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
     const session: Session = {
       ...active,
       completedAt: finishedAt.toISOString(),
-      elapsedSeconds: Math.min(
-        604800,
-        Math.max(0, Math.floor((finishedAt.getTime() - Date.parse(active.startedAt)) / 1000)),
-      ),
+      elapsedSeconds: sessionElapsedSeconds(active, finishedAt.getTime()),
       rewardContext: createRewardContext(
         getRewards(state.history, state.profile.weeklyGoal, finishedAt).currentWeek.goal,
         finishedAt,
@@ -337,7 +367,14 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
   }
   function discard() {
     clearSessionUI(state.active?.id)
-    setState((previous) => ({ ...previous, active: null }))
+    setState((previous) => ({
+      ...previous,
+      active: null,
+      plan: generateWorkout(previous.profile, previous.history),
+    }))
+    setReviewWorkout(null)
+    setBuilderInitial(undefined)
+    setBuilderFocus(undefined)
     finishing.current = false
     setSessionDirty(false)
     showPage('today')
@@ -392,9 +429,12 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
       setToast('Finish or discard your active session before editing a workout.', 'workout')
       return
     }
-    setBuilderInitial(initial)
+    setReviewWorkout(null)
+    setBuilderInitial(initial ?? generateWorkout(state.profile, state.history))
+    setBuilderFocus(undefined)
+    setBuilderVersion((version) => version + 1)
     setBuilderDirty(false)
-    showPage('builder')
+    showPage('workout')
   }
   function saveRoutine(routine: Workout) {
     const existing = state.routines || []
@@ -408,18 +448,17 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
       plan: freshWorkout(routine),
     }))
     setBuilderDirty(false)
-    showPage('today')
-    setToast('Workout saved. Your plan is ready when you are.')
+    setToast('Routine saved. It’s ready for another day, too.')
   }
   function startRoutine(routine: Workout) {
-    start(routine)
+    review(routine)
   }
   async function install() {
     const outcome = await pwa.install()
     if (outcome === 'manual') setDialog({ type: 'install' })
     else if (outcome === 'accepted') setToast('Fitt is ready for your home screen.')
   }
-  const activeNavigation = page === 'builder' ? 'today' : page
+  const activeNavigation = page === 'builder' ? 'workout' : page
   if (!ready)
     return (
       <div className="app-loading" role="status">
@@ -433,7 +472,9 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <div className="app-shell">
+      <div
+        className={`app-shell${state.active && page !== 'workout' ? ' has-active-session-strip' : ''}`}
+      >
         <aside className="sidebar">
           <button className="brand" onClick={() => navigate('today')} aria-label="Fitt home">
             <FMark />
@@ -609,6 +650,13 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
                 onDirtyChange={setSessionDirty}
                 onChange={(active) => setState((previous) => ({ ...previous, active }))}
                 onBack={() => navigate('today')}
+                onTogglePause={() =>
+                  setState((previous) =>
+                    previous.active
+                      ? { ...previous, active: toggleSessionPause(previous.active) }
+                      : previous,
+                  )
+                }
                 onFinish={() =>
                   doneSets(state.active!) < totalSets(state.active!)
                     ? setDialog({ type: 'finish' })
@@ -619,19 +667,43 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
                 onInfo={(id) => setDialog({ type: 'exercise', id })}
               />
             ) : page === 'workout' ? (
-              <section className="panel workout-start" aria-labelledby="workout-start-title">
-                <Dumbbell size={30} aria-hidden="true" />
-                <p className="eyebrow">YOUR NEXT WORKOUT</p>
-                <h1 id="workout-start-title">Ready when you are.</h1>
-                <p>
-                  {state.plan?.title} · {state.plan?.duration} minutes ·{' '}
-                  {state.plan?.exercises.length} exercises
-                </p>
-                <Button onClick={() => start()}>Start my workout</Button>
-                <Button variant="secondary" onClick={() => navigate('today')}>
-                  Review my plan
-                </Button>
-              </section>
+              reviewWorkout ? (
+                <WorkoutReview
+                  workout={reviewWorkout}
+                  saved={
+                    !!state.routines?.some(
+                      (routine) =>
+                        routine.id === reviewWorkout.id &&
+                        JSON.stringify(routine.exercises) ===
+                          JSON.stringify(reviewWorkout.exercises),
+                    )
+                  }
+                  onEdit={() => {
+                    setBuilderInitial(reviewWorkout)
+                    setReviewWorkout(null)
+                    setBuilderDirty(false)
+                  }}
+                  onStart={() => start(reviewWorkout)}
+                  onSave={() => saveRoutine(reviewWorkout)}
+                  onInfo={(id) => setDialog({ type: 'exercise', id })}
+                />
+              ) : (
+                <WorkoutBuilder
+                  key={`${builderInitial?.id || 'new'}-${builderVersion}`}
+                  profile={state.profile}
+                  history={state.history}
+                  initial={builderInitial || state.plan || undefined}
+                  initialFocus={builderFocus}
+                  onFocusChange={setBuilderFocus}
+                  onSave={review}
+                  onCancel={() => {
+                    setBuilderDirty(false)
+                    showPage('today')
+                  }}
+                  onInfo={(id) => setDialog({ type: 'exercise', id })}
+                  onDirtyChange={setBuilderDirty}
+                />
+              )
             ) : page === 'journey' ? (
               <JourneyView
                 history={state.history}
@@ -648,13 +720,10 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
               />
             ) : page === 'settings' ? (
               <SetupView
-                accountPanel={
-                  <AccountPanel account={store.account} onGoToWorkout={() => navigate('workout')} />
-                }
+                accountPanel={<AccountPanel account={store.account} />}
                 accountMode={!!store.account.user}
                 profile={state.profile}
                 active={!!state.active}
-                onGoToWorkout={() => navigate('workout')}
                 preferences={preferences}
                 onChange={profileChange}
                 onPreferences={(next) =>
@@ -690,16 +759,18 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
               state.active ? (
                 <section aria-label="Create workout">
                   <h1>One workout at a time.</h1>
-                  <ActiveWorkoutNotice onGoToWorkout={() => navigate('workout')}>
-                    Finish or discard your current workout before creating another one.
-                  </ActiveWorkoutNotice>
+                  <TrainingLockNote>
+                    Finish or discard your workout to create another one.
+                  </TrainingLockNote>
                 </section>
               ) : (
                 <WorkoutBuilder
                   profile={state.profile}
                   history={state.history}
-                  initial={builderInitial}
-                  onSave={saveRoutine}
+                  initial={builderInitial || state.plan || undefined}
+                  initialFocus={builderFocus}
+                  onFocusChange={setBuilderFocus}
+                  onSave={review}
                   onCancel={() => {
                     setBuilderDirty(false)
                     showPage('today')
@@ -712,7 +783,7 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
               <TodayView
                 state={state}
                 onProfile={profileChange}
-                onStart={() => start()}
+                onStart={() => review()}
                 onQuick={startQuick}
                 onInfo={(id) => setDialog({ type: 'exercise', id })}
                 onSwap={(index) => setDialog({ type: 'swap', index, active: false })}
@@ -759,6 +830,9 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
               </button>
             </footer>
           </main>
+          {state.active && page !== 'workout' && (
+            <ActiveSessionStrip session={state.active} onResume={() => navigate('workout')} />
+          )}
           <nav
             className={`bottom-nav${admin.allowed ? ' has-admin' : ''}`}
             aria-label="Mobile navigation"

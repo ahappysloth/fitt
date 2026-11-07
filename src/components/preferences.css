@@ -246,16 +246,6 @@
 .pref-celebrations button > span {
   flex: 1;
 }
-.pref-notice {
-  border: 1px solid #515c3c;
-  border-radius: 12px;
-  padding: 15px 18px;
-  background: #1d2415;
-  color: #c9d3bc;
-  font-size: var(--type-body);
-  line-height: 1.6;
-  margin-bottom: 24px;
-}
 .pref-feature-icon {
   margin-bottom: 18px;
 }
