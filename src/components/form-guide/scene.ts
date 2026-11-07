@@ -26,6 +26,7 @@ export function createGuideScene(
   onProgress: (progress: number) => void,
   onLost: () => void,
   onCameraChange: (view: CameraView | 'custom') => void,
+  inspectionControls = false,
 ): GuideScene {
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -61,7 +62,11 @@ export function createGuideScene(
     renderer.domElement.setAttribute('role', 'img')
     renderer.domElement.setAttribute(
       'aria-label',
-      `Interactive 3D ${motion.name.toLowerCase()}. Drag to rotate, or use the camera controls below.`,
+      `Interactive 3D ${motion.name.toLowerCase()}. ${
+        inspectionControls
+          ? 'Left-drag rotates, middle-drag moves, scroll zooms. Shift and arrow keys move, Home resets.'
+          : 'Drag to rotate, or use the camera controls below.'
+      }`,
     )
     renderer.domElement.tabIndex = 0
     host.appendChild(renderer.domElement)
@@ -82,8 +87,25 @@ export function createGuideScene(
     const controls = new OrbitControls(camera, renderer.domElement)
     cleanups.push(() => controls.dispose())
     controls.target.set(0, 0.3, 0.08)
-    controls.enablePan = false
-    controls.enableZoom = false
+    controls.enablePan = inspectionControls
+    controls.enableZoom = inspectionControls
+    controls.screenSpacePanning = true
+    controls.minZoom = 0.75
+    controls.maxZoom = 1.5
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE
+    controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN
+    controls.touches.TWO = THREE.TOUCH.DOLLY_PAN
+    controls.panSpeed = 0.8
+    controls.zoomSpeed = 0.9
+    if (inspectionControls) {
+      const preventMiddleDefault = (event: MouseEvent) => {
+        if (event.button === 1) event.preventDefault()
+      }
+      renderer.domElement.addEventListener('mousedown', preventMiddleDefault)
+      cleanups.push(() =>
+        renderer.domElement.removeEventListener('mousedown', preventMiddleDefault),
+      )
+    }
     controls.enableDamping = false
     controls.minPolarAngle = 0.18
     controls.maxPolarAngle = Math.PI / 2 - 0.09
@@ -293,10 +315,34 @@ export function createGuideScene(
       camera.updateProjectionMatrix()
       render()
     }
+    function pan(horizontal: number, vertical: number) {
+      onCameraChange('custom')
+      camera.updateMatrixWorld()
+      const step = ((camera.top - camera.bottom) / camera.zoom) * 0.12
+      const offset = new THREE.Vector3()
+        .setFromMatrixColumn(camera.matrixWorld, 0)
+        .multiplyScalar(horizontal * step)
+      offset.addScaledVector(
+        new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1),
+        vertical * step,
+      )
+      controls.target.add(offset)
+      camera.position.add(offset)
+      controls.update()
+      render()
+    }
     function keyboard(event: KeyboardEvent) {
-      if (!['ArrowLeft', 'ArrowRight', '+', '-', '=', 'Home'].includes(event.key)) return
+      if (event.altKey || event.ctrlKey || event.metaKey) return
+      const keys = ['ArrowLeft', 'ArrowRight', '+', '-', '=', 'Home']
+      if (inspectionControls && event.shiftKey) keys.push('ArrowUp', 'ArrowDown')
+      if (!keys.includes(event.key)) return
       event.preventDefault()
-      if (event.key === 'ArrowLeft') rotate(-0.15)
+      if (inspectionControls && event.shiftKey && event.key.startsWith('Arrow'))
+        pan(
+          event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0,
+          event.key === 'ArrowUp' ? 1 : event.key === 'ArrowDown' ? -1 : 0,
+        )
+      else if (event.key === 'ArrowLeft') rotate(-0.15)
       else if (event.key === 'ArrowRight') rotate(0.15)
       else if (event.key === 'Home') view('angle')
       else zoom(event.key === '-' ? -0.1 : 0.1)

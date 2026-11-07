@@ -8,7 +8,6 @@ import {
   ArrowUp,
   Maximize2,
   Minus,
-  Move,
   Move3D,
   Plus,
   RotateCcw,
@@ -17,7 +16,6 @@ import {
 import type { BodyModel } from '../../lib/types'
 import {
   createModelInspectorScene,
-  type InspectorInteraction,
   type InspectorView,
   type ModelInspectorScene,
 } from './model-inspector-scene'
@@ -42,7 +40,6 @@ export default function ModelInspector({
   const [unavailable, setUnavailable] = useState(false)
   const [view, setView] = useState<InspectorView | 'custom'>('angle')
   const [zoom, setZoom] = useState(100)
-  const [interaction, setInteraction] = useState<InspectorInteraction>('orbit')
 
   useEffect(() => {
     if (!host.current) return
@@ -89,9 +86,6 @@ export default function ModelInspector({
   useEffect(() => {
     scene.current?.model(bodyModel)
   }, [bodyModel])
-  useEffect(() => {
-    scene.current?.interaction(interaction)
-  }, [interaction, ready])
   useEffect(() => {
     scene.current?.highlight(musclePreview.enabled ? musclePreview.regions : [])
   }, [musclePreview.enabled, musclePreview.regions, ready])
@@ -204,26 +198,6 @@ export default function ModelInspector({
             </div>
           </div>
           <div className="model-inspector__row model-inspector__navigation">
-            <div
-              className="model-inspector__segments"
-              role="group"
-              aria-label="Inspector drag mode"
-            >
-              <button
-                type="button"
-                aria-pressed={interaction === 'orbit'}
-                onClick={() => setInteraction('orbit')}
-              >
-                <Move3D size={14} /> Rotate
-              </button>
-              <button
-                type="button"
-                aria-pressed={interaction === 'pan'}
-                onClick={() => setInteraction('pan')}
-              >
-                <Move size={14} /> Move
-              </button>
-            </div>
             <div className="model-inspector__tools">
               <div role="group" aria-label="Rotate inspector model">
                 <button
@@ -298,7 +272,7 @@ export default function ModelInspector({
           </div>
         </fieldset>
         <p id="model-inspector-help" className="model-inspector__help">
-          Drag to rotate. Choose Move or use two fingers to pan. Scroll or pinch to zoom.{' '}
+          Left-drag to rotate. Middle-drag or use two fingers to move. Scroll or pinch to zoom.{' '}
           <span>Keyboard: arrows rotate, Shift + arrows move, + / − zoom, Home resets.</span>
         </p>
       </div>

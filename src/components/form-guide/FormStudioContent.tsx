@@ -60,7 +60,10 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
         </div>
         <div className="form-study__viewer">
           <BodyModelPreferenceProvider value={{ bodyModel, onBodyModelChange: setBodyModel }}>
-            <KneePushupGuide previewMuscles={previewEnabled ? previewRegions : undefined} />
+            <KneePushupGuide
+              inspectionControls
+              previewMuscles={previewEnabled ? previewRegions : undefined}
+            />
           </BodyModelPreferenceProvider>
         </div>
       </section>

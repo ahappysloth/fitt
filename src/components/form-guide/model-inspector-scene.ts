@@ -5,13 +5,11 @@ import { createAthlete } from './athlete'
 
 export type InspectorView = 'angle' | 'front' | 'side' | 'back'
 export type InspectorDetail = 'body' | 'head' | 'feet'
-export type InspectorInteraction = 'orbit' | 'pan'
 export interface ModelInspectorScene {
   model(value: BodyModel): void
   highlight(regions: readonly Muscle[]): void
   view(value: InspectorView): void
   detail(value: InspectorDetail): void
-  interaction(value: InspectorInteraction): void
   rotate(horizontal: number, vertical?: number): void
   pan(horizontal: number, vertical: number): void
   zoom(factor: number): void
@@ -58,7 +56,7 @@ export function createModelInspectorScene(
     canvas.setAttribute('role', 'img')
     canvas.setAttribute(
       'aria-label',
-      'Standing character model. Arrow keys rotate, Shift and arrow keys move, plus and minus zoom, Home resets.',
+      'Standing character model. Left-drag rotates, middle-drag moves, scroll zooms. Arrow keys rotate, Shift and arrow keys move, plus and minus zoom, Home resets.',
     )
     canvas.setAttribute('aria-describedby', 'model-inspector-help')
     host.appendChild(canvas)
@@ -85,7 +83,17 @@ export function createModelInspectorScene(
     controls.rotateSpeed = 0.7
     controls.zoomSpeed = 0.9
     controls.panSpeed = 0.8
+    controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE
+    controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN
+    controls.touches.ONE = THREE.TOUCH.ROTATE
     controls.touches.TWO = THREE.TOUCH.DOLLY_PAN
+    function preventMiddleDefault(event: MouseEvent) {
+      if (event.button === 1) event.preventDefault()
+    }
+    // Reserve the middle button for camera movement, including on browsers
+    // where a middle press normally starts page auto-scrolling.
+    canvas.addEventListener('mousedown', preventMiddleDefault)
+    cleanups.push(() => canvas.removeEventListener('mousedown', preventMiddleDefault))
     scene.add(new THREE.HemisphereLight('#e8ecf0', '#252525', 1.4))
     const key = new THREE.DirectionalLight('#fffaf3', 2.6)
     key.position.set(2.3, 3.8, 2.3)
@@ -252,10 +260,6 @@ export function createModelInspectorScene(
       pan,
       zoom,
       reset,
-      interaction(value) {
-        controls.mouseButtons.LEFT = value === 'pan' ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE
-        controls.touches.ONE = value === 'pan' ? THREE.TOUCH.PAN : THREE.TOUCH.ROTATE
-      },
       dispose,
     }
   } catch (error) {

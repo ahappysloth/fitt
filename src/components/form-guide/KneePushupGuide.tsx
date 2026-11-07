@@ -27,15 +27,22 @@ interface FormGuideOptions {
   fallback?: ReactNode
   /** Admin-only override; undefined retains the exercise's own muscle controls. */
   previewMuscles?: readonly Muscle[]
+  /** Enables free panning and wheel/pinch zoom in the studio. */
+  inspectionControls?: boolean
 }
 
-export default function KneePushupGuide({ fallback, previewMuscles }: FormGuideOptions) {
+export default function KneePushupGuide({
+  fallback,
+  previewMuscles,
+  inspectionControls,
+}: FormGuideOptions) {
   return (
     <FormGuide
       key={kneePushupMotion.id}
       motion={kneePushupMotion}
       fallback={fallback}
       previewMuscles={previewMuscles}
+      inspectionControls={inspectionControls}
     />
   )
 }
@@ -44,6 +51,7 @@ export function FormGuide({
   motion,
   fallback,
   previewMuscles,
+  inspectionControls = false,
 }: FormGuideOptions & { motion: GuideMotion }) {
   const { bodyModel, onBodyModelChange } = useBodyModelPreference()
   const host = useRef<HTMLDivElement>(null)
@@ -94,6 +102,7 @@ export function FormGuide({
         updateProgress,
         () => setUnavailable(true),
         setView,
+        inspectionControls,
       )
       setReady(true)
     } catch {
@@ -103,7 +112,7 @@ export function FormGuide({
       scene.current?.dispose()
       scene.current = null
     }
-  }, [motion])
+  }, [motion, inspectionControls])
   useEffect(() => {
     scene.current?.model(bodyModel)
   }, [bodyModel])
@@ -223,7 +232,9 @@ export function FormGuide({
         </div>
         <div className="form-3d__orbit-hint">
           <Move3D size={13} />
-          <span>Drag to explore</span>
+          <span>
+            {inspectionControls ? 'Left-drag rotate · middle-drag move' : 'Drag to explore'}
+          </span>
         </div>
       </div>
       <div className="form-3d__camera-row">
