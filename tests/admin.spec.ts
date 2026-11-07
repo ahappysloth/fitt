@@ -92,6 +92,13 @@ test('native admin studios isolate demo state and close on access revocation or 
   await inspector.locator('.model-inspector__viewport').scrollIntoViewIfNeeded()
   await expect(inspector).toHaveAttribute('data-ready', 'true')
   await expect(inspector.locator('canvas')).toBeVisible()
+  await inspector.getByRole('button', { name: 'Preview muscle groups', exact: true }).click()
+  const muscles = inspector.locator('#muscle-preview-options')
+  await muscles.getByRole('button', { name: 'Clear', exact: true }).click()
+  for (const name of ['Core', 'Forearms', 'Calves']) {
+    await muscles.getByRole('button', { name, exact: true }).click()
+  }
+  await expect(guide).toHaveAttribute('data-highlighted-muscles', 'core,forearms,calves')
   await inspector.locator('.model-inspector__studio').screenshot({
     path: `preview/admin-inspector-native-${info.project.name}.png`,
   })
@@ -104,6 +111,9 @@ test('native admin studios isolate demo state and close on access revocation or 
   await page.getByRole('button', { name: 'Preview mobile', exact: true }).click()
   await expect(form).toHaveClass(/is-mobile/)
   expect((await form.boundingBox())!.width).toBeLessThanOrEqual(390)
+  expect(
+    (await muscles.getByRole('button', { name: 'Core', exact: true }).boundingBox())!.height,
+  ).toBeGreaterThanOrEqual(44)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({
     path: `preview/admin-form-mobile-preview-${info.project.name}.png`,

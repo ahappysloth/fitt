@@ -21,14 +21,17 @@ import {
   type InspectorView,
   type ModelInspectorScene,
 } from './model-inspector-scene'
+import MusclePreviewControls, { type MusclePreviewState } from './MusclePreviewControls'
 import './model-inspector.css'
 
 export default function ModelInspector({
   bodyModel,
   onBodyModelChange,
+  musclePreview,
 }: {
   bodyModel: BodyModel
   onBodyModelChange(value: BodyModel): void
+  musclePreview: MusclePreviewState
 }) {
   const host = useRef<HTMLDivElement>(null)
   const scene = useRef<ModelInspectorScene | null>(null)
@@ -90,6 +93,9 @@ export default function ModelInspector({
     scene.current?.interaction(interaction)
   }, [interaction, ready])
   useEffect(() => {
+    scene.current?.highlight(musclePreview.enabled ? musclePreview.regions : [])
+  }, [musclePreview.enabled, musclePreview.regions, ready])
+  useEffect(() => {
     if (unavailable) {
       scene.current?.dispose()
       scene.current = null
@@ -103,6 +109,8 @@ export default function ModelInspector({
       aria-labelledby="model-inspector-title"
       data-ready={ready && !unavailable}
       data-model={bodyModel}
+      data-muscle-preview={musclePreview.enabled}
+      data-highlighted-muscles={musclePreview.enabled ? musclePreview.regions.join(',') : ''}
     >
       <div className="form-study__section-title">
         <div>
@@ -154,6 +162,7 @@ export default function ModelInspector({
         </div>
         <fieldset className="model-inspector__controls" disabled={!ready || unavailable}>
           <legend className="model-inspector__sr-only">Model inspection controls</legend>
+          <MusclePreviewControls {...musclePreview} />
           <div className="model-inspector__row">
             <div
               className="model-inspector__segments"

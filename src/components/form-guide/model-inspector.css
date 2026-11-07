@@ -90,6 +90,106 @@
   margin: 0;
   min-width: 0;
 }
+.model-inspector__muscle-preview {
+  padding: 19px 0;
+  border-top: 1px solid #2b3028;
+  scroll-margin-top: calc(96px + var(--safe-area-top, 0px));
+}
+.model-inspector__muscle-heading,
+.model-inspector__muscle-actions,
+.model-inspector__muscle-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.model-inspector__muscle-heading h3 {
+  margin: 0 0 4px;
+  color: #e2e9d9;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.model-inspector__muscle-heading p,
+.model-inspector__muscle-footnote p {
+  margin: 0;
+  color: #929e87;
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+.model-inspector .model-inspector__muscle-toggle {
+  border-color: #30382b;
+  background: #1b2019;
+  min-height: 40px;
+  flex-shrink: 0;
+}
+.model-inspector__muscle-toggle[aria-pressed='true'] .form-3d__switch {
+  background: #526834;
+}
+.model-inspector__muscle-toggle[aria-pressed='true'] .form-3d__switch::after {
+  transform: translateX(10px);
+  background: #c7fa53;
+}
+.model-inspector__muscle-options {
+  padding-top: 12px;
+}
+.model-inspector__muscle-actions {
+  padding-bottom: 9px;
+  color: #a9b39e;
+  font-size: 0.75rem;
+}
+.model-inspector__muscle-actions > div {
+  display: flex;
+  gap: 4px;
+}
+.model-inspector__muscle-group {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.model-inspector__muscle-group > span {
+  color: #a9b39e;
+  font-size: 0.75rem;
+}
+.model-inspector__muscle-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.model-inspector .model-inspector__muscle-group button {
+  min-height: 36px;
+  border-color: #30382b;
+  font-size: 0.75rem;
+}
+.model-inspector__muscle-group i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #687060;
+}
+.model-inspector__muscle-group [aria-pressed='true'] i {
+  background: #c7fa53;
+}
+.model-inspector__muscle-footnote {
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px solid #292e26;
+}
+.model-inspector__muscle-footnote a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #d5f7a0;
+  font-size: 0.75rem;
+  padding-block: 8px;
+  text-underline-offset: 4px;
+}
+.model-inspector__muscle-footnote a:focus-visible {
+  outline: 2px solid #c7fa53;
+  outline-offset: 3px;
+}
 .model-inspector__row {
   display: flex;
   flex-wrap: wrap;
@@ -197,6 +297,18 @@
     gap: 10px;
     padding: 13px 0;
   }
+  .model-inspector__muscle-group {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .model-inspector__muscle-heading > div {
+    flex: 1 1 170px;
+  }
+  .model-inspector .model-inspector__muscle-group button,
+  .model-inspector .model-inspector__muscle-actions button,
+  .model-inspector .model-inspector__muscle-toggle {
+    min-height: 44px;
+  }
   .model-inspector__help {
     padding: 14px;
   }
@@ -232,5 +344,8 @@
   }
   .model-inspector__tools button {
     min-width: 44px;
+  }
+  .model-inspector .model-inspector__muscle-group button {
+    min-height: 44px;
   }
 }

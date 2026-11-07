@@ -3,12 +3,15 @@ import { ArrowUpRight, Check, CirclePlay, Move3D, ShieldCheck } from 'lucide-rea
 import KneePushupGuide from './KneePushupGuide'
 import ModelInspector from './ModelInspector'
 import { BodyModelPreferenceProvider } from '../BodyModelPreference'
-import type { BodyModel } from '../../lib/types'
+import type { BodyModel, Muscle } from '../../lib/types'
+import { kneePushupMuscles } from './muscle-regions'
 import '../../form-preview/preview.css'
 
 /** Shared studio content. The local provider keeps model experiments out of account preferences. */
 export default function FormStudioContent({ embedded = false }: { embedded?: boolean }) {
   const [bodyModel, setBodyModel] = useState<BodyModel>('male')
+  const [previewEnabled, setPreviewEnabled] = useState(false)
+  const [previewRegions, setPreviewRegions] = useState<readonly Muscle[]>(kneePushupMuscles)
   const Heading = embedded ? 'h2' : 'h1'
   const MovementHeading = embedded ? 'h3' : 'h2'
   return (
@@ -57,11 +60,20 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
         </div>
         <div className="form-study__viewer">
           <BodyModelPreferenceProvider value={{ bodyModel, onBodyModelChange: setBodyModel }}>
-            <KneePushupGuide />
+            <KneePushupGuide previewMuscles={previewEnabled ? previewRegions : undefined} />
           </BodyModelPreferenceProvider>
         </div>
       </section>
-      <ModelInspector bodyModel={bodyModel} onBodyModelChange={setBodyModel} />
+      <ModelInspector
+        bodyModel={bodyModel}
+        onBodyModelChange={setBodyModel}
+        musclePreview={{
+          enabled: previewEnabled,
+          regions: previewRegions,
+          onEnabledChange: setPreviewEnabled,
+          onRegionsChange: setPreviewRegions,
+        }}
+      />
       <section id="the-system" className="form-study__system">
         <div className="form-study__section-title">
           <div>

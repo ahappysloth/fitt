@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import type { BodyModel } from '../../lib/types'
+import type { BodyModel, Muscle } from '../../lib/types'
 import { createAthlete } from './athlete'
 
 export type InspectorView = 'angle' | 'front' | 'side' | 'back'
@@ -8,6 +8,7 @@ export type InspectorDetail = 'body' | 'head' | 'feet'
 export type InspectorInteraction = 'orbit' | 'pan'
 export interface ModelInspectorScene {
   model(value: BodyModel): void
+  highlight(regions: readonly Muscle[]): void
   view(value: InspectorView): void
   detail(value: InspectorDetail): void
   interaction(value: InspectorInteraction): void
@@ -239,6 +240,10 @@ export function createModelInspectorScene(
     return {
       model(value) {
         athlete.model(value)
+        render()
+      },
+      highlight(regions) {
+        athlete.highlight(regions)
         render()
       },
       view,

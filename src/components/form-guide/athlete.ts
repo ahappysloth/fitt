@@ -2,7 +2,8 @@ import * as THREE from 'three'
 import data from './body-data.json'
 import maleData from './male-body-data.json'
 import femaleData from './female-body-data.json'
-import type { BodyModel } from '../../lib/types'
+import type { BodyModel, Muscle } from '../../lib/types'
+import { kneePushupMuscles, muscleRegionWeights, previewMuscles } from './muscle-regions'
 import type { PoseFrame, FocusRegion } from './contracts'
 export type { FocusRegion } from './contracts'
 
@@ -13,22 +14,23 @@ function decode(value: string) {
   for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index)
   return bytes.buffer
 }
-function regionWeights(x: number, y: number, z: number): [number, number, number] {
-  const ax = Math.abs(x)
-  const ellipsoid = (cx: number, cy: number, cz: number, rx: number, ry: number, rz: number) => {
-    const radius = Math.sqrt(((ax - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2)
-    return 1 - THREE.MathUtils.smoothstep(radius, 0.66, 1.07)
+let canonicalMasks: Record<Muscle, Float32Array> | undefined
+function muscleMasks(positions: Float32Array) {
+  if (canonicalMasks) return canonicalMasks
+  const masks = Object.fromEntries(
+    previewMuscles.map((muscle) => [muscle, new Float32Array(data.vertices)]),
+  ) as Record<Muscle, Float32Array>
+  for (let index = 0; index < data.vertices; index++) {
+    const weights = muscleRegionWeights(
+      positions[index * 3],
+      positions[index * 3 + 1],
+      positions[index * 3 + 2],
+    )
+    for (const muscle of previewMuscles) masks[muscle][index] = weights[muscle]
   }
-  const chest = Math.max(
-    ellipsoid(0.08, 0.42, 0.108, 0.087, 0.092, 0.061),
-    ellipsoid(0.11, 0.465, 0.096, 0.062, 0.055, 0.048),
-  )
-  const shoulder = ellipsoid(0.182, 0.508, 0.014, 0.067, 0.072, 0.08)
-  const triceps = Math.max(
-    ellipsoid(0.245, 0.428, -0.015, 0.067, 0.1, 0.049),
-    ellipsoid(0.283, 0.381, -0.007, 0.046, 0.06, 0.044),
-  )
-  return [chest, triceps, shoulder]
+  // Immutable canonical masks are shared by the inspector and movement viewers.
+  canonicalMasks = masks
+  return masks
 }
 function transformKey(name: string) {
   const side = name.endsWith('.L') ? 'L' : 'R'
@@ -58,9 +60,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
   )
   geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(decode(data.indices)), 1))
   const colors = new Float32Array(positions.length)
-  const masks = Array.from({ length: data.vertices }, (_, i) =>
-    regionWeights(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]),
-  )
+  const masks = muscleMasks(positions)
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   const material = new THREE.MeshStandardMaterial({
     color: '#ffffff',
@@ -95,18 +95,20 @@ export function createAthlete(initialModel: BodyModel = 'male') {
   const baseColor = new THREE.Color('#858b8a'),
     activeColor = new THREE.Color('#c7fa53'),
     subtle = new THREE.Color('#59605c')
-  function focus(enabled: boolean, region: FocusRegion) {
+  function highlight(regions: readonly Muscle[]) {
     const color = new THREE.Color()
     for (let i = 0; i < data.vertices; i++) {
-      const mask =
-        region === 'all'
-          ? Math.max(...masks[i])
-          : masks[i][{ chest: 0, triceps: 1, shoulders: 2 }[region]]
-      color.copy(enabled ? subtle : baseColor)
-      if (enabled) color.lerp(activeColor, mask)
+      let mask = 0
+      for (const region of regions) mask = Math.max(mask, masks[region][i])
+      color.copy(regions.length ? subtle : baseColor)
+      if (regions.length) color.lerp(activeColor, mask)
       color.toArray(colors, i * 3)
     }
     geometry.attributes.color.needsUpdate = true
+  }
+  function focus(enabled: boolean, region: FocusRegion) {
+    // The workout's All control means its exercise regions, never the whole body.
+    highlight(enabled ? (region === 'all' ? kneePushupMuscles : [region]) : [])
   }
   function applyPose(frame: PoseFrame) {
     data.bones.forEach((info, i) => {
@@ -138,6 +140,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     mesh,
     applyPose,
     focus,
+    highlight,
     model,
     dispose: () => {
       geometry.dispose()

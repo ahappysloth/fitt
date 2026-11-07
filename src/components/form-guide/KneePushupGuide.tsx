@@ -16,17 +16,35 @@ import {
   ScanLine,
 } from 'lucide-react'
 import type { FocusRegion } from './athlete'
+import type { Muscle } from '../../lib/types'
 import { kneePushupMotion } from './knee-pushup'
 import type { GuideMotion } from './contracts'
 import { createGuideScene, type CameraView, type GuideScene } from './scene'
 import './form-guide.css'
 import { useBodyModelPreference } from '../BodyModelPreference'
 
-export default function KneePushupGuide({ fallback }: { fallback?: ReactNode }) {
-  return <FormGuide key={kneePushupMotion.id} motion={kneePushupMotion} fallback={fallback} />
+interface FormGuideOptions {
+  fallback?: ReactNode
+  /** Admin-only override; undefined retains the exercise's own muscle controls. */
+  previewMuscles?: readonly Muscle[]
 }
 
-export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?: ReactNode }) {
+export default function KneePushupGuide({ fallback, previewMuscles }: FormGuideOptions) {
+  return (
+    <FormGuide
+      key={kneePushupMotion.id}
+      motion={kneePushupMotion}
+      fallback={fallback}
+      previewMuscles={previewMuscles}
+    />
+  )
+}
+
+export function FormGuide({
+  motion,
+  fallback,
+  previewMuscles,
+}: FormGuideOptions & { motion: GuideMotion }) {
   const { bodyModel, onBodyModelChange } = useBodyModelPreference()
   const host = useRef<HTMLDivElement>(null)
   const timeline = useRef<HTMLInputElement>(null)
@@ -96,8 +114,9 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
     scene.current?.speed(speed)
   }, [speed])
   useEffect(() => {
-    scene.current?.focus(muscles, region)
-  }, [muscles, region])
+    if (previewMuscles !== undefined) scene.current?.highlight(previewMuscles)
+    else scene.current?.focus(muscles, region)
+  }, [muscles, region, previewMuscles, ready])
   useEffect(() => {
     scene.current?.alignment(alignment)
   }, [alignment])
@@ -141,6 +160,8 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
       aria-label={`${motion.name} animated guide`}
       data-ready={ready}
       data-model={bodyModel}
+      data-muscle-preview={previewMuscles !== undefined}
+      data-highlighted-muscles={previewMuscles?.join(',')}
     >
       <div className="form-3d__heading">
         <span>
@@ -312,18 +333,26 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
         </div>
       </div>
       <div className="form-3d__layers">
-        <button type="button" aria-pressed={muscles} onClick={() => setMuscles(!muscles)}>
-          <Layers2 size={15} />
-          Muscle focus
-          <span className="form-3d__switch" />
-        </button>
+        {previewMuscles === undefined ? (
+          <button type="button" aria-pressed={muscles} onClick={() => setMuscles(!muscles)}>
+            <Layers2 size={15} />
+            Muscle focus
+            <span className="form-3d__switch" />
+          </button>
+        ) : (
+          <a className="form-3d__preview-link" href="#muscle-preview">
+            <Layers2 size={15} />
+            {previewMuscles.length ? `${previewMuscles.length} muscle groups` : 'No highlights'}
+            <span>Edit preview</span>
+          </a>
+        )}
         <button type="button" aria-pressed={alignment} onClick={() => setAlignment(!alignment)}>
           <ScanLine size={15} />
           Body line
           <span className="form-3d__switch" />
         </button>
       </div>
-      {muscles && (
+      {previewMuscles === undefined && muscles && (
         <div className="form-3d__muscles" role="group" aria-label="Highlighted muscle region">
           {motion.regions.map(({ id, label }) => (
             <button
@@ -339,7 +368,9 @@ export function FormGuide({ motion, fallback }: { motion: GuideMotion; fallback?
         </div>
       )}
       <p className="form-3d__note">
-        Highlighted areas show muscle involvement, not activation intensity.
+        {previewMuscles === undefined
+          ? 'Highlighted areas show muscle involvement, not activation intensity.'
+          : 'Preview selections appear in both the standing model and this guide.'}
       </p>
     </section>
   )

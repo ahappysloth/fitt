@@ -317,6 +317,26 @@
   border-top: 1px solid #292929;
   border-bottom: 1px solid #292929;
 }
+.form-3d__preview-link {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 8px 18px;
+  color: #d5f7a0;
+  font-size: 0.6875rem;
+  text-decoration: none;
+}
+.form-3d__preview-link span {
+  color: #a9b39e;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.form-3d__preview-link:focus-visible {
+  outline: 2px solid #c7fa53;
+  outline-offset: 3px;
+}
 .form-3d__layers > button {
   display: flex;
   align-items: center;
@@ -328,7 +348,7 @@
   color: #a1ad95;
   font-size: 0.75rem;
 }
-.form-3d__layers > button + button {
+.form-3d__layers > :is(button, a) + button {
   border-left: 1px solid #292929;
 }
 .form-3d__layers > button[aria-pressed='true'] {
@@ -494,7 +514,7 @@
   .form-3d__layers {
     grid-template-columns: 1fr;
   }
-  .form-3d__layers > button + button {
+  .form-3d__layers > :is(button, a) + button {
     border-left: 0;
     border-top: 1px solid #292929;
   }

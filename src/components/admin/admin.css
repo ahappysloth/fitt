@@ -215,6 +215,18 @@
     gap: 10px;
     padding: 13px 0;
   }
+  .form-study--native .model-inspector__muscle-group {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .form-study--native .model-inspector__muscle-heading > div {
+    flex: 1 1 170px;
+  }
+  .form-study--native .model-inspector .model-inspector__muscle-group button,
+  .form-study--native .model-inspector .model-inspector__muscle-actions button,
+  .form-study--native .model-inspector .model-inspector__muscle-toggle {
+    min-height: 44px;
+  }
   .form-study--native .model-inspector__help {
     padding: 14px;
   }
