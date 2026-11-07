@@ -59,15 +59,41 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     new THREE.Uint16BufferAttribute(new Uint16Array(decode(data.skinWeights)), 4, true),
   )
   geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(decode(data.indices)), 1))
-  const colors = new Float32Array(positions.length)
+  const selectedWeights = new Float32Array(data.vertices)
   const masks = muscleMasks(positions)
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  geometry.setAttribute('muscleWeight', new THREE.BufferAttribute(selectedWeights, 1))
   const material = new THREE.MeshStandardMaterial({
-    color: '#ffffff',
-    vertexColors: true,
+    color: '#858b8a',
     roughness: 0.52,
     metalness: 0.18,
   })
+  const activeColor = { value: new THREE.Color('#c7fa53') }
+  // Shape the edge after interpolation so closeups keep a narrow, smooth feather
+  // instead of exposing the coarse mesh triangles with a per-vertex threshold.
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.fittMuscleColor = activeColor
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nattribute float muscleWeight;\nvarying float vFittMuscleWeight;',
+      )
+      .replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\nvFittMuscleWeight = muscleWeight;',
+      )
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform vec3 fittMuscleColor;\nvarying float vFittMuscleWeight;',
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+         float muscleEdge = smoothstep(0.15, 0.85, vFittMuscleWeight);
+         diffuseColor.rgb = mix(diffuseColor.rgb, fittMuscleColor, muscleEdge);`,
+      )
+  }
+  material.customProgramCacheKey = () => 'fitt-muscle-edge-1'
   const mesh = new THREE.SkinnedMesh(geometry, material)
   mesh.name = 'Fitt training mannequin'
   mesh.castShadow = true
@@ -93,18 +119,15 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     position = new THREE.Vector3(),
     scale = new THREE.Vector3(1, 1, 1)
   const baseColor = new THREE.Color('#858b8a'),
-    activeColor = new THREE.Color('#c7fa53'),
     subtle = new THREE.Color('#59605c')
   function highlight(regions: readonly Muscle[]) {
-    const color = new THREE.Color()
     for (let i = 0; i < data.vertices; i++) {
       let mask = 0
       for (const region of regions) mask = Math.max(mask, masks[region][i])
-      color.copy(regions.length ? subtle : baseColor)
-      if (regions.length) color.lerp(activeColor, mask)
-      color.toArray(colors, i * 3)
+      selectedWeights[i] = mask
     }
-    geometry.attributes.color.needsUpdate = true
+    material.color.copy(regions.length ? subtle : baseColor)
+    geometry.attributes.muscleWeight.needsUpdate = true
   }
   function focus(enabled: boolean, region: FocusRegion) {
     // The workout's All control means its exercise regions, never the whole body.

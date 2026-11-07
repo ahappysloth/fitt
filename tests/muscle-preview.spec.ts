@@ -6,6 +6,10 @@ test('admin muscle preview shares independent selections across both viewers wit
 }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
+  // Shader compilation errors are logged rather than thrown by the renderer.
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text())
+  })
   const html = await readFile('preview/fitt-form-studio.html', 'utf8')
   await page.route('**/muscle-study', (route) =>
     route.fulfill({ contentType: 'text/html', body: html }),

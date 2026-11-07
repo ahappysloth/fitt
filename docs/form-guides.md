@@ -12,6 +12,8 @@ The study also includes a standing model inspector below the exercise viewer. It
 
 The admin and standalone studios offer a shared **Muscle preview** panel. Its independent toggles cover chest, shoulders, biceps, triceps, forearms, upper back, lower back, core, quads, glutes, hamstrings, and calves. Any combination is rendered by the same canonical surface masks in both the standing and animated models. The panel supports Select all, Clear, and disabling preview while remembering the selection. Preview state stays local to the studio and preserves the selected body, camera, playback, and position in the rep. Ordinary workout guides retain their exercise-specific controls; Knee Push-up's All option continues to mean chest, triceps, and shoulders.
 
+Highlight boundaries use a restrained feather after the selected mask weights are interpolated in the fragment shader. This reduces the broad glow while preserving the existing region contours and the model's lighting. A scalar weight attribute follows the same skinned vertices through body switches and motion; it does not change geometry or require an extra rendering pass.
+
 A complete skeleton and individually modeled muscles are a **content upgrade**, not a reason to replace the viewer. The prototype already has a real bone rig and weighted mesh. Its muscle highlights are approximate surface masks. The next anatomy asset should supply named muscle groups and optional bone meshes, all bound to the same canonical rig, or include a deliberate retargeting step. A detailed medical-looking asset still needs accurate movement clips and deformation work; more polygons alone will not fix form.
 
 ## Separation of responsibilities

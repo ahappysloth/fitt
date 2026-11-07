@@ -74,30 +74,28 @@ describe('shared muscle regions', () => {
       const pose = athlete.mesh.skeleton.boneMatrices!.slice()
       const shape = geometry.attributes.position.array.slice()
       athlete.highlight(['chest'])
-      const chest = geometry.attributes.color.array.slice()
+      const chest = geometry.attributes.muscleWeight.array.slice()
       athlete.highlight(['calves'])
-      const calves = geometry.attributes.color.array.slice()
+      const calves = geometry.attributes.muscleWeight.array.slice()
       athlete.highlight(['chest', 'calves', 'chest'])
-      const combined = geometry.attributes.color.array
-      const expectedColors = new Float32Array(combined.length)
-      for (let index = 0; index < combined.length; index += 3) {
-        const expected = chest[index] >= calves[index] ? chest : calves
-        for (let axis = 0; axis < 3; axis++) expectedColors[index + axis] = expected[index + axis]
-      }
-      expect(combined).toEqual(expectedColors)
+      const combined = geometry.attributes.muscleWeight.array
+      const expectedWeights = Float32Array.from(chest, (weight, index) =>
+        Math.max(weight, calves[index]),
+      )
+      expect(combined).toEqual(expectedWeights)
       expect(geometry.attributes.position.array).toEqual(shape)
       expect(athlete.mesh.skeleton.boneMatrices).toEqual(pose)
       const highlights = combined.slice()
       athlete.model('female')
-      expect(geometry.attributes.color.array).toEqual(highlights)
+      expect(geometry.attributes.muscleWeight.array).toEqual(highlights)
       expect(athlete.mesh.skeleton.boneMatrices).toEqual(pose)
       athlete.highlight([])
-      const neutral = geometry.attributes.color.array
-      expect(neutral.every((color, index) => color === neutral[index % 3])).toBe(true)
+      const neutral = geometry.attributes.muscleWeight.array
+      expect(neutral.every((weight) => weight === 0)).toBe(true)
       athlete.focus(true, 'all')
-      const exercise = geometry.attributes.color.array.slice()
+      const exercise = geometry.attributes.muscleWeight.array.slice()
       athlete.highlight(['chest', 'triceps', 'shoulders'])
-      expect(geometry.attributes.color.array).toEqual(exercise)
+      expect(geometry.attributes.muscleWeight.array).toEqual(exercise)
     } finally {
       athlete.dispose()
     }
