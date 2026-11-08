@@ -1,5 +1,14 @@
 import { available, byId, exercises } from './catalog'
 import { MAX_ADDED_LOAD_KG } from './limits'
+import {
+  comfortable,
+  comparableExposures,
+  completeWork,
+  hasReportedEffort,
+  orderedHistory,
+  originalLoad,
+  originalTarget,
+} from './training-evidence'
 import type {
   AppState,
   Exercise,
@@ -46,6 +55,9 @@ export const focusNames: Record<Focus, string> = {
 }
 
 function makeSets(_exercise: Exercise, count: number, target: number, load = 0): WorkoutSet[] {
+  // Legacy backups can contain fractional values; new session recommendations
+  // must still be usable by the whole-rep/second logger. Keep history unchanged.
+  target = Math.max(1, Math.min(600, Math.round(target)))
   return Array.from({ length: count }, () => ({
     id: uid(),
     target,
@@ -54,25 +66,25 @@ function makeSets(_exercise: Exercise, count: number, target: number, load = 0):
     targetLoad: load,
     effort: 'good',
     done: false,
+    prescription: { target, load, source: 'generated' },
+    recommendationSource: 'prescribed',
+    effortConfirmed: false,
+    targetLocked: false,
   }))
 }
 const completed = (entry: WorkoutExercise) => entry.sets.filter((s) => s.done)
-const successful = (entry: WorkoutExercise) =>
-  entry.sets.length > 0 &&
-  entry.sets.every(
-    (s) => s.done && s.reps >= s.target && s.load >= s.targetLoad && s.effort !== 'hard',
-  )
 
 export function prescribe(
   exercise: Exercise,
   profile: Profile,
   history: Session[],
 ): WorkoutExercise {
-  const previous = [...history]
-    .reverse()
-    .flatMap((h) =>
-      h.exercises.filter((e) => e.exerciseId === exercise.id && completed(e).length > 0),
-    )
+  const desiredSets = profile.duration === 20 ? 2 : 3
+  const previous = orderedHistory(history).flatMap(
+    (h) =>
+      // One exercise exposure per session, even if imported entries repeat.
+      h.exercises.find((e) => e.exerciseId === exercise.id && completed(e).length > 0) ?? [],
+  )
   let target = exercise.min
   let load = 0
   let selected = exercise
@@ -80,26 +92,38 @@ export function prescribe(
   const last = previous[0]
   if (last) {
     const done = completed(last)
+    // The original prescription survives in-session suggestions. For legacy
+    // entries use all available targets, including skipped work, conservatively.
     const plannedTarget = Math.min(
       exercise.max,
-      Math.max(1, Math.round(done.reduce((n, s) => n + s.target, 0) / done.length)),
+      Math.max(1, Math.min(...last.sets.map(originalTarget))),
     )
-    load =
-      exercise.weighted && profile.equipment.includes('vest')
-        ? Math.min(...done.map((s) => s.load))
-        : 0
-    // A full, comfortable exercise can reveal that the original target was too
-    // low. Keep partial work and changed loads from inflating the next plan.
-    const canCalibrate =
-      successful(last) && done.every((s) => s.load === load && s.load === s.targetLoad)
-    target = canCalibrate
+    target = plannedTarget
+    const consistentLoad = done.every((s) => s.load === done[0].load)
+    const canUseLoad = exercise.weighted && profile.equipment.includes('vest')
+    load = canUseLoad
       ? Math.min(
-          exercise.max,
-          Math.max(1, Math.round(done.reduce((n, s) => n + s.reps, 0) / done.length)),
+          MAX_ADDED_LOAD_KG,
+          Math.max(0, consistentLoad ? done[0].load : Math.min(...done.map(originalLoad))),
         )
-      : plannedTarget
+      : 0
+    const full =
+      completeWork(last, desiredSets) &&
+      consistentLoad &&
+      done.every((s) => !(hasReportedEffort(s) && s.effort === 'hard'))
+    const changedLoad = done.some((s) => s.load !== originalLoad(s))
+    const canCalibrate = full && !changedLoad && done.every((s) => s.reps >= originalTarget(s))
+    if (canCalibrate) {
+      target = Math.min(exercise.max, Math.max(plannedTarget, Math.min(...done.map((s) => s.reps))))
+    } else if (full && changedLoad && canUseLoad) {
+      // A new load is a different task. Preserve demonstrated work at that load;
+      // reduced-load extra reps do not earn a higher repetition prescription.
+      target = Math.min(plannedTarget, Math.max(1, Math.min(...done.map((s) => s.reps))))
+    }
     const struggled = done.some(
-      (s) => s.reps < s.target || s.load < s.targetLoad || s.effort === 'hard',
+      (s) =>
+        (hasReportedEffort(s) && s.effort === 'hard') ||
+        (s.load === originalLoad(s) && s.reps < originalTarget(s)),
     )
     if (struggled) {
       if (load > 0) {
@@ -127,7 +151,7 @@ export function prescribe(
       // Calibrating an underestimated target is separate from earning a new
       // variation or added load through the existing two-session progression.
       note = 'Target calibrated to your completed sets. Build consistency here.'
-    } else if (previous.length > 1 && successful(last) && successful(previous[1])) {
+    } else if (previous.length > 1 && comparableExposures(last, previous[1], desiredSets)) {
       if (target >= exercise.max) {
         const harder = exercise.harder && byId[exercise.harder]
         if (harder && available(harder, profile.equipment)) {
@@ -152,12 +176,16 @@ export function prescribe(
         note = `Two strong sessions. ${exercise.unit === 'sec' ? 'Five more seconds' : 'One more rep'} per set.`
       }
     } else {
-      note = 'Build consistency at this target before progressing.'
+      note =
+        full && changedLoad
+          ? 'Keep the demonstrated load and build consistency at this target.'
+          : 'Build consistency at this target before progressing.'
     }
   }
   return {
     exerciseId: selected.id,
-    sets: makeSets(selected, profile.duration === 20 ? 2 : 3, target, load),
+    plannedSetCount: desiredSets,
+    sets: makeSets(selected, desiredSets, target, load),
     note,
   }
 }
@@ -182,8 +210,7 @@ export function generateWorkout(profile: Profile, history: Session[], seed = 0):
     )
     pool.sort((a, b) => b.level - a.level || b.equipment.length - a.equipment.length)
     // Keep the most recent variation so progress is earned over consecutive sessions.
-    const last = [...history]
-      .reverse()
+    const last = orderedHistory(history)
       .flatMap((h) => h.exercises)
       .find(
         (e) =>
@@ -216,6 +243,7 @@ export function freshWorkout(workout: Workout): Workout {
     createdAt: new Date().toISOString(),
     exercises: workout.exercises.map((entry) => ({
       ...entry,
+      plannedSetCount: entry.sets.length,
       sets: entry.sets.map((set) => ({
         ...set,
         id: uid(),
@@ -223,6 +251,14 @@ export function freshWorkout(workout: Workout): Workout {
         reps: set.target,
         load: set.targetLoad,
         effort: 'good',
+        prescription: {
+          target: set.target,
+          load: set.targetLoad,
+          source: set.prescription?.source ?? 'manual',
+        },
+        recommendationSource: 'prescribed',
+        effortConfirmed: false,
+        targetLocked: false,
       })),
     })),
   }
@@ -257,6 +293,7 @@ export function alternativesFor(entry: WorkoutExercise, profile: Profile) {
 export function replaceExercise(entry: WorkoutExercise, exercise: Exercise): WorkoutExercise {
   return {
     exerciseId: exercise.id,
+    plannedSetCount: entry.sets.length,
     sets: makeSets(exercise, entry.sets.length, exercise.min),
     note: 'Variation changed. Start with a controlled set and adjust as needed.',
   }
@@ -269,7 +306,8 @@ export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise
   if (set.done)
     return { ...entry, sets: entry.sets.map((s) => (s.id === id ? { ...s, done: false } : s)) }
   const exercise = byId[entry.exerciseId]
-  const struggled = set.reps < set.target || set.effort === 'hard' || set.load < set.targetLoad
+  const reportedHard = hasReportedEffort(set) && set.effort === 'hard'
+  const struggled = set.reps < set.target || reportedHard || set.load < set.targetLoad
   // Comfortable extra reps calibrate an underestimated target. Leave some
   // headroom for fatigue after a "good" set; an easy set can repeat its result.
   const target = Math.min(
@@ -277,18 +315,14 @@ export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise
     Math.max(
       1,
       struggled
-        ? Math.min(
-            set.target,
-            set.reps - (set.effort === 'hard' ? (exercise.unit === 'sec' ? 5 : 1) : 0),
-          )
-        : Math.max(set.target, set.effort === 'easy' ? set.reps : Math.round(set.reps * 0.9)),
+        ? Math.min(set.target, set.reps - (reportedHard ? (exercise.unit === 'sec' ? 5 : 1) : 0))
+        : comfortable(set)
+          ? Math.max(set.target, set.effort === 'easy' ? set.reps : Math.round(set.reps * 0.9))
+          : set.target,
     ),
   )
   const load = exercise.weighted
-    ? Math.min(
-        MAX_ADDED_LOAD_KG,
-        Math.max(0, set.load - (set.effort === 'hard' && set.load > 0 ? 2.5 : 0)),
-      )
+    ? Math.min(MAX_ADDED_LOAD_KG, Math.max(0, set.load - (reportedHard && set.load > 0 ? 2.5 : 0)))
     : 0
   const nextCompleted = entry.sets.findIndex((s, i) => i > index && s.done)
   let adjusted = false
@@ -300,14 +334,22 @@ export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise
       i < index ||
       (nextCompleted !== -1 && i > nextCompleted) ||
       s.done ||
+      s.targetLocked ||
       s.reps !== s.target ||
       s.load !== s.targetLoad ||
-      s.effort !== 'good' ||
+      (s.targetLocked === undefined && hasReportedEffort(s) && s.effort !== 'good') ||
       (s.target === target && s.targetLoad === load)
     )
       return s
     adjusted = true
-    return { ...s, target, reps: target, load, targetLoad: load }
+    return {
+      ...s,
+      target,
+      reps: target,
+      load,
+      targetLoad: load,
+      recommendationSource: 'adapted' as const,
+    }
   })
   return {
     ...entry,
