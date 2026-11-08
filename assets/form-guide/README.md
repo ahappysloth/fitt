@@ -57,6 +57,8 @@ The palms and the inner 75 mm knee-contact envelope remain exactly canonical. Sc
 
 Both variants record their source checksums. The male asset contains positions only and uses the canonical topology directly. The female asset additionally contains `normals` (base64 Float32 XYZ) and an optional `topology` record: `baseVertexCount`, `edgeParents` (base64 Uint16 sequential parent pairs) and `indices` (base64 Uint16 triangle indices). Its original vertex prefix keeps the canonical indexing. The runtime derives each appended vertex's canonical coordinates, four normalized skin weights and muscle-mask values from its two preceding parents, and caches the female geometry separately. The skeleton, pose, material, highlights and contact anchors remain shared. The canonical and male JSON assets remain byte-identical.
 
+Both bodies receive the same runtime shading polish after loading their generated or authored normals. Two edge-connected passes reduce coarse normal variation without changing any positions, triangles, skin weights or muscle masks. The filter fades across sharper features, never joins disconnected surfaces, and limits each result to 20 degrees from its original normal. Both variants continue to use the same satin material (`roughness: 0.46`, `metalness: 0.18`) in the inspector and workout guide. The polished normals are built once per cached surface.
+
 To regenerate, download the thirteen source files and run. The first four local filenames below preserve the existing checksum keys:
 
 ```sh

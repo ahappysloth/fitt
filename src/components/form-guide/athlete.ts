@@ -5,6 +5,7 @@ import femaleData from './female-body-data.json'
 import type { BodyModel, Muscle } from '../../lib/types'
 import { kneePushupMuscles, muscleRegionWeights, previewMuscles } from './muscle-regions'
 import { refineWeights, surfaceBuffers, type ModelSurface } from './surface-buffers'
+import { finishSurfaceNormals } from './surface-normals'
 import type { PoseFrame, FocusRegion } from './contracts'
 export type { FocusRegion } from './contracts'
 
@@ -67,6 +68,8 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     if (buffers.normals)
       geometry.setAttribute('normal', new THREE.BufferAttribute(buffers.normals, 3))
     else geometry.computeVertexNormals()
+    // Authored and generated normals receive the same finish on both bodies.
+    finishSurfaceNormals(geometry)
     return { geometry, selectedWeights, masks }
   }
   const surfaces = new Map<BodyModel, ReturnType<typeof buildSurface>>()
