@@ -11,6 +11,7 @@ import pathlib
 import struct
 import sys
 from collections import defaultdict
+from form_chest import refine_female_chest
 
 root = pathlib.Path(__file__).resolve().parents[1]
 obj_path, rig_path, weights_path = map(pathlib.Path, sys.argv[1:4])
@@ -511,11 +512,14 @@ def round_female_lower_chest(surface):
     assert minimum_jacobian > .30, 'Lower chest warp must remain invertible'
     return warped
 
-female_positions = sculpt_surface(female_chest_chart(fit_surface(female_vertices)), 'female')
+female_chart = female_chest_chart(fit_surface(female_vertices))
+female_positions = sculpt_surface(female_chart, 'female')
 female_positions = polish_surface(round_female_lower_chest(female_positions), 'female')
 female_positions = preserve_lower_legs(female_positions, positions)
-female_total_offset = max(length(sub(female_positions[i:i+3], positions[i:i+3]))
-                          for i in range(0, len(positions), 3))
+female_positions, chest_refinement = refine_female_chest(
+    female_positions, female_chart,
+    [[lookup[old] for old in face] for face in faces], positions)
+female_total_offset = chest_refinement['maximumCanonicalDisplacementMeters']
 assert female_total_offset < .09, 'Final female silhouette exceeds its 90 mm envelope'
 female_variant = {
     'version': 1,
@@ -536,6 +540,7 @@ female_variant = {
     'lowerChestWarp': {'maximumLiftMeters': .055, 'inputYRange': [.18, .43],
                        'minimumJacobianBound': round(1-.055*math.pi/.25, 6)},
     'maximumCanonicalDisplacementMeters': round(female_total_offset, 6),
+    **chest_refinement,
     'positions': encode('f', female_positions),
 }
 female_output = root / 'src/components/form-guide/female-body-data.json'

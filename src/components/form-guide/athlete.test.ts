@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { Vector3 } from 'three'
+import { describe, expect, it, vi } from 'vitest'
+import { Vector3, type BufferGeometry } from 'three'
 import { createAthlete } from './athlete'
 import { kneePushupPose, movementAt } from './knee-pushup'
 import data from './body-data.json'
@@ -8,26 +8,26 @@ const point = (name: string) =>
   new Vector3(...(data.bones.find((bone) => bone.name === name)!.head as [number, number, number]))
 
 describe('body surface quality', () => {
-  const raw = Uint8Array.from(atob(data.positions), (character) => character.charCodeAt(0))
-  const canonical = new Float32Array(raw.buffer)
-  const restVertex = (index: number) => new Vector3().fromArray(canonical, index * 3)
+  const restVertex = (geometry: BufferGeometry, index: number) =>
+    new Vector3().fromBufferAttribute(geometry.attributes.canonicalPosition, index)
 
   it.each(['male', 'female'] as const)(
     'preserves local %s facial proportions instead of stretching tiny features across the head',
     (model) => {
       const athlete = createAthlete(model)
       try {
-        const { position } = athlete.mesh.geometry.attributes
-        const triangles = athlete.mesh.geometry.index!
+        const geometry = athlete.mesh.geometry
+        const { position, canonicalPosition } = geometry.attributes
+        const triangles = geometry.index!
         let largestStretch = 0
         let checked = 0
         for (let index = 0; index < triangles.count; index += 3) {
           const vertices = [0, 1, 2].map((offset) => triangles.getX(index + offset))
-          if (!vertices.every((vertex) => canonical[vertex * 3 + 1] > 0.67)) continue
+          if (!vertices.every((vertex) => canonicalPosition.getY(vertex) > 0.67)) continue
           for (let edge = 0; edge < 3; edge++) {
             const start = vertices[edge],
               end = vertices[(edge + 1) % 3]
-            const originalLength = restVertex(start).distanceTo(restVertex(end))
+            const originalLength = restVertex(geometry, start).distanceTo(restVertex(geometry, end))
             const length = new Vector3()
               .fromBufferAttribute(position, start)
               .distanceTo(new Vector3().fromBufferAttribute(position, end))
@@ -50,10 +50,11 @@ describe('body surface quality', () => {
     (model) => {
       const athlete = createAthlete(model)
       try {
-        const { position, skinIndex, skinWeight } = athlete.mesh.geometry.attributes
+        const geometry = athlete.mesh.geometry
+        const { position, skinIndex, skinWeight } = geometry.attributes
         let checked = 0
         for (let index = 0; index < position.count; index++) {
-          const original = restVertex(index)
+          const original = restVertex(geometry, index)
           const names = [0, 1, 2, 3]
             .filter((slot) => skinWeight.getComponent(index, slot) > 0)
             .map((slot) => data.bones[skinIndex.getComponent(index, slot)].name)
@@ -75,13 +76,14 @@ describe('body surface quality', () => {
   it('keeps the rounded female chest continuous without collapsed triangles', () => {
     const athlete = createAthlete('female')
     try {
-      const { position } = athlete.mesh.geometry.attributes
-      const triangles = athlete.mesh.geometry.index!
+      const geometry = athlete.mesh.geometry
+      const { position } = geometry.attributes
+      const triangles = geometry.index!
       const adjacentNormals = new Map<string, Vector3>()
       let checked = 0
       for (let index = 0; index < triangles.count; index += 3) {
         const ids = [0, 1, 2].map((offset) => triangles.getX(index + offset))
-        const original = ids.map(restVertex)
+        const original = ids.map((id) => restVertex(geometry, id))
         const center = original
           .reduce((sum, point) => sum.add(point), new Vector3())
           .divideScalar(3)
@@ -103,9 +105,16 @@ describe('body surface quality', () => {
           .length()
         expect(normal.length() / originalArea).toBeGreaterThan(0.04)
         normal.normalize()
-        // The rounded underside may face backward in Z, but must face down.
-        // Adjacent faces must turn continuously rather than fold or flip.
-        if (normal.z < 0) expect(normal.y).toBeLessThan(-0.5)
+        // The underside faces down; the rounded side attachment can instead
+        // return laterally toward the ribs. Neither may fold into its neighbors.
+        if (normal.z < 0 && Math.abs(normal.x) < 0.8) expect(normal.y).toBeLessThan(-0.5)
+        const shadedNormal = ids
+          .reduce(
+            (sum, id) => sum.add(new Vector3().fromBufferAttribute(geometry.attributes.normal, id)),
+            new Vector3(),
+          )
+          .normalize()
+        expect(normal.dot(shadedNormal)).toBeGreaterThan(0)
         for (let edge = 0; edge < 3; edge++) {
           const start = ids[edge],
             end = ids[(edge + 1) % 3]
@@ -122,13 +131,38 @@ describe('body surface quality', () => {
     }
   })
 
+  it('keeps the refined female surface closed with consistent triangle winding', () => {
+    const athlete = createAthlete('female')
+    try {
+      const triangles = athlete.mesh.geometry.index!
+      const edges = new Map<string, { count: number; winding: number }>()
+      for (let index = 0; index < triangles.count; index += 3) {
+        const ids = [0, 1, 2].map((offset) => triangles.getX(index + offset))
+        for (let edge = 0; edge < 3; edge++) {
+          const a = ids[edge],
+            b = ids[(edge + 1) % 3]
+          const key = `${Math.min(a, b)}:${Math.max(a, b)}`
+          const record = edges.get(key) ?? { count: 0, winding: 0 }
+          record.count++
+          record.winding += a < b ? 1 : -1
+          edges.set(key, record)
+        }
+      }
+      const openOrReversed = [...edges].filter(([, edge]) => edge.count !== 2 || edge.winding !== 0)
+      expect(openOrReversed).toEqual([])
+    } finally {
+      athlete.dispose()
+    }
+  })
+
   it('keeps the female reference silhouette bounded and preserves her reviewed lower legs and feet', () => {
     const athlete = createAthlete('female')
     try {
-      const { position } = athlete.mesh.geometry.attributes
+      const geometry = athlete.mesh.geometry
+      const { position } = geometry.attributes
       let largestDisplacement = 0
       for (let index = 0; index < position.count; index++) {
-        const original = restVertex(index)
+        const original = restVertex(geometry, index)
         const distance = original.distanceTo(new Vector3().fromBufferAttribute(position, index))
         largestDisplacement = Math.max(largestDisplacement, distance)
         if (original.y < -0.35) expect(distance).toBe(0)
@@ -235,13 +269,37 @@ describe('the Knee Push-up movement contract', () => {
     const matrices = athlete.mesh.skeleton.boneMatrices!.slice()
     expect(athlete.mesh.name).toBe('Fitt male training mannequin')
     athlete.model('female')
-    expect(position.array).not.toEqual(male)
+    expect(athlete.mesh.geometry.attributes.position.array).not.toEqual(male)
+    expect(position.array).toEqual(male)
     expect(athlete.mesh.skeleton.boneMatrices).toEqual(matrices)
     athlete.model('male')
     expect(athlete.mesh.geometry).toBe(geometry)
     expect(geometry.attributes.position).toBe(position)
     expect(position.array).toEqual(male)
     athlete.dispose()
+  })
+
+  it('caches both surfaces and releases their GPU resources with the shared rig and material', () => {
+    const athlete = createAthlete()
+    athlete.highlight(['chest', 'forearms'])
+    const male = athlete.mesh.geometry
+    const material = athlete.mesh.material
+    const skeleton = athlete.mesh.skeleton
+    athlete.model('female')
+    const female = athlete.mesh.geometry
+    const highlights = female.attributes.muscleWeight.array.slice()
+    athlete.model('male')
+    expect(athlete.mesh.geometry).toBe(male)
+    athlete.model('female')
+    expect(athlete.mesh.geometry).toBe(female)
+    expect(female.attributes.muscleWeight.array).toEqual(highlights)
+    expect(athlete.mesh.material).toBe(material)
+    expect(athlete.mesh.skeleton).toBe(skeleton)
+    const disposed = [male, female, material, skeleton].map((resource) =>
+      vi.spyOn(resource, 'dispose'),
+    )
+    athlete.dispose()
+    disposed.forEach((dispose) => expect(dispose).toHaveBeenCalledTimes(1))
   })
 })
 

@@ -4,6 +4,7 @@ import maleData from './male-body-data.json'
 import femaleData from './female-body-data.json'
 import type { BodyModel, Muscle } from '../../lib/types'
 import { kneePushupMuscles, muscleRegionWeights, previewMuscles } from './muscle-regions'
+import { refineWeights, surfaceBuffers, type ModelSurface } from './surface-buffers'
 import type { PoseFrame, FocusRegion } from './contracts'
 export type { FocusRegion } from './contracts'
 
@@ -44,24 +45,40 @@ function transformKey(name: string) {
 }
 
 export function createAthlete(initialModel: BodyModel = 'male') {
-  const geometry = new THREE.BufferGeometry()
   const positions = new Float32Array(decode(data.positions))
-  const malePositions = new Float32Array(decode(maleData.positions))
-  const femalePositions = new Float32Array(decode(femaleData.positions))
-  // Keep canonical coordinates intact for muscle masks and subsequent switches.
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3))
-  geometry.setAttribute(
-    'skinIndex',
-    new THREE.Uint8BufferAttribute(new Uint8Array(decode(data.skinIndices)), 4),
-  )
-  geometry.setAttribute(
-    'skinWeight',
-    new THREE.Uint16BufferAttribute(new Uint16Array(decode(data.skinWeights)), 4, true),
-  )
-  geometry.setIndex(new THREE.BufferAttribute(new Uint16Array(decode(data.indices)), 1))
-  const selectedWeights = new Float32Array(data.vertices)
-  const masks = muscleMasks(positions)
-  geometry.setAttribute('muscleWeight', new THREE.BufferAttribute(selectedWeights, 1))
+  const baseMasks = muscleMasks(positions)
+  function buildSurface(surface: ModelSurface) {
+    const buffers = surfaceBuffers(data, surface)
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(buffers.positions, 3))
+    // Canonical ancestry is also useful for geometric checks after local refinement.
+    geometry.setAttribute('canonicalPosition', new THREE.BufferAttribute(buffers.canonical, 3))
+    geometry.setAttribute('skinIndex', new THREE.Uint8BufferAttribute(buffers.skinIndices, 4))
+    geometry.setAttribute(
+      'skinWeight',
+      new THREE.Uint16BufferAttribute(buffers.skinWeights, 4, true),
+    )
+    geometry.setIndex(new THREE.BufferAttribute(buffers.indices, 1))
+    const selectedWeights = new Float32Array(buffers.positions.length / 3)
+    const masks = Object.fromEntries(
+      previewMuscles.map((region) => [region, refineWeights(baseMasks[region], buffers.parents)]),
+    ) as Record<Muscle, Float32Array>
+    geometry.setAttribute('muscleWeight', new THREE.BufferAttribute(selectedWeights, 1))
+    if (buffers.normals)
+      geometry.setAttribute('normal', new THREE.BufferAttribute(buffers.normals, 3))
+    else geometry.computeVertexNormals()
+    return { geometry, selectedWeights, masks }
+  }
+  const surfaces = new Map<BodyModel, ReturnType<typeof buildSurface>>()
+  function surfaceFor(value: BodyModel) {
+    let surface = surfaces.get(value)
+    if (!surface) {
+      surface = buildSurface(value === 'male' ? maleData : femaleData)
+      surfaces.set(value, surface)
+    }
+    return surface
+  }
+  let activeSurface = surfaceFor(initialModel)
   const material = new THREE.MeshStandardMaterial({
     color: '#929898',
     roughness: 0.46,
@@ -94,7 +111,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
       )
   }
   material.customProgramCacheKey = () => 'fitt-muscle-edge-1'
-  const mesh = new THREE.SkinnedMesh(geometry, material)
+  const mesh = new THREE.SkinnedMesh(activeSurface.geometry, material)
   mesh.name = 'Fitt training mannequin'
   mesh.castShadow = true
   mesh.receiveShadow = true
@@ -120,8 +137,11 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     scale = new THREE.Vector3(1, 1, 1)
   const baseColor = new THREE.Color('#929898'),
     subtle = new THREE.Color('#59605c')
+  let highlightedRegions: readonly Muscle[] = []
   function highlight(regions: readonly Muscle[]) {
-    for (let i = 0; i < data.vertices; i++) {
+    highlightedRegions = [...regions]
+    const { geometry, masks, selectedWeights } = activeSurface
+    for (let i = 0; i < selectedWeights.length; i++) {
       let mask = 0
       for (const region of regions) mask = Math.max(mask, masks[region][i])
       selectedWeights[i] = mask
@@ -151,10 +171,10 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     return frame
   }
   function model(value: BodyModel) {
-    geometry.attributes.position.array.set(value === 'male' ? malePositions : femalePositions)
-    geometry.attributes.position.needsUpdate = true
-    geometry.computeVertexNormals()
-    // A shape switch retains the skeleton, pose, masks and GPU resources.
+    activeSurface = surfaceFor(value)
+    mesh.geometry = activeSurface.geometry
+    highlight(highlightedRegions)
+    // Each surface is cached; switching retains the skeleton, material and pose.
     mesh.name = `Fitt ${value} training mannequin`
   }
   model(initialModel)
@@ -166,7 +186,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     highlight,
     model,
     dispose: () => {
-      geometry.dispose()
+      for (const surface of surfaces.values()) surface.geometry.dispose()
       material.dispose()
       skeleton.dispose()
     },

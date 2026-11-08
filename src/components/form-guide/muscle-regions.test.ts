@@ -87,15 +87,18 @@ describe('shared muscle regions', () => {
       expect(athlete.mesh.skeleton.boneMatrices).toEqual(pose)
       const highlights = combined.slice()
       athlete.model('female')
-      expect(geometry.attributes.muscleWeight.array).toEqual(highlights)
+      const femaleGeometry = athlete.mesh.geometry
+      expect(femaleGeometry.attributes.muscleWeight.array.slice(0, data.vertices)).toEqual(
+        highlights,
+      )
       expect(athlete.mesh.skeleton.boneMatrices).toEqual(pose)
       athlete.highlight([])
-      const neutral = geometry.attributes.muscleWeight.array
+      const neutral = femaleGeometry.attributes.muscleWeight.array
       expect(neutral.every((weight) => weight === 0)).toBe(true)
       athlete.focus(true, 'all')
-      const exercise = geometry.attributes.muscleWeight.array.slice()
+      const exercise = femaleGeometry.attributes.muscleWeight.array.slice()
       athlete.highlight(['chest', 'triceps', 'shoulders'])
-      expect(geometry.attributes.muscleWeight.array).toEqual(exercise)
+      expect(femaleGeometry.attributes.muscleWeight.array).toEqual(exercise)
     } finally {
       athlete.dispose()
     }
