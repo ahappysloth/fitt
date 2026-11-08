@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { loadState, parseBackup, saveState, STORAGE_KEY } from './storage'
 import { emptyState, freshWorkout, generateWorkout, localDay, quickWorkout } from './workout'
 import type { AppState, Session } from './types'
+import { MAX_ADDED_LOAD_KG } from './limits'
 
 function savedState(): AppState {
   const state = emptyState()
@@ -125,5 +126,137 @@ describe('body-model preferences', () => {
     const state = savedState()
     const invalid = { ...state, preferences: { ...state.preferences, bodyModel } }
     expect(() => parseBackup(JSON.stringify(invalid))).toThrow('appearance preferences')
+  })
+})
+
+describe('training evidence backups', () => {
+  it('round-trips optional evidence on history, active sessions, plans, and saved routines', () => {
+    const state = parseBackup(JSON.stringify(savedState()))
+    state.plan = generateWorkout(state.profile, [])
+    state.active = { ...freshWorkout(state.plan), startedAt: '2026-11-01T12:00:00Z' }
+    state.routines = [generateWorkout(state.profile, [])]
+    for (const workout of [state.history[0], state.active, state.plan, ...state.routines]) {
+      const exercise = workout.exercises[0]
+      exercise.plannedSetCount = 10
+      Object.assign(exercise.sets[0], {
+        prescription: { target: 600, load: MAX_ADDED_LOAD_KG, source: 'generated' },
+        recommendationSource: 'prescribed',
+        effortConfirmed: false,
+        targetLocked: true,
+      })
+      Object.assign(exercise.sets[1], {
+        prescription: { target: 1, load: 0, source: 'manual' },
+        recommendationSource: 'adapted',
+        effortConfirmed: true,
+        targetLocked: false,
+      })
+    }
+    expect(parseBackup(JSON.stringify(state))).toEqual(state)
+  })
+
+  it('does not infer prescriptions, effort confirmation, or planned counts for legacy records', () => {
+    const legacy = savedState()
+    legacy.plan = generateWorkout(legacy.profile, [])
+    legacy.active = { ...freshWorkout(legacy.plan), startedAt: '2026-11-01T12:00:00Z' }
+    legacy.routines = [generateWorkout(legacy.profile, [])]
+    for (const workout of [legacy.history[0], legacy.active, legacy.plan, ...legacy.routines]) {
+      for (const exercise of workout.exercises) {
+        delete exercise.plannedSetCount
+        for (const set of exercise.sets) {
+          delete set.prescription
+          delete set.recommendationSource
+          delete set.effortConfirmed
+          delete set.targetLocked
+        }
+      }
+    }
+    const restored = parseBackup(JSON.stringify(legacy))
+    for (const workout of [
+      restored.history[0],
+      restored.active!,
+      restored.plan!,
+      ...restored.routines!,
+    ]) {
+      for (const exercise of workout.exercises) {
+        expect(exercise).not.toHaveProperty('plannedSetCount')
+        for (const set of exercise.sets) {
+          expect(set).not.toHaveProperty('prescription')
+          expect(set).not.toHaveProperty('recommendationSource')
+          expect(set).not.toHaveProperty('effortConfirmed')
+          expect(set).not.toHaveProperty('targetLocked')
+        }
+      }
+    }
+  })
+
+  it.each([
+    { prescription: null },
+    { prescription: [] },
+    { prescription: {} },
+    { prescription: { target: 0, load: 0, source: 'generated' } },
+    { prescription: { target: 601, load: 0, source: 'generated' } },
+    { prescription: { target: '8', load: 0, source: 'generated' } },
+    { prescription: { target: 8, load: -1, source: 'manual' } },
+    { prescription: { target: 8, load: MAX_ADDED_LOAD_KG + 1, source: 'manual' } },
+    { prescription: { target: 8, load: '0', source: 'manual' } },
+    { prescription: { target: 8, load: 0, source: 'adapted' } },
+    { prescription: { target: 8, load: 0 } },
+    { recommendationSource: null },
+    { recommendationSource: 'generated' },
+    { effortConfirmed: null },
+    { effortConfirmed: 'true' },
+    { effortConfirmed: 1 },
+    { targetLocked: null },
+    { targetLocked: 'false' },
+    { targetLocked: 0 },
+  ])('rejects malformed set evidence %j', (metadata) => {
+    const state = savedState()
+    Object.assign(state.history[0].exercises[0].sets[0], metadata)
+    expect(() => parseBackup(JSON.stringify(state))).toThrow('invalid workout data')
+  })
+
+  it.each([null, 0, 11, 1.5, '3', false])(
+    'rejects invalid planned set count %j',
+    (plannedSetCount) => {
+      const state = savedState()
+      Object.assign(state.history[0].exercises[0], { plannedSetCount })
+      expect(() => parseBackup(JSON.stringify(state))).toThrow('invalid workout data')
+    },
+  )
+
+  it('leaves saved bytes untouched when evidence cannot be loaded', () => {
+    const invalid = savedState()
+    Object.assign(invalid.history[0].exercises[0].sets[0], { effortConfirmed: 'yes' })
+    const raw = JSON.stringify(invalid)
+    const setItem = vi.fn()
+    vi.stubGlobal('localStorage', { getItem: () => raw, setItem })
+    try {
+      expect(loadState().error).toContain('Automatic saving is paused')
+      expect(setItem).not.toHaveBeenCalled()
+      expect(localStorage.getItem(STORAGE_KEY)).toBe(raw)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('orders imported history by actual completion time, breaks ties by ID, and reorders corrections', () => {
+    const state = savedState()
+    const sample = { ...state.history[0], startedAt: '2026-10-30T12:00:00Z' }
+    state.history = [
+      { ...sample, id: 'z-later', completedAt: '2026-10-31T23:30:00-02:00' },
+      { ...sample, id: 'b-tie', completedAt: '2026-11-01T01:00:00Z' },
+      { ...sample, id: 'a-tie', completedAt: '2026-10-31T20:00:00-05:00' },
+    ]
+    const restored = parseBackup(JSON.stringify(state))
+    expect(restored.history.map((session) => session.id)).toEqual(['a-tie', 'b-tie', 'z-later'])
+    expect(
+      parseBackup(JSON.stringify({ ...state, history: [...state.history].reverse() })),
+    ).toEqual(restored)
+    restored.history[0].completedAt = '2026-11-01T02:00:00Z'
+    expect(parseBackup(JSON.stringify(restored)).history.map((session) => session.id)).toEqual([
+      'b-tie',
+      'z-later',
+      'a-tie',
+    ])
   })
 })
