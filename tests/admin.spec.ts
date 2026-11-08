@@ -56,6 +56,69 @@ test('an ordinary signed-in account does not receive an Admin navigation item', 
   await expect(page.getByRole('link', { name: 'Admin', exact: true })).toHaveCount(0)
 })
 
+test('the wide desktop sidebar stays in place during Admin loading and scroll locks', async ({
+  playwright,
+  browserName,
+  launchOptions,
+}, info) => {
+  test.skip(info.project.name.startsWith('mobile'), 'Desktop classic-scrollbar layout')
+  // Headless Chromium normally hides scrollbars, which conceals the layout shift.
+  const browser = await playwright[browserName].launch({
+    ...launchOptions,
+    ignoreDefaultArgs: ['--hide-scrollbars'],
+    args: [...(launchOptions.args || []), '--disable-features=OverlayScrollbar,OverlayScrollbars'],
+  })
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1000 } })
+  let releaseAccess = () => {}
+  try {
+    await mockAccount(page, true)
+    await page.goto('/')
+    const admin = page.getByRole('link', { name: 'Admin', exact: true })
+    await expect(admin).toBeVisible()
+    const sidebar = page.locator('.sidebar')
+    const before = await sidebar.boundingBox()
+    // Exercise a real non-overlay scrollbar on a page taller than the viewport.
+    expect(
+      await page.evaluate(() => innerWidth - document.documentElement.clientWidth),
+    ).toBeGreaterThan(0)
+    const accessGate = new Promise<void>((resolve) => (releaseAccess = resolve))
+    await page.route('**/api/admin/access', async (route) => {
+      await accessGate
+      await route.fulfill({ json: { allowed: true, userId: owner.id } })
+    })
+    await admin.click()
+    await expect(page.getByText('Checking admin access…', { exact: true })).toBeVisible()
+    const loading = await sidebar.boundingBox()
+    releaseAccess()
+    await expect(page.locator('.admin-view')).toBeVisible()
+    const loaded = await sidebar.boundingBox()
+    expect(loading!.x).toBeCloseTo(before!.x, 2)
+    expect(loaded!.x).toBeCloseTo(before!.x, 2)
+    expect(loading!.width).toBe(before!.width)
+    expect(loaded!.width).toBe(before!.width)
+
+    await page.getByRole('link', { name: 'Library', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Filter muscle group', exact: true }).click()
+    await expect(page.getByRole('listbox')).toBeVisible()
+    expect((await sidebar.boundingBox())!.x).toBeCloseTo(before!.x, 2)
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('listbox')).toHaveCount(0)
+    expect((await sidebar.boundingBox())!.x).toBeCloseTo(before!.x, 2)
+
+    await page
+      .getByRole('button', { name: /^View .* instructions$/ })
+      .first()
+      .click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    expect((await sidebar.boundingBox())!.x).toBeCloseTo(before!.x, 2)
+    await page.getByRole('button', { name: 'Close dialog', exact: true }).click()
+    expect((await sidebar.boundingBox())!.x).toBeCloseTo(before!.x, 2)
+  } finally {
+    releaseAccess()
+    await browser.close()
+  }
+})
+
 test('native admin studios isolate demo state and close on access revocation or another-tab sign out', async ({
   page,
 }, info) => {

@@ -33,6 +33,16 @@
 * {
   box-sizing: border-box;
 }
+html {
+  /* Keep the centered shell still when a loading view briefly needs no scrollbar. */
+  scrollbar-gutter: stable;
+}
+@supports (scrollbar-gutter: stable) {
+  html body[data-scroll-locked] {
+    /* Radix scroll locking must not add a second gap beside the reserved gutter. */
+    margin-right: 0 !important;
+  }
+}
 body {
   margin: 0;
   min-width: 320px;
