@@ -393,10 +393,23 @@
 }
 .workout-session__target {
   text-align: center;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   line-height: 1.6;
   color: #aab39d;
   margin-bottom: 25px;
+}
+.workout-session__target button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 3px;
+  margin-block: -12px;
+  color: var(--session-accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+  vertical-align: middle;
 }
 .workout-session__error {
   color: #f3c4aa;
@@ -487,6 +500,14 @@
   font-size: 0.75rem;
   color: #b9c3ac;
   background: #191e15;
+}
+.workout-session__effort-help {
+  min-height: 2.8em;
+  margin: 7px 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #aab39d;
 }
 .workout-session__effort button.active {
   background: #334225;

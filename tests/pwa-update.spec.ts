@@ -133,7 +133,7 @@ test('updates a saved active workout and preserves pending inputs and its rest d
   await page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }).fill('4')
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }).fill('6')
-  await page.getByRole('button', { name: 'Challenging', exact: true }).click()
+  await page.getByRole('button', { name: 'Too hard', exact: true }).click()
   const before = (await readState(page)).active!
   const timerKey = `fitt.session-ui.${before.id}`
   const restEnd = await page.evaluate(
@@ -151,7 +151,7 @@ test('updates a saved active workout and preserves pending inputs and its rest d
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
   ).toHaveValue('6')
-  await expect(page.getByRole('button', { name: 'Challenging', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Too hard', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   )

@@ -33,17 +33,29 @@ metadata is omitted from the cloud session representation.
 
 ## Recommendation feedback
 
-Logging a comfortable set above the current target recalibrates untouched later
-sets. For example, 20 squats against a target of 10 suggest 18 after **Just right**
-or 20 after **Easy**. Meeting the adjusted target does not repeatedly reduce it.
-Hard or missed sets can reduce the next suggestion. Completed work, manual
-pending inputs, and recommendations established by a newer completed set are
-preserved.
+Logging a set above the current target can recalibrate untouched later sets. For
+example, 20 squats against a target of 10 suggest 18 after **Just right**, or 20
+after **Easy**. Effort starts unselected and is optional. **Too hard** means the
+work could not be completed comfortably or with controlled form; ordinary effort
+is not automatically a failure. Each explanation appears in the same reserved
+space so choosing a rating does not move the log action.
 
-Future plans can calibrate from actual performance after a complete, comfortable
-exercise at comparable load. Catalog ranges and the existing two-success rule for
-harder variations or added load still apply. This is a targeted correction to
-performance feedback, not a new training-program model.
+Actual results, original prescriptions, and current recommendations are separate.
+Valid manual rep/load input explicitly locks that set even if the value equals
+the recommendation. Choosing effort also preserves the result being rated.
+**Follow suggestion** restores the suggested values and
+allows later automatic changes without clearing the selected effort rating.
+Corrections preserve original prescriptions and completed evidence; undoing a
+result does not erase its starting target. An added set begins unrated with its
+own prescription, rather than inheriting the previous result or feedback.
+Removing sets during the session retains the original planned set count.
+
+A complete exercise can conservatively calibrate from demonstrated performance.
+Earning an additional progression requires two complete comparable exposures
+with explicit comfortable feedback. A partial exercise cannot inflate its
+starting prescription by averaging rewritten suggestions. Saved routine targets
+remain fixed. See [training engine policy](training-engine.md) for evidence,
+compatibility, and remaining programming limits.
 
 ## Verification
 

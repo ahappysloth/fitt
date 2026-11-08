@@ -74,6 +74,14 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await continueReviewedWorkout(page)
   const started = (await read(page)).active!
+  const authored = started.exercises.find((entry) => entry.exerciseId === 'knee-pushup')
+  expect(authored?.plannedSetCount).toBe(authored?.sets.length)
+  expect(authored?.sets[0]).toMatchObject({
+    prescription: { target: 11, load: 0, source: 'manual' },
+    recommendationSource: 'prescribed',
+    effortConfirmed: false,
+    targetLocked: false,
+  })
   await page.getByRole('link', { name: 'Library', exact: true }).click()
   const strip = page.getByRole('button', { name: /Return to active workout/ })
   await expect(strip).toBeVisible()
@@ -95,7 +103,7 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   expect((await read(page)).active).toBeNull()
 })
 
-test('keeps logging first, preserves edits between tabs, and adapts a good20 squat to18', async ({
+test('keeps logging first, preserves edits between tabs, and adapts an explicit Just right 20 squat to 18', async ({
   page,
 }) => {
   if (test.info().project.name.startsWith('mobile'))
@@ -124,6 +132,7 @@ test('keeps logging first, preserves edits between tabs, and adapts a good20 squ
   const coming = await documentTop(page.locator('.workout-session__coming-up'))
   expect(logger).toBeLessThan(setsBefore)
   expect(setsBefore).toBeLessThan(coming)
+  await page.getByRole('button', { name: 'Just right', exact: true }).click()
   await page.getByRole('button', { name: 'Log Bodyweight squat set 1', exact: true }).click()
   await expect(
     page.getByRole('spinbutton', { name: 'Bodyweight squat set 2 reps', exact: true }),

@@ -50,7 +50,7 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
   await page.getByRole('button', { name: 'Start my workout', exact: true }).click()
   await continueReviewedWorkout(page)
   await page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }).fill('4')
-  await page.getByRole('button', { name: 'Challenging', exact: true }).click()
+  await page.getByRole('button', { name: 'Too hard', exact: true }).click()
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),

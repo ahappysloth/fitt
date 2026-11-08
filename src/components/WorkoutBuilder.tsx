@@ -183,6 +183,7 @@ export default function WorkoutBuilder({
         : {
             exerciseId,
             note: '',
+            plannedSetCount: 1,
             sets: [
               {
                 id: uid(),
@@ -262,6 +263,7 @@ export default function WorkoutBuilder({
         return {
           exerciseId: exercise.id,
           note: 'Your routine. Adjust each set to match how you feel.',
+          plannedSetCount: Number(entry.count),
           sets: Array.from({ length: Number(entry.count) }, () => ({
             id: uid(),
             target: Number(entry.target),
@@ -270,6 +272,10 @@ export default function WorkoutBuilder({
             targetLoad: load,
             effort: 'good' as const,
             done: false,
+            prescription: { target: Number(entry.target), load, source: 'manual' as const },
+            recommendationSource: 'prescribed' as const,
+            effortConfirmed: false,
+            targetLocked: false,
           })),
         }
       }),

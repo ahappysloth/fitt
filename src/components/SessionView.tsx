@@ -21,6 +21,7 @@ import {
 import { byId, muscleNames } from '../lib/catalog'
 import type { Effort, Profile, Session, WorkoutExercise, WorkoutSet } from '../lib/types'
 import { completeSet, doneSets, totalSets, uid } from '../lib/workout'
+import { hasReportedEffort } from '../lib/training-evidence'
 import { sessionElapsedSeconds } from '../lib/session-clock'
 import ExerciseGuide from './ExerciseGuide'
 import { MuscleMap } from './Visuals'
@@ -50,6 +51,8 @@ interface Draft {
   reps: string
   load: string
   effort: Effort
+  effortConfirmed: boolean
+  targetLocked: boolean
 }
 interface Feedback {
   id: number
@@ -57,6 +60,11 @@ interface Feedback {
   reward: boolean
 }
 const emptyTimers: TimerState = { restEnd: null, holdEnd: null, loggedIds: [] }
+const effortDescriptions: Record<Effort, string> = {
+  easy: 'Plenty left in reserve.',
+  good: 'Effort felt manageable, with some in reserve.',
+  hard: 'Couldn’t finish comfortably or keep good form.',
+}
 const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 const timerKey = (sessionId: string) => `fitt.session-ui.${sessionId}`
@@ -100,10 +108,15 @@ function restoredTimers(session: Session): TimerState {
     return { ...emptyTimers, loggedIds }
   }
 }
+const effortWasReported = (set?: WorkoutSet) => !!set && hasReportedEffort(set)
+const targetWasLocked = (set?: WorkoutSet) =>
+  !!set && (set.targetLocked ?? (set.reps !== set.target || set.load !== set.targetLoad))
 const draftFor = (set?: WorkoutSet): Draft => ({
   reps: String(set?.reps ?? 0),
   load: String(set?.load ?? 0),
   effort: set?.effort ?? 'good',
+  effortConfirmed: effortWasReported(set),
+  targetLocked: targetWasLocked(set),
 })
 const validNumber = (raw: string, max: number, integer = false) => {
   if (raw.trim() === '') return false
@@ -179,7 +192,9 @@ function SessionContent({
       (!!editing &&
         (Number(draft.reps) !== current.reps ||
           (weighted && Number(draft.load) !== current.load) ||
-          draft.effort !== current.effort)))
+          draft.effort !== current.effort ||
+          draft.effortConfirmed !== effortWasReported(current) ||
+          draft.targetLocked !== targetWasLocked(current))))
   const isFirstLog = !!current && !loggedIds.current.has(current.id)
   const nextIndex = session.exercises.findIndex(
     (item, index) => index > exerciseIndex && item.sets.some((set) => !set.done),
@@ -281,16 +296,40 @@ function SessionContent({
     })
   }
   function changeReps(raw: string) {
-    setDraftState({ key: selectionKey, value: { ...draft, reps: raw } })
-    if (validNumber(raw, 600, true)) updatePending({ reps: Number(raw) })
+    const valid = validNumber(raw, 600, true)
+    setDraftState({
+      key: selectionKey,
+      value: { ...draft, reps: raw, targetLocked: valid || draft.targetLocked },
+    })
+    if (valid) updatePending({ reps: Number(raw), targetLocked: true })
   }
   function changeLoad(raw: string) {
-    setDraftState({ key: selectionKey, value: { ...draft, load: raw } })
-    if (validNumber(raw, 300)) updatePending({ load: Number(raw) })
+    const valid = validNumber(raw, 300)
+    setDraftState({
+      key: selectionKey,
+      value: { ...draft, load: raw, targetLocked: valid || draft.targetLocked },
+    })
+    if (valid) updatePending({ load: Number(raw), targetLocked: true })
   }
   function changeEffort(effort: Effort) {
-    setDraftState({ key: selectionKey, value: { ...draft, effort } })
-    updatePending({ effort })
+    setDraftState({
+      key: selectionKey,
+      value: { ...draft, effort, effortConfirmed: true, targetLocked: true },
+    })
+    updatePending({ effort, effortConfirmed: true, targetLocked: true })
+  }
+  function followSuggestion() {
+    if (!current) return
+    setDraftState({
+      key: selectionKey,
+      value: {
+        ...draft,
+        reps: String(current.target),
+        load: String(current.targetLoad),
+        targetLocked: false,
+      },
+    })
+    updatePending({ reps: current.target, load: current.targetLoad, targetLocked: false })
   }
   function selectExercise(index: number) {
     if (dirty) {
@@ -324,6 +363,8 @@ function SessionContent({
               reps: Number(draft.reps),
               load: weighted ? Number(draft.load) : set.load,
               effort: draft.effort,
+              effortConfirmed: draft.effortConfirmed,
+              targetLocked: draft.targetLocked,
               done: false,
             }
           : set,
@@ -368,13 +409,36 @@ function SessionContent({
   function addSet() {
     if (entry.sets.length >= 6) return
     const previous = entry.sets[entry.sets.length - 1]
-    replaceEntry({ ...entry, sets: [...entry.sets, { ...previous, id: uid(), done: false }] })
+    const target = previous.target
+    const load = previous.targetLoad
+    const added: WorkoutSet = {
+      id: uid(),
+      target,
+      reps: target,
+      load,
+      targetLoad: load,
+      effort: 'good',
+      done: false,
+      prescription: { target, load, source: 'manual' },
+      recommendationSource: 'prescribed',
+      effortConfirmed: false,
+      targetLocked: false,
+    }
+    replaceEntry({
+      ...entry,
+      plannedSetCount: entry.plannedSetCount ?? entry.sets.length,
+      sets: [...entry.sets, added],
+    })
     setEditingId(null)
   }
   function removeLastSet() {
     const last = entry.sets[entry.sets.length - 1]
     if (entry.sets.length <= 1 || last.done) return
-    replaceEntry({ ...entry, sets: entry.sets.slice(0, -1) })
+    replaceEntry({
+      ...entry,
+      plannedSetCount: entry.plannedSetCount ?? entry.sets.length,
+      sets: entry.sets.slice(0, -1),
+    })
   }
 
   return (
@@ -683,8 +747,14 @@ function SessionContent({
                   </div>
                   <p id={`${inputId}-target`} className="workout-session__target">
                     Target: {current.target} {exercise.unit}
-                    {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} · log what you
-                    did.
+                    {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} ·{' '}
+                    {draft.targetLocked ? (
+                      <button type="button" onClick={followSuggestion}>
+                        Follow suggestion
+                      </button>
+                    ) : (
+                      'log what you did.'
+                    )}
                   </p>
                   {!validReps && (
                     <p className="workout-session__error">Enter a whole number from 0 to 600.</p>
@@ -757,23 +827,30 @@ function SessionContent({
                     </div>
                   )}
                   <fieldset className="workout-session__effort">
-                    <legend className="eyebrow">HOW DID THAT FEEL?</legend>
+                    <legend className="eyebrow">HOW DID THAT FEEL? · OPTIONAL</legend>
                     <div>
                       {(
                         [
                           ['easy', 'Easy'],
                           ['good', 'Just right'],
-                          ['hard', 'Challenging'],
+                          ['hard', 'Too hard'],
                         ] as const
                       ).map(([value, label]) => (
                         <button
                           key={value}
-                          aria-pressed={draft.effort === value}
-                          className={draft.effort === value ? 'active' : ''}
+                          aria-label={label}
+                          aria-describedby={`${inputId}-effort-${value}`}
+                          aria-pressed={draft.effortConfirmed && draft.effort === value}
+                          className={
+                            draft.effortConfirmed && draft.effort === value ? 'active' : ''
+                          }
                           onClick={() => changeEffort(value)}
                         >
-                          {draft.effort === value && <Check size={12} />}
+                          {draft.effortConfirmed && draft.effort === value && <Check size={12} />}
                           {label}
+                          <span id={`${inputId}-effort-${value}`} className="sr-only">
+                            {effortDescriptions[value]}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -788,7 +865,12 @@ function SessionContent({
                     {editing ? 'Save changes' : 'Log this set'}
                     {!editing && isFirstLog && <span>+5 XP</span>}
                   </button>
-                  {editing ? (
+                  <p className="workout-session__effort-help">
+                    {draft.effortConfirmed
+                      ? effortDescriptions[draft.effort]
+                      : 'Choose how much you had left, or log without a rating.'}
+                  </p>
+                  {editing && (
                     <div className="workout-session__edit-actions">
                       <button
                         className="workout-session__text-button"
@@ -800,11 +882,6 @@ function SessionContent({
                         Remove log
                       </button>
                     </div>
-                  ) : (
-                    <p className="workout-session__kind-note">
-                      <Heart size={12} />
-                      Honest effort is always a win.
-                    </p>
                   )}
                 </>
               ) : (
@@ -906,11 +983,13 @@ function SessionContent({
                     </strong>
                     <small>
                       {set.done
-                        ? set.effort === 'easy'
-                          ? 'Easy'
-                          : set.effort === 'hard'
-                            ? 'Challenging'
-                            : 'Just right'
+                        ? !effortWasReported(set)
+                          ? 'Effort not rated'
+                          : set.effort === 'easy'
+                            ? 'Easy'
+                            : set.effort === 'hard'
+                              ? 'Too hard'
+                              : 'Just right'
                         : 'Suggested target'}
                     </small>
                   </div>

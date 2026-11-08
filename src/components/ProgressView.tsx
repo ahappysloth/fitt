@@ -10,6 +10,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { byId } from '../lib/catalog'
+import { hasReportedEffort } from '../lib/training-evidence'
 import type { Session } from '../lib/types'
 import { doneSets, localDay, sessionReps, totalSets, weekDays } from '../lib/workout'
 import { ExerciseThumbnail } from './ExerciseGuide'
@@ -231,7 +232,7 @@ export default function ProgressView({
                               .filter((s) => s.done)
                               .map(
                                 (s) =>
-                                  `${s.reps} ${byId[e.exerciseId].unit}${s.load ? ` + ${s.load} kg` : ''} (${s.effort})`,
+                                  `${s.reps} ${byId[e.exerciseId].unit}${s.load ? ` + ${s.load} kg` : ''} (${hasReportedEffort(s) ? { easy: 'Easy', good: 'Just right', hard: 'Too hard' }[s.effort] : 'Effort not rated'})`,
                               )
                               .join(' · ') || 'Not completed'}
                           </p>
