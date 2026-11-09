@@ -25,10 +25,10 @@ function ControlsFixture() {
         <button type="button">After duration</button>
         <Tooltip content="Choose another variation">
           <button type="button" aria-label="Fixture swap">
-            Swap movement
+            Swap exercise
           </button>
         </Tooltip>
-        <Tooltip content="Keep your logged sets. Swap before recording this movement.">
+        <Tooltip content="Keep your logged sets. Swap before recording this exercise.">
           <button type="button" aria-label="Unavailable swap" disabled>
             Unavailable swap
           </button>

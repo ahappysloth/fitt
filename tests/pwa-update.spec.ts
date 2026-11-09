@@ -1,4 +1,4 @@
-import { continueReviewedWorkout, addBuilderMovement } from './helpers/workout'
+import { continueReviewedWorkout, addBuilderExercise } from './helpers/workout'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -239,7 +239,7 @@ test('another tab can activate an update without reloading a dirty routine, then
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
   await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Keep this routine')
-  await addBuilderMovement(page, 'Knee push-up')
+  await addBuilderExercise(page, 'Knee push-up')
   const other = await context.newPage()
   await boot(other, release.origin)
   await release.publish(other)

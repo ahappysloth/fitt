@@ -25,7 +25,7 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
             <span>From every angle.</span>
           </Heading>
           <p className="form-study__lead">
-            A quiet space to understand the movement. Take it slowly, find your angle, and make the
+            A quiet space to understand the exercise. Take it slowly, find your angle, and make the
             next rep yours.
           </p>
           <div className="form-study__movement">
@@ -84,7 +84,7 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
             <h2>Your model. A consistent way to learn.</h2>
           </div>
           <span>
-            FIRST MOVEMENT STUDY <ArrowUpRight size={14} />
+            FIRST EXERCISE STUDY <ArrowUpRight size={14} />
           </span>
         </div>
         <div className="form-study__principles">
@@ -92,7 +92,7 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
             <Move3D size={20} />
             <h3>Explore the form</h3>
             <p>
-              Choose a male or female model with the same guided movement and useful camera angles.
+              Choose a male or female model with the same guided exercise and useful camera angles.
               Rotate when it helps; use the side view to check the body line.
             </p>
           </article>
@@ -109,13 +109,13 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
             <h3>Build on one system</h3>
             <p>
               The body, animation, and viewer are separate. A more detailed anatomy model and new
-              movements can share the same controls and visual language.
+              exercises can share the same controls and visual language.
             </p>
           </article>
         </div>
         <p className="form-study__footnote">
           Knee Push-up is the first prototype. Surface highlights indicate approximate muscle
-          regions. Detailed anatomical layers and the remaining movements come after this foundation
+          regions. Detailed anatomical layers and the remaining exercises come after this foundation
           is approved.
         </p>
       </section>

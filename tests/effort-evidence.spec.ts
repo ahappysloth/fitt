@@ -95,7 +95,7 @@ for (const [label, expected] of [
   })
 }
 
-test('same-value manual input survives corrections and can follow suggestions again', async ({
+test('same-value manual input survives corrections and can reset to its target', async ({
   page,
 }) => {
   await seed(page)
@@ -107,15 +107,17 @@ test('same-value manual input survives corrections and can follow suggestions ag
   await reps(page, 2).fill('')
   await reps(page, 2).fill('18')
   await effort(page, 'Just right').click()
-  await expect(page.getByRole('button', { name: 'Follow suggestion', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Reset to target', exact: true })).toHaveCount(0)
   await saveCorrection(page, '30')
   await expect(reps(page, 2)).toHaveValue('18')
   expect((await read(page)).active!.exercises[0].sets[1].targetLocked).toBe(true)
   await page.reload()
   await expect(reps(page, 2)).toHaveValue('18')
   await expect(effort(page, 'Just right')).toHaveAttribute('aria-pressed', 'true')
-  await page.getByRole('button', { name: 'Follow suggestion', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Follow suggestion', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Reset to target', exact: true })).toHaveCount(0)
+  await reps(page, 2).fill('19')
+  await page.getByRole('button', { name: 'Reset to target', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Reset to target', exact: true })).toHaveCount(0)
   await expect(effort(page, 'Just right')).toHaveAttribute('aria-pressed', 'true')
   expect((await read(page)).active!.exercises[0].sets[1].targetLocked).toBe(false)
   await saveCorrection(page, '24')
@@ -130,7 +132,7 @@ for (const [label, value] of [
   ['Easy', 'easy'],
   ['Too hard', 'hard'],
 ] as const) {
-  test(`an explicit ${label} rating protects unchanged input until following suggestions`, async ({
+  test(`an explicit ${label} rating protects unchanged input until resetting to the target`, async ({
     page,
   }) => {
     const active = activeSquats()
@@ -148,7 +150,9 @@ for (const [label, value] of [
       effortConfirmed: true,
       targetLocked: true,
     })
-    await page.getByRole('button', { name: 'Follow suggestion', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Reset to target', exact: true })).toHaveCount(0)
+    await reps(page, 2).fill('19')
+    await page.getByRole('button', { name: 'Reset to target', exact: true }).click()
     await expect(effort(page, label)).toHaveAttribute('aria-pressed', 'true')
     await saveCorrection(page, '24')
     await expect(reps(page, 2)).toHaveValue('22')

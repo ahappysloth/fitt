@@ -77,7 +77,7 @@ export default function AppDialogs({
     dialog.type === 'exercise'
       ? byId[dialog.id].name
       : dialog.type === 'swap'
-        ? 'Find your variation'
+        ? 'Swap exercise'
         : dialog.type === 'finish'
           ? 'Finish where you are?'
           : dialog.type === 'discard'
@@ -113,7 +113,7 @@ export default function AppDialogs({
         <div className="swap-dialog">
           <p className="dialog-copy">
             Choose a variation of {byId[entry.exerciseId].name.toLowerCase()} using your equipment.
-            Targets reset for the new movement.
+            Targets reset for the new exercise.
           </p>
           <div className="swap-list">
             {alternativesFor(entry, state.profile).map((exercise) => (
@@ -305,7 +305,7 @@ function ExerciseDetail({ exercise }: { exercise: Exercise }) {
       <div className="guide-modal-muscles">
         <MuscleMap muscles={exercise.muscles} small />
         <div>
-          <p className="eyebrow">KNOW YOUR MOVEMENT</p>
+          <p className="eyebrow">KNOW YOUR EXERCISES</p>
           <h3>Muscles at work</h3>
           <div className="muscle-tags">
             {exercise.muscles.map((muscle) => (

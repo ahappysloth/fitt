@@ -76,9 +76,9 @@ load. Variable-load work is not pooled into comparable progression evidence.
 Logging adapts later untouched sets of that exercise, preserving completed work,
 manual input, and recommendations established by a later completed set. Valid
 manual input sets `targetLocked`, even when numerically equal to the suggestion.
-Choosing an effort rating also keeps the entered result it describes. Follow
-suggestion explicitly releases the lock and resets the entered values to the
-current suggestion without silently clearing effort feedback.
+Choosing an effort rating also keeps the entered result it describes.
+**Reset to target** appears only when the entered numbers differ from the target.
+It restores those numbers and releases the lock without clearing effort feedback.
 
 ## Remaining work
 

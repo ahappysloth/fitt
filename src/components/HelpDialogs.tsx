@@ -25,7 +25,7 @@ const progressSteps = [
   {
     icon: Dumbbell,
     title: 'Start with what you have.',
-    copy: 'Choose your equipment and experience. Follow your plan, swap a movement, or build your own.',
+    copy: 'Choose your equipment and experience. Follow your plan, swap an exercise, or build your own.',
   },
   {
     icon: SlidersHorizontal,

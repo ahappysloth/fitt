@@ -43,7 +43,7 @@ space so choosing a rating does not move the log action.
 Actual results, original prescriptions, and current recommendations are separate.
 Valid manual rep/load input explicitly locks that set even if the value equals
 the recommendation. Choosing effort also preserves the result being rated.
-**Follow suggestion** restores the suggested values and
+**Reset to target** restores the suggested values and
 allows later automatic changes without clearing the selected effort rating.
 Corrections preserve original prescriptions and completed evidence; undoing a
 result does not erase its starting target. An added set begins unrated with its

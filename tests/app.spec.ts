@@ -1,4 +1,4 @@
-import { continueReviewedWorkout, addBuilderMovement } from './helpers/workout'
+import { continueReviewedWorkout, addBuilderExercise } from './helpers/workout'
 import { test, expect, type Page } from '@playwright/test'
 
 const key = 'form.training.v1'
@@ -91,7 +91,7 @@ test('creates and reuses custom workouts with independent session IDs', async ({
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
   await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('My push practice')
-  await addBuilderMovement(page, 'Knee push-up')
+  await addBuilderExercise(page, 'Knee push-up')
   await page.getByRole('spinbutton', { name: 'Knee push-up sets', exact: true }).fill('1')
   await page.getByRole('spinbutton', { name: 'Knee push-up target reps', exact: true }).fill('8')
   await page.getByRole('button', { name: 'Review workout', exact: true }).click()
@@ -127,7 +127,7 @@ test('creating a workout after reviewing a saved routine preserves the original 
     await page.getByRole('button', { name: 'Create workout', exact: true }).click()
     await page.getByRole('button', { name: /^Start empty/ }).click()
     await page.getByRole('textbox', { name: 'Routine name', exact: true }).fill(title)
-    await addBuilderMovement(page, 'Knee push-up')
+    await addBuilderExercise(page, 'Knee push-up')
     await page.getByRole('button', { name: 'Review workout', exact: true }).click()
     await page.getByRole('button', { name: 'Save routine', exact: true }).click()
     await page.getByRole('link', { name: 'Today', exact: true }).click()
@@ -364,7 +364,7 @@ test('requires explicit bodyweight conversion after removing a weighted vest', a
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
   await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Weighted push practice')
-  await addBuilderMovement(page, 'Push-up')
+  await addBuilderExercise(page, 'Push-up')
   await page.getByRole('spinbutton', { name: 'Push-up added load', exact: true }).fill('5')
   await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await page.getByRole('button', { name: 'Save routine', exact: true }).click()
@@ -383,7 +383,9 @@ test('requires explicit bodyweight conversion after removing a weighted vest', a
   await expect(page.getByRole('status')).toContainText('includes added weight')
   expect((await readState(page)).active).toBeNull()
   await page.getByRole('button', { name: 'Edit workout', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Review workout', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Review workout', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('weighted vest')
+  await expect(page.getByRole('heading', { name: 'Your workout. Your way.' })).toBeVisible()
   await page.getByRole('button', { name: 'Use bodyweight', exact: true }).click()
   await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await page.getByRole('button', { name: 'Save routine', exact: true }).click()

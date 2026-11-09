@@ -545,10 +545,10 @@ function SessionContent({
         </div>
       )}
       <div className="workout-session__selection">
-        <label htmlFor={`${inputId}-exercise`}>Current movement</label>
+        <label htmlFor={`${inputId}-exercise`}>Current exercise</label>
         <Select
           id={`${inputId}-exercise`}
-          label="Current movement"
+          label="Current exercise"
           value={String(exerciseIndex)}
           onValueChange={(value) => selectExercise(Number(value))}
           options={session.exercises.map((item, index) => ({
@@ -579,7 +579,7 @@ function SessionContent({
                     className={artView === 'movement' ? 'active' : ''}
                     onClick={() => setArtView('movement')}
                   >
-                    Movement
+                    Exercise
                   </button>
                   <button
                     aria-pressed={artView === 'muscles'}
@@ -606,7 +606,7 @@ function SessionContent({
                       </span>
                     ))}
                   </div>
-                  <p>Highlighted muscles work together in this movement.</p>
+                  <p>Highlighted muscles work together in this exercise.</p>
                 </div>
               )}
               <div className="workout-session__technique">
@@ -631,7 +631,7 @@ function SessionContent({
                 <Tooltip
                   content={
                     exerciseDone > 0
-                      ? 'Keep logged sets intact. Swap before logging this movement.'
+                      ? 'Keep logged sets intact. Swap before logging this exercise.'
                       : 'Choose another variation'
                   }
                 >
@@ -661,7 +661,7 @@ function SessionContent({
           <section className="panel workout-session__logger">
             <div className="workout-session__current-heading">
               <span className="eyebrow">
-                MOVEMENT {exerciseIndex + 1} OF {session.exercises.length}
+                EXERCISE {exerciseIndex + 1} OF {session.exercises.length}
               </span>
               <h2 ref={headingRef} tabIndex={-1}>
                 {exercise.name}
@@ -748,9 +748,13 @@ function SessionContent({
                   <p id={`${inputId}-target`} className="workout-session__target">
                     Target: {current.target} {exercise.unit}
                     {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} ·{' '}
-                    {draft.targetLocked ? (
+                    {draft.targetLocked &&
+                    (!validReps ||
+                      !validLoad ||
+                      Number(draft.reps) !== current.target ||
+                      (weighted && Number(draft.load) !== current.targetLoad)) ? (
                       <button type="button" onClick={followSuggestion}>
-                        Follow suggestion
+                        Reset to target
                       </button>
                     ) : (
                       'log what you did.'
@@ -889,11 +893,11 @@ function SessionContent({
                   <span>
                     <CheckCircle2 size={30} />
                   </span>
-                  <h3>{allDone ? 'You did the work.' : 'Movement complete.'}</h3>
+                  <h3>{allDone ? 'You did the work.' : 'Exercise complete.'}</h3>
                   <p>
                     {allDone
                       ? 'Save your session and take that good feeling with you.'
-                      : `${exerciseDone} sets logged. Take a breath before the next movement.`}
+                      : `${exerciseDone} sets logged. Take a breath before the next exercise.`}
                   </p>
                   <button
                     className="primary-button"
@@ -1047,7 +1051,7 @@ function SessionContent({
                 ),
               )
             ) : (
-              <p>This is your only movement. Add a set above whenever you like.</p>
+              <p>This is your only exercise. Add a set above whenever you like.</p>
             )}
           </section>
           <div className="workout-session__finish-area">
@@ -1075,7 +1079,7 @@ function SessionContent({
       {pendingExerciseIndex !== null && (
         <Modal title="Leave this set edit?" onClose={() => setPendingExerciseIndex(null)}>
           <p className="modal-description">
-            Save your correction first, or discard it to switch movements.
+            Save your correction first, or discard it to switch exercises.
           </p>
           <div className="modal-actions">
             <button className="secondary-button" onClick={() => setPendingExerciseIndex(null)}>
