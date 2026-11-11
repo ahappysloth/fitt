@@ -1,6 +1,7 @@
 export type Equipment = 'bar' | 'rings' | 'bands' | 'parallettes' | 'bench' | 'vest'
 export type Level = 'beginner' | 'intermediate'
 export type Focus = 'full' | 'upper' | 'lower' | 'core'
+export type Goal = 'muscle' | 'strength' | 'fit' | 'health'
 export type Muscle =
   | 'chest'
   | 'upper-back'
@@ -40,6 +41,8 @@ export interface Profile {
   duration: 20 | 30 | 45
   focus: Focus
   weeklyGoal: number
+  /** Absent in older backups; resolved with profileGoal(). */
+  goal?: Goal
 }
 export interface WorkoutSet {
   id: string

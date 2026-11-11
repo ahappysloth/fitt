@@ -1,7 +1,9 @@
 import { available, byId, exercises } from './catalog'
 import { MAX_ADDED_LOAD_KG } from './limits'
+import { goalParams, profileGoal, targetRange } from './goals'
 import type {
   AppState,
+  Effort,
   Exercise,
   Focus,
   Pattern,
@@ -18,6 +20,7 @@ export const defaultProfile: Profile = {
   duration: 30,
   focus: 'full',
   weeklyGoal: 3,
+  goal: 'health',
 }
 export const emptyState = (): AppState => ({
   version: 1,
@@ -59,14 +62,35 @@ function makeSets(_exercise: Exercise, count: number, target: number, load = 0):
 const completed = (entry: WorkoutExercise) => entry.sets.filter((s) => s.done)
 // A set logged at zero is a skipped set, not evidence about the right target.
 const worked = (entry: WorkoutExercise) => entry.sets.filter((s) => s.done && s.reps > 0)
+const missedSet = (s: WorkoutSet) => s.reps < s.target || s.load < s.targetLoad
+/** Every set was completed at its target. "Challenging" (0–1 reps left) still counts. */
 const successful = (entry: WorkoutExercise) =>
-  entry.sets.length > 0 &&
-  entry.sets.every(
-    (s) => s.done && s.reps >= s.target && s.load >= s.targetLoad && s.effort !== 'hard',
-  )
+  entry.sets.length > 0 && entry.sets.every((s) => s.done && !missedSet(s))
+const missed = (entry: WorkoutExercise) =>
+  completed(entry).length < entry.sets.length ||
+  worked(entry).length < completed(entry).length ||
+  worked(entry).some(missedSet)
 const average = (values: number[]) => values.reduce((n, v) => n + v, 0) / values.length
 const step = (exercise: Exercise) => (exercise.unit === 'sec' ? 5 : 1)
-const LOAD_STEP_KG = 2.5
+const loadStep = (exercise: Exercise) =>
+  exercise.pattern === 'squat' || exercise.pattern === 'hinge' ? 5 : 2.5
+/** The hardest-rated set decides how the exercise felt overall. */
+function overallEffort(sets: WorkoutSet[]): Effort {
+  if (sets.some((s) => s.effort === 'hard')) return 'hard'
+  return sets.every((s) => s.effort === 'easy') ? 'easy' : 'good'
+}
+/** Follow a variation ladder past rungs that need equipment the user lacks. */
+function nextAvailable(exercise: Exercise, direction: 'easier' | 'harder', profile: Profile) {
+  const seen = new Set<string>()
+  let id = exercise[direction]
+  while (id && !seen.has(id)) {
+    seen.add(id)
+    const candidate = byId[id]
+    if (available(candidate, profile.equipment)) return candidate
+    id = candidate[direction]
+  }
+  return undefined
+}
 
 /** Both sessions were prescribed the same target and added load. */
 function sameWork(a: WorkoutExercise, b: WorkoutExercise) {
@@ -75,118 +99,142 @@ function sameWork(a: WorkoutExercise, b: WorkoutExercise) {
   return targets(a) === targets(b) && loads(a) === loads(b)
 }
 
+export const setsPerExercise = (profile: Profile) =>
+  goalParams[profileGoal(profile)].sets[profile.duration]
+
 export function prescribe(
   exercise: Exercise,
   profile: Profile,
   history: Session[],
 ): WorkoutExercise {
+  const goal = profileGoal(profile)
+  const [low, high] = targetRange(exercise, goal)
   const previous = [...history]
     .reverse()
     .flatMap((h) => h.exercises.filter((e) => e.exerciseId === exercise.id && worked(e).length > 0))
-  let target = exercise.min
+  let target = low
   let load = 0
   let selected = exercise
-  let note = 'Start controlled. Leave a couple of good reps in reserve.'
+  let note = 'Start controlled. Stop each set with two or three good reps left.'
   const last = previous[0]
   if (last) {
     const done = worked(last)
-    const plannedTarget = Math.min(
-      exercise.max,
-      Math.max(exercise.min, Math.round(average(done.map((s) => s.target)))),
-    )
+    const planned = Math.min(high, Math.max(low, Math.round(average(done.map((s) => s.target)))))
     const achieved = Math.round(average(done.map((s) => s.reps)))
     const vest = exercise.weighted && profile.equipment.includes('vest')
     load = vest ? Math.min(...done.map((s) => s.load)) : 0
-    // A full, comfortable exercise can reveal that the original target was too
-    // low. Keep partial work and changed loads from inflating the next plan.
-    const canCalibrate =
-      successful(last) && done.every((s) => s.load === load && s.load === s.targetLoad)
-    target = canCalibrate
-      ? Math.min(exercise.max, Math.max(plannedTarget, achieved))
-      : plannedTarget
-    const struggled =
-      completed(last).length < last.sets.length ||
-      done.length < completed(last).length ||
-      done.some((s) => s.reps < s.target || s.load < s.targetLoad || s.effort === 'hard')
-    if (struggled) {
-      // In-session logging already lowered the sets after a hard or missed set,
-      // so start from what was actually demonstrated. Only a hard final set has
-      // not been absorbed by those in-session adjustments yet.
-      const finalHard = done[done.length - 1].effort === 'hard'
-      target = Math.min(exercise.max, Math.max(1, Math.min(plannedTarget, achieved)))
-      if (finalHard && load > 0) {
-        load = Math.max(0, load - LOAD_STEP_KG)
-        note = 'Lighter added load after a challenging session.'
-      } else {
-        if (finalHard) target -= step(exercise)
-        note = 'Target adjusted to match your last session.'
-      }
-      if (target < exercise.min) {
+    if (missed(last)) {
+      // In-session logging already lowered the sets after a missed set, so
+      // start from what was actually demonstrated rather than reducing again.
+      target = Math.min(high, Math.max(1, Math.min(planned, achieved)))
+      note = 'Target adjusted to match your last session.'
+      if (target < low) {
+        const easier = nextAvailable(exercise, 'easier', profile)
         if (load > 0) {
-          load = Math.max(0, load - LOAD_STEP_KG)
-          target = exercise.min
+          load = Math.max(0, load - loadStep(exercise))
+          target = low
           note = 'Lighter added load so you can work in your rep range.'
-        } else if (exercise.easier && available(byId[exercise.easier], profile.equipment)) {
-          selected = byId[exercise.easier]
-          target = selected.min
-          load = 0
+        } else if (easier) {
+          selected = easier
+          target = targetRange(easier, goal)[0]
           note = 'An easier variation to rebuild clean, confident reps.'
         } else {
-          target = exercise.min
+          target = low
           note = 'Start at the bottom of the range. Rest longer between sets if you need to.'
         }
       }
-    } else if (target > plannedTarget) {
-      // Calibrating an underestimated target is separate from earning a new
-      // variation or added load through the existing two-session progression.
-      note = 'Target calibrated to your completed sets. Build consistency here.'
-    } else if (previous.length > 1 && successful(previous[1]) && sameWork(previous[1], last)) {
-      if (target >= exercise.max) {
-        const harder = exercise.harder && byId[exercise.harder]
-        if (harder && available(harder, profile.equipment)) {
+    } else {
+      const effort = overallEffort(done)
+      // Extra comfortable reps at the planned load reveal an underestimated target.
+      const steadyLoad = done.every((s) => s.load === load && s.load === s.targetLoad)
+      const demonstrated = steadyLoad ? Math.min(high, achieved) : planned
+      const repeated = previous.length > 1 && successful(previous[1]) && sameWork(previous[1], last)
+      // Easy (4+ reps left) earns two steps and Just right one. Challenging work
+      // holds until it has been done twice; steady goals always wait for two.
+      let steps = effort === 'easy' ? 2 : effort === 'good' ? 1 : repeated ? 1 : 0
+      if (goalParams[goal].steadyProgression && !repeated) steps = 0
+      if (demonstrated > planned) {
+        target = demonstrated
+        note = 'Target calibrated to your completed sets. Build consistency here.'
+      } else if (steps === 0) {
+        target = planned
+        note =
+          effort === 'hard'
+            ? 'Strong, honest work. Repeat this target until it feels a little easier.'
+            : 'Build consistency at this target before progressing.'
+      } else if (planned >= high) {
+        target = planned
+        const harder = nextAvailable(exercise, 'harder', profile)
+        if (harder) {
           selected = harder
-          target = harder.min
+          target = targetRange(harder, goal)[0]
           load = 0
-          note = 'Two strong sessions. You’ve earned the next variation.'
+          note = 'You’ve earned the next variation.'
         } else if (vest) {
           if (load >= MAX_ADDED_LOAD_KG) {
             note = 'You’ve reached the added-load recording limit. Keep this target controlled.'
           } else {
-            const increase = Math.min(LOAD_STEP_KG, MAX_ADDED_LOAD_KG - load)
+            const increase = Math.min(loadStep(exercise), MAX_ADDED_LOAD_KG - load)
             load += increase
-            target = exercise.min
-            note = `Two strong sessions. Add ${increase} kg and build your reps again.`
+            // A small load step costs a few reps, not the whole range.
+            target = Math.max(low, high - 3 * step(exercise))
+            note = `Add ${increase} kg and build your reps again.`
           }
         } else {
-          note = 'You’ve reached this rep range. Keep each rep controlled.'
+          note =
+            'You’ve reached this range. Slow the lowering to three seconds to keep progressing.'
         }
       } else {
-        target = Math.min(exercise.max, target + step(exercise))
-        note = `Two strong sessions. ${exercise.unit === 'sec' ? 'Five more seconds' : 'One more rep'} per set.`
+        const increase = steps * step(exercise)
+        target = Math.min(high, planned + increase)
+        note =
+          exercise.unit === 'sec'
+            ? `${increase} more seconds per set.`
+            : `${increase === 1 ? 'One more rep' : `${increase} more reps`} per set.`
       }
-    } else {
-      note = 'Build consistency at this target before progressing.'
     }
   }
   return {
     exerciseId: selected.id,
-    sets: makeSets(selected, profile.duration === 20 ? 2 : 3, target, load),
+    sets: makeSets(selected, setsPerExercise(profile), target, load),
     note,
   }
 }
 
-export function generateWorkout(profile: Profile, history: Session[], seed = 0): Workout {
-  const groups: Record<Focus, Pattern[]> = {
-    full: ['push', 'pull', 'squat', 'core', 'hinge', 'shoulder'],
-    upper: ['push', 'pull', 'shoulder', 'core'],
-    lower: ['squat', 'hinge', 'core'],
-    core: ['core', 'hinge', 'shoulder'],
+const focusPatterns: Record<Focus, Pattern[]> = {
+  full: ['push', 'pull', 'squat', 'core', 'hinge', 'shoulder'],
+  upper: ['push', 'pull', 'shoulder', 'core'],
+  lower: ['squat', 'hinge', 'core'],
+  core: ['core', 'hinge', 'shoulder'],
+}
+
+/** When a session has room for fewer patterns than the focus covers, train the stalest ones. */
+function sessionPatterns(profile: Profile, history: Session[]): Pattern[] {
+  const group = focusPatterns[profile.focus]
+  const count = Math.min(group.length, goalParams[profileGoal(profile)].exercises[profile.duration])
+  if (count >= group.length) return group
+  const lastTrained = (pattern: Pattern) => {
+    for (let index = history.length - 1; index >= 0; index -= 1)
+      if (
+        history[index].exercises.some(
+          (e) => byId[e.exerciseId].pattern === pattern && completed(e).length > 0,
+        )
+      )
+        return index
+    return -1
   }
-  const patterns = groups[profile.focus].slice(
-    0,
-    profile.duration === 20 ? 4 : profile.duration === 30 ? 5 : 6,
+  const chosen = new Set(
+    group
+      .map((pattern, order) => ({ pattern, order, seen: lastTrained(pattern) }))
+      .sort((a, b) => a.seen - b.seen || a.order - b.order)
+      .slice(0, count)
+      .map((item) => item.pattern),
   )
-  const selected = patterns.map((pattern) => {
+  return group.filter((pattern) => chosen.has(pattern))
+}
+
+export function generateWorkout(profile: Profile, history: Session[], seed = 0): Workout {
+  const selected = sessionPatterns(profile, history).map((pattern) => {
     const pool = exercises.filter(
       (e) =>
         e.pattern === pattern &&
@@ -285,27 +333,25 @@ export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise
   if (set.reps === 0)
     return { ...entry, sets: entry.sets.map((s) => (s.id === id ? { ...s, done: true } : s)) }
   const exercise = byId[entry.exerciseId]
-  const struggled = set.reps < set.target || set.effort === 'hard' || set.load < set.targetLoad
-  // Comfortable extra reps calibrate an underestimated target. Leave some
-  // headroom for fatigue after a "good" set; an easy set can repeat its result.
+  // Only a missed target lowers the remaining sets. "Challenging" means 0–1 reps
+  // were left, which is productive work, not a reason to cut the next set.
+  const missedTarget = missedSet(set)
   const target = Math.min(
     600,
     Math.max(
       1,
-      struggled
-        ? Math.min(
+      missedTarget
+        ? Math.min(set.target, set.reps)
+        : Math.max(
             set.target,
-            set.reps - (set.effort === 'hard' ? (exercise.unit === 'sec' ? 5 : 1) : 0),
-          )
-        : Math.max(set.target, set.effort === 'easy' ? set.reps : Math.round(set.reps * 0.9)),
+            // Leave headroom for fatigue; an easy set can repeat its result.
+            set.effort === 'easy'
+              ? set.reps
+              : Math.round(set.reps * (set.effort === 'hard' ? 0.8 : 0.9)),
+          ),
     ),
   )
-  const load = exercise.weighted
-    ? Math.min(
-        MAX_ADDED_LOAD_KG,
-        Math.max(0, set.load - (set.effort === 'hard' && set.load > 0 ? 2.5 : 0)),
-      )
-    : 0
+  const load = exercise.weighted ? Math.min(MAX_ADDED_LOAD_KG, Math.max(0, set.load)) : 0
   const nextCompleted = entry.sets.findIndex((s, i) => i > index && s.done)
   let adjusted = false
   const sets = entry.sets.map((s, i) => {

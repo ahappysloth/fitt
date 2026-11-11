@@ -13,6 +13,7 @@ import {
   localDay,
 } from './workout'
 import { parseBackup } from './storage'
+import { restSeconds, targetRange } from './goals'
 import { demos } from '../components/ExerciseGuide'
 import type { AppState, Profile, Session, WorkoutExercise } from './types'
 
@@ -104,45 +105,43 @@ describe('progression responds to actual performance', () => {
   })
   it('keeps calibration separate from earning progression', () => {
     const history = [session('squat', 10), session('squat', 10, { reps: 20 })]
+    const high = targetRange(byId.squat, 'health')[1]
     const calibrated = prescribe(byId.squat, defaultProfile, history)
     expect(calibrated.exerciseId).toBe('squat')
-    expect(calibrated.sets[0].target).toBe(byId.squat.max)
-    const once = prescribe(byId.squat, defaultProfile, [
-      ...history,
-      session('squat', byId.squat.max),
-    ])
+    expect(calibrated.sets[0].target).toBe(high)
+    const once = prescribe(byId.squat, defaultProfile, [...history, session('squat', high)])
     expect(once.exerciseId).toBe('squat')
     const progressed = prescribe(byId.squat, defaultProfile, [
       ...history,
-      session('squat', byId.squat.max),
-      session('squat', byId.squat.max),
+      session('squat', high),
+      session('squat', high),
     ])
     expect(progressed.exerciseId).toBe('reverse-lunge')
   })
-  it('does not calibrate upward from partial, hard, or changed-load work', () => {
+  it('does not calibrate upward from partial or changed-load work', () => {
     const partial = session('squat', 10, { reps: 20 })
     partial.exercises[0].sets[2].done = false
     expect(prescribe(byId.squat, defaultProfile, [partial]).sets[0].target).toBe(10)
-    const hard = prescribe(byId.squat, defaultProfile, [
-      session('squat', 10, { reps: 20, effort: 'hard' }),
+    const challenging = prescribe(byId.squat, defaultProfile, [
+      session('squat', 10, { effort: 'hard' }),
     ])
-    expect(hard.sets[0].target).toBe(9)
+    expect(challenging.sets[0].target).toBe(10)
     const weighted: Profile = { ...defaultProfile, equipment: ['vest'] }
     const changed = prescribe(byId.pushup, weighted, [
-      session('pushup', 6, { reps: 10, load: 10, targetLoad: 5 }),
+      session('pushup', 8, { reps: 10, load: 10, targetLoad: 5 }),
     ])
-    expect(changed.sets[0]).toMatchObject({ target: 6, targetLoad: 10 })
+    expect(changed.sets[0]).toMatchObject({ target: 8, targetLoad: 10 })
     const reduced = prescribe(byId.pushup, weighted, [
-      session('pushup', 6, { reps: 10, load: 5, targetLoad: 10 }),
+      session('pushup', 8, { reps: 10, load: 5, targetLoad: 10 }),
     ])
     // The lower demonstrated load is the next load; it is not reduced again.
-    expect(reduced.sets[0]).toMatchObject({ target: 6, targetLoad: 5 })
+    expect(reduced.sets[0]).toMatchObject({ target: 8, targetLoad: 5 })
   })
   it('calibrates holds in seconds and keeps next-session targets in their prescribed range', () => {
     const calibrated = prescribe(byId.plank, defaultProfile, [session('plank', 20, { reps: 30 })])
     expect(calibrated.sets[0].target).toBe(30)
     const capped = prescribe(byId.plank, defaultProfile, [session('plank', 20, { reps: 600 })])
-    expect(capped.sets[0].target).toBe(byId.plank.max)
+    expect(capped.sets[0].target).toBe(targetRange(byId.plank, 'health')[1])
     expect(() =>
       parseBackup(
         JSON.stringify({ ...emptyState(), plan: { ...session('plank'), exercises: [capped] } }),
@@ -150,17 +149,17 @@ describe('progression responds to actual performance', () => {
     ).not.toThrow()
   })
   it('waits for two complete successes before increasing reps', () => {
-    expect(prescribe(byId['knee-pushup'], defaultProfile, [session()]).sets[0].target).toBe(6)
-    expect(
-      prescribe(byId['knee-pushup'], defaultProfile, [session(), session()]).sets[0].target,
-    ).toBe(7)
+    const knee = () => session('knee-pushup', 8)
+    expect(prescribe(byId['knee-pushup'], defaultProfile, [knee()]).sets[0].target).toBe(8)
+    expect(prescribe(byId['knee-pushup'], defaultProfile, [knee(), knee()]).sets[0].target).toBe(9)
   })
   it('does not progress from a partial exercise or lowered added load', () => {
-    const partial = session()
+    const partial = session('knee-pushup', 8)
     partial.exercises[0].sets[2].done = false
     expect(
-      prescribe(byId['knee-pushup'], defaultProfile, [session(), partial]).sets[0].target,
-    ).toBe(6)
+      prescribe(byId['knee-pushup'], defaultProfile, [session('knee-pushup', 8), partial]).sets[0]
+        .target,
+    ).toBe(8)
     const weighted = { ...defaultProfile, equipment: ['vest'] as Profile['equipment'] }
     const reduced = session('pushup', 8, { load: 5, targetLoad: 10 })
     const next = prescribe(byId.pushup, weighted, [session('pushup', 8), reduced]).sets[0]
@@ -174,24 +173,37 @@ describe('progression responds to actual performance', () => {
     expect(entry.sets[0].target).toBe(25)
   })
   it('unlocks a harder available variation only at the top of the rep range', () => {
+    const top = targetRange(byId['knee-pushup'], 'health')[1]
+    const below = prescribe(byId['knee-pushup'], defaultProfile, [
+      session('knee-pushup', top - 1),
+      session('knee-pushup', top - 1),
+    ])
+    expect(below.exerciseId).toBe('knee-pushup')
     const next = prescribe(byId['knee-pushup'], defaultProfile, [
-      session('knee-pushup', 12),
-      session('knee-pushup', 12),
+      session('knee-pushup', top),
+      session('knee-pushup', top),
     ])
     expect(next.exerciseId).toBe('pushup')
-    expect(next.sets[0].target).toBe(6)
+    expect(next.sets[0].target).toBe(targetRange(byId.pushup, 'health')[0])
+    const lungeTop = targetRange(byId['reverse-lunge'], 'health')[1]
     const unavailable = prescribe(byId['reverse-lunge'], defaultProfile, [
-      session('reverse-lunge', 12),
-      session('reverse-lunge', 12),
+      session('reverse-lunge', lungeTop),
+      session('reverse-lunge', lungeTop),
     ])
     expect(unavailable.exerciseId).toBe('reverse-lunge')
   })
-  it('reduces weight before changing variation after a hard session', () => {
+  it('keeps the load after challenging sets that hit their target', () => {
     const next = prescribe(byId.pushup, { ...defaultProfile, equipment: ['vest'] }, [
-      session('pushup', 6, { load: 10, targetLoad: 10, effort: 'hard' }),
+      session('pushup', 8, { load: 10, targetLoad: 10, effort: 'hard' }),
+    ])
+    expect(next.sets[0]).toMatchObject({ target: 8, load: 10 })
+  })
+  it('reduces weight before changing variation when reps fall below the range', () => {
+    const next = prescribe(byId.pushup, { ...defaultProfile, equipment: ['vest'] }, [
+      session('pushup', 8, { reps: 4, load: 10, targetLoad: 10 }),
     ])
     expect(next.exerciseId).toBe('pushup')
-    expect(next.sets[0].load).toBe(7.5)
+    expect(next.sets[0]).toMatchObject({ target: byId.pushup.min, load: 7.5 })
   })
   it('never prescribes below the movement minimum', () => {
     const skipped = session('squat', 8, { reps: 0 })
@@ -264,7 +276,7 @@ describe('progression responds to actual performance', () => {
     entry.sets[0].effort = 'hard'
     const result = completeSet(entry, entry.sets[0].id)
     expect(result.sets[0]).toMatchObject({ target: 6, reps: 4, done: true })
-    expect(result.sets[1]).toMatchObject({ target: 3, reps: 3, done: false })
+    expect(result.sets[1]).toMatchObject({ target: 4, reps: 4, done: false })
     result.sets[1].reps = 1
     const second = completeSet(result, result.sets[1].id)
     expect(second.sets[0]).toEqual(result.sets[0])
@@ -300,7 +312,8 @@ describe('progression responds to actual performance', () => {
     const reduced = completeSet(challenging, challenging.sets[1].id)
     expect(reduced.sets[0]).toEqual(first.sets[0])
     expect(reduced.sets[1]).toMatchObject({ target: 18, reps: 14, effort: 'hard', done: true })
-    expect(reduced.sets[2]).toMatchObject({ target: 13, reps: 13, done: false })
+    // A missed set lowers the rest to what was done, once.
+    expect(reduced.sets[2]).toMatchObject({ target: 14, reps: 14, done: false })
   })
   it.each(['good', 'hard'] as const)(
     'treats a zero-rep %s log as a skipped set and keeps later targets',
@@ -313,7 +326,7 @@ describe('progression responds to actual performance', () => {
       expect(result.sets[1]).toMatchObject({ target: 10, reps: 10, done: false })
     },
   )
-  it('uses seconds for hold calibration and five-second reductions for hard holds', () => {
+  it('uses seconds for hold calibration and lowers holds only to what was held', () => {
     const entry = session('plank', 20, { done: false }).exercises[0]
     entry.sets[0].reps = 40
     const first = completeSet(entry, entry.sets[0].id)
@@ -321,7 +334,7 @@ describe('progression responds to actual performance', () => {
     first.sets[1].reps = 30
     first.sets[1].effort = 'hard'
     const second = completeSet(first, first.sets[1].id)
-    expect(second.sets[2]).toMatchObject({ target: 25, reps: 25 })
+    expect(second.sets[2]).toMatchObject({ target: 30, reps: 30 })
   })
   it('bounds calibrated recommendations by the recording limit and the demonstrated result', () => {
     const entry = session('squat', 10, { done: false }).exercises[0]
@@ -332,7 +345,7 @@ describe('progression responds to actual performance', () => {
     const state = { ...emptyState(), plan: { ...session('squat'), exercises: [result] } }
     expect(() => parseBackup(JSON.stringify(state))).not.toThrow()
   })
-  it('carries demonstrated weighted load forward and reduces it after hard work', () => {
+  it('carries demonstrated weighted load forward and keeps it after a challenging set', () => {
     const entry = session('pushup', 6, { done: false, load: 10, targetLoad: 10 }).exercises[0]
     entry.sets[0].load = 15
     const first = completeSet(entry, entry.sets[0].id)
@@ -340,7 +353,7 @@ describe('progression responds to actual performance', () => {
     expect(first.sets[1]).toMatchObject({ target: 6, targetLoad: 15, load: 15 })
     first.sets[1].effort = 'hard'
     const second = completeSet(first, first.sets[1].id)
-    expect(second.sets[2]).toMatchObject({ target: 5, targetLoad: 12.5, load: 12.5 })
+    expect(second.sets[2]).toMatchObject({ target: 6, targetLoad: 15, load: 15 })
   })
   it('does not increase reps when achieving extra reps at a reduced load', () => {
     const entry = session('pushup', 6, { done: false, load: 10, targetLoad: 10 }).exercises[0]
@@ -379,7 +392,7 @@ describe('progression responds to actual performance', () => {
     undone.sets[0].effort = 'hard'
     const corrected = completeSet(undone, undone.sets[0].id)
     expect(corrected.sets[0]).toMatchObject({ target: 10, reps: 5, done: true })
-    expect(corrected.sets[1]).toMatchObject({ target: 4, reps: 4 })
+    expect(corrected.sets[1]).toMatchObject({ target: 5, reps: 5 })
   })
   it('preserves recommendations based on a later completed set when correcting an older one', () => {
     const entry = session('squat', 10, { done: false }).exercises[0]
@@ -393,7 +406,7 @@ describe('progression responds to actual performance', () => {
     const corrected = completeSet(undone, undone.sets[0].id)
     expect(corrected.sets[0]).toMatchObject({ target: 10, reps: 30, done: true })
     expect(corrected.sets[1]).toEqual(second.sets[1])
-    expect(corrected.sets[2]).toMatchObject({ target: 13, reps: 13 })
+    expect(corrected.sets[2]).toMatchObject({ target: 14, reps: 14 })
     expect(corrected.note).toBe(second.note)
   })
   it('undoes a logged set without deleting the workout', () => {
@@ -406,6 +419,80 @@ describe('progression responds to actual performance', () => {
     const entry = session('deadbug', 8, { load: 5 }).exercises[0]
     const result = replaceExercise(entry, byId.plank)
     expect(result.sets[0]).toMatchObject({ target: 20, reps: 20, load: 0, done: false })
+  })
+})
+
+describe('training goals', () => {
+  const muscle: Profile = { ...defaultProfile, goal: 'muscle' }
+  it('progresses by effort when the goal does not require steady progression', () => {
+    expect(prescribe(byId.squat, muscle, [session('squat', 10)]).sets[0].target).toBe(11)
+    expect(
+      prescribe(byId.squat, muscle, [session('squat', 10, { effort: 'easy' })]).sets[0].target,
+    ).toBe(12)
+    const challenging = () => session('squat', 10, { effort: 'hard' })
+    expect(prescribe(byId.squat, muscle, [challenging()]).sets[0].target).toBe(10)
+    expect(prescribe(byId.squat, muscle, [challenging(), challenging()]).sets[0].target).toBe(11)
+  })
+  it('keeps steady progression for the health goal', () => {
+    expect(prescribe(byId.squat, defaultProfile, [session('squat', 10)]).sets[0].target).toBe(10)
+  })
+  it('keeps each movement floor and applies the goal ceiling', () => {
+    expect(targetRange(byId.squat, 'muscle')).toEqual([8, 20])
+    expect(targetRange(byId.squat, 'health')).toEqual([8, 15])
+    expect(targetRange(byId.squat, 'strength')).toEqual([8, 8])
+    expect(targetRange(byId.pushup, 'strength')).toEqual([6, 8])
+    expect(targetRange(byId.plank, 'strength')).toEqual([20, 30])
+    // Negatives stay short whatever the goal.
+    expect(targetRange(byId['negative-pullup'], 'muscle')).toEqual([3, 6])
+  })
+  it('moves strength work to the next variation at the top of its short range', () => {
+    const strength: Profile = { ...defaultProfile, goal: 'strength', level: 'intermediate' }
+    const next = prescribe(byId.pushup, strength, [session('pushup', 8)])
+    expect(next.exerciseId).toBe('diamond-pushup')
+  })
+  it('adds a larger vest step for legs and keeps most of the rep range', () => {
+    // Split squats end their ladder, so progress continues with added load.
+    const vest: Profile = { ...muscle, equipment: ['vest', 'bench'], level: 'intermediate' }
+    const next = prescribe(byId['split-squat'], vest, [session('split-squat', 15)])
+    expect(next.sets[0]).toMatchObject({ target: 12, load: 5 })
+  })
+  it('sizes sessions and rest for the goal', () => {
+    const strength = generateWorkout({ ...defaultProfile, goal: 'strength', duration: 30 }, [])
+    expect(strength.exercises).toHaveLength(3)
+    expect(strength.exercises.every((entry) => entry.sets.length === 3)).toBe(true)
+    const fit = generateWorkout({ ...defaultProfile, goal: 'fit', duration: 45 }, [])
+    expect(fit.exercises).toHaveLength(6)
+    expect(fit.exercises.every((entry) => entry.sets.length === 4)).toBe(true)
+    expect(restSeconds(byId.squat, 'strength')).toBe(150)
+    expect(restSeconds(byId.squat, 'fit')).toBe(55)
+  })
+  it('rotates patterns that do not fit in a short session', () => {
+    const profile: Profile = { ...defaultProfile, goal: 'strength', duration: 20 }
+    const first = generateWorkout(profile, [])
+    const patterns = (workout: { exercises: WorkoutExercise[] }) =>
+      workout.exercises.map((entry) => byId[entry.exerciseId].pattern)
+    expect(patterns(first)).toEqual(['push', 'pull'])
+    const done: Session = {
+      ...first,
+      startedAt: first.createdAt,
+      completedAt: first.createdAt,
+      elapsedSeconds: 600,
+      exercises: first.exercises.map((entry) => ({
+        ...entry,
+        sets: entry.sets.map((set) => ({ ...set, done: true })),
+      })),
+    }
+    expect(patterns(generateWorkout(profile, [done]))).toEqual(['squat', 'core'])
+  })
+  it('defaults older backups by level and rejects unknown goals', () => {
+    const state = emptyState()
+    delete state.profile.goal
+    expect(parseBackup(JSON.stringify(state)).profile.goal).toBe('health')
+    state.profile.level = 'intermediate'
+    expect(parseBackup(JSON.stringify(state)).profile.goal).toBe('muscle')
+    expect(() =>
+      parseBackup(JSON.stringify({ ...state, profile: { ...state.profile, goal: 'bulk' } })),
+    ).toThrow()
   })
 })
 

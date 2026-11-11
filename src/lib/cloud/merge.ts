@@ -11,6 +11,7 @@ const profileLabels = {
   duration: 'Workout length',
   focus: 'Training focus',
   weeklyGoal: 'Weekly goal',
+  goal: 'Training goal',
 } as const
 const preferenceLabels = {
   displayName: 'Display name',

@@ -11,7 +11,8 @@ import {
   Trophy,
   Zap,
 } from 'lucide-react'
-import type { AppState, Exercise, Session } from '../lib/types'
+import { profileGoal, restSeconds } from '../lib/goals'
+import type { AppState, Exercise, Goal, Session } from '../lib/types'
 import { alternativesFor, doneSets, totalSets } from '../lib/workout'
 import { byId, equipmentList, muscleNames } from '../lib/catalog'
 import { getRewards, getSessionReward } from '../lib/rewards'
@@ -108,7 +109,9 @@ export default function AppDialogs({
   const AwardIcon = award ? awardIcons[award.id] : Trophy
   return (
     <Modal title={title} onClose={onClose} wide={dialog.type === 'exercise'}>
-      {dialog.type === 'exercise' && <ExerciseDetail exercise={byId[dialog.id]} />}
+      {dialog.type === 'exercise' && (
+        <ExerciseDetail exercise={byId[dialog.id]} goal={profileGoal(state.profile)} />
+      )}
       {dialog.type === 'swap' && entry && (
         <div className="swap-dialog">
           <p className="dialog-copy">
@@ -294,7 +297,7 @@ export default function AppDialogs({
   )
 }
 
-function ExerciseDetail({ exercise }: { exercise: Exercise }) {
+function ExerciseDetail({ exercise, goal }: { exercise: Exercise; goal: Goal }) {
   return (
     <div className="guide-modal exercise-detail">
       <Pill>
@@ -331,7 +334,7 @@ function ExerciseDetail({ exercise }: { exercise: Exercise }) {
         </span>
         <span>
           <Clock3 size={15} />
-          {exercise.rest}s rest
+          {restSeconds(exercise, goal)}s rest
         </span>
       </div>
     </div>

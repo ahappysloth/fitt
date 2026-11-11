@@ -1,6 +1,7 @@
 import { byId, equipmentList } from './catalog'
 import { emptyState, localDay } from './workout'
-import type { AppState } from './types'
+import type { AppState, Goal } from './types'
+import { goalIds, profileGoal } from './goals'
 import { MAX_ADDED_LOAD_KG } from './limits'
 
 export const STORAGE_KEY = 'form.training.v1'
@@ -103,7 +104,8 @@ export function parseBackup(raw: string): AppState {
     ![20, 30, 45].includes(p.duration as number) ||
     !['full', 'upper', 'lower', 'core'].includes(p.focus as string) ||
     !numberIn(p.weeklyGoal, 1, 7) ||
-    !Number.isInteger(p.weeklyGoal)
+    !Number.isInteger(p.weeklyGoal) ||
+    (p.goal !== undefined && !goalIds.includes(p.goal as Goal))
   )
     throw new Error('The training preferences in this backup are invalid.')
   if (
@@ -143,6 +145,7 @@ export function parseBackup(raw: string): AppState {
     throw new Error('This backup contains duplicate saved routines.')
   return {
     ...state,
+    profile: { ...state.profile, goal: profileGoal(state.profile) },
     preferences: {
       ...(state.preferences || { displayName: '', celebration: 'playful', onboarded: true }),
       bodyModel: state.preferences?.bodyModel ?? 'male',

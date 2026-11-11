@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { Profile, UserPreferences } from '../lib/types'
 import { equipmentList } from '../lib/catalog'
+import { goals, profileGoal } from '../lib/goals'
 import { focusNames } from '../lib/workout'
 import { Select } from './ui'
 import TrainingLockNote from './TrainingLockNote'
@@ -50,6 +51,7 @@ export default function SetupView({
   onHelp,
 }: SetupViewProps) {
   const fileInput = useRef<HTMLInputElement>(null)
+  const currentGoal = profileGoal(profile)
   const personal = preferences ?? {
     displayName: '',
     celebration: 'playful' as const,
@@ -150,7 +152,38 @@ export default function SetupView({
               disabled={active}
               aria-describedby={active ? 'training-preferences-locked' : undefined}
             >
-              <legend>Experience</legend>
+              <legend>Training goal</legend>
+              <div className="pref-levels pref-goals">
+                {goals.map((goal) => (
+                  <button
+                    key={goal.id}
+                    type="button"
+                    className={currentGoal === goal.id ? 'is-selected' : ''}
+                    aria-pressed={currentGoal === goal.id}
+                    onClick={() => onChange({ ...profile, goal: goal.id })}
+                  >
+                    <strong>{goal.name}</strong>
+                    <small>{goal.description}</small>
+                    {currentGoal === goal.id && <Check size={16} />}
+                  </button>
+                ))}
+              </div>
+              {currentGoal === 'fit' && (
+                <p className="pref-caption pref-goal-note">
+                  Fat loss comes mainly from what you eat. Training keeps your muscle and fitness
+                  while you do it.
+                </p>
+              )}
+              {currentGoal === 'strength' &&
+                !profile.equipment.some(
+                  (item) => item === 'bar' || item === 'rings' || item === 'vest',
+                ) && (
+                  <p className="pref-caption pref-goal-note">
+                    Without a bar, rings or a vest, strength progresses through harder variations in
+                    bigger jumps. A pull-up bar is the most useful addition.
+                  </p>
+                )}
+              <p className="pref-subheading">Experience</p>
               <div className="pref-levels">
                 {(['beginner', 'intermediate'] as const).map((level) => (
                   <button

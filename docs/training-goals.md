@@ -1,0 +1,64 @@
+# Training goals and progression
+
+Settings → Your rhythm asks for a training goal. The goal changes rep ranges, sets,
+session size, rest, and how quickly targets rise. Parameters live in
+`src/lib/goals.ts`; prescriptions in `src/lib/workout.ts`.
+
+| Goal               | Ceiling   | Movements × sets (20 / 30 / 45 min) | Rest  | Progression                 |
+| ------------------ | --------- | ----------------------------------- | ----- | --------------------------- |
+| Build muscle       | 20 (60 s) | 3×3 / 5×3 / 6×3                     | ×1.2  | by effort, every session    |
+| Get stronger       | 8 (30 s)  | 2×3 / 3×3 / 4×3                     | ×2    | by effort; harder variation |
+| Lose fat & get fit | 15 (45 s) | 4×3 / 5×3 / 6×4                     | ×0.75 | by effort, every session    |
+| Stay healthy       | 15 (45 s) | 4×2 / 5×3 / 6×3                     | ×1    | two successes per increase  |
+
+Goals keep each movement's own starting point and set the ceiling: the lower of
+the goal ceiling and the movement's catalog maximum is where a harder variation (or
+added load) takes over. Rest is the movement's base rest times the
+goal multiplier, rounded to 5 s and kept between 30 and 240 s. Existing profiles
+without a goal default to Stay healthy (beginner) or Build muscle (intermediate).
+
+## Effort means reps left
+
+The three ratings are anchored to reps in reserve: Easy = 4+ more, Just right = 2–3
+more, Challenging = 0–1 more. A completed Challenging set is productive work, not a
+failure:
+
+- **Missed target** (fewer reps or less load than planned): later sets in the session
+  drop to what was done, and the next session starts from what was demonstrated.
+  Below the range, the vest gets lighter, then the easier variation is used, and the
+  minimum is never undercut.
+- **Hit target**: Easy adds two reps (10 s), Just right one rep (5 s), Challenging
+  holds until it has been done twice at the same target. Stay healthy waits for two
+  successes before any increase.
+- At the top of the range, the next _available_ harder variation follows (rungs that
+  need missing equipment are skipped); without one, a weighted vest adds 2.5 kg
+  (5 kg for squat and hinge patterns) and the target drops three reps, not to the
+  bottom of the range.
+
+## Session planning
+
+When a goal's session holds fewer movement patterns than the focus covers, the
+patterns trained longest ago are chosen first, so short sessions rotate through
+squat, push, pull, hinge, shoulder and core instead of always dropping the last
+ones.
+
+## Evidence and judgement calls
+
+Summarised from the algorithm review (citations from the reviewer's knowledge, not
+re-verified): hypertrophy is similar from roughly 5–30 reps when sets end near
+failure (Schoenfeld 2017, 2021); proximity to failure matters more for hypertrophy
+than strength (Refalo 2023; Robinson 2024); RIR ratings are usable but novices
+under-estimate by about a rep (Zourdos 2016; Halperin 2022); longer rest preserves
+volume (Schoenfeld 2016; Singer 2024). Fat loss is driven mainly by diet — Settings
+says so plainly. The exact windows, multipliers and session sizes are judgement
+calls informed by that evidence.
+
+## Not yet implemented
+
+Recommended by the review and left for follow-up: a first-session "find your level"
+calibration set, new movements to close ladder dead ends (decline/archer push-ups,
+dips, rows that lead to pull-ups, step-ups, single-leg RDLs, L-sits), weekly volume
+targets per pattern with upper/lower splits at 4+ sessions a week, plateau and
+optional deload suggestions, a return-after-a-break reduction, conditioning
+finishers for the fat-loss goal, using a swapped-in movement's own history, and a
+one-time "Choose your goal" card for people who set up before goals existed.

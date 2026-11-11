@@ -13,6 +13,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import { profileGoal, restSeconds } from '../lib/goals'
 import { available, byId, exercises, muscleNames } from '../lib/catalog'
 import { MAX_ADDED_LOAD_KG } from '../lib/limits'
 import type {
@@ -553,7 +554,7 @@ export default function WorkoutBuilder({
                     ) : (
                       <p className="builder-entry-note">
                         <Clock3 size={12} />
-                        {exercise.rest}s suggested rest<span>·</span>
+                        {restSeconds(exercise, profileGoal(profile))}s suggested rest<span>·</span>
                         <button type="button" onClick={() => onInfo(exercise.id)}>
                           Review form
                           <ArrowUpRightIcon />

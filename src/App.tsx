@@ -17,6 +17,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
+import { profileGoal } from './lib/goals'
 import type {
   AppState,
   BodyModel,
@@ -688,6 +689,7 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
               reviewWorkout ? (
                 <WorkoutReview
                   workout={reviewWorkout}
+                  goal={profileGoal(state.profile)}
                   saved={
                     !!state.routines?.some(
                       (routine) =>

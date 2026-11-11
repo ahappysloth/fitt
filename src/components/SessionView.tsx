@@ -18,6 +18,7 @@ import {
   Trash2,
   Zap,
 } from 'lucide-react'
+import { profileGoal, restSeconds } from '../lib/goals'
 import { byId, muscleNames } from '../lib/catalog'
 import type { Effort, Profile, Session, WorkoutExercise, WorkoutSet } from '../lib/types'
 import { completeSet, doneSets, totalSets, uid } from '../lib/workout'
@@ -171,6 +172,7 @@ function SessionContent({
   const rest = timers.restEnd ? Math.max(0, Math.ceil((timers.restEnd - timerNow) / 1000)) : null
   const hold = timers.holdEnd ? Math.max(0, Math.ceil((timers.holdEnd - timerNow) / 1000)) : null
   const elapsed = sessionElapsedSeconds(session, now)
+  const restFor = restSeconds(exercise, profileGoal(profile))
   const resting = rest !== null && rest > 0 && !!current && !editing
   const validReps = validNumber(draft.reps, 600, true)
   const validLoad = !weighted || validNumber(draft.load, 300)
@@ -393,7 +395,7 @@ function SessionContent({
     setNow(timestamp)
     if (!editing)
       setTimers({
-        restEnd: timestamp + exercise.rest * 1000,
+        restEnd: timestamp + restFor * 1000,
         holdEnd: null,
         loggedIds: [...loggedIds.current],
       })
@@ -647,7 +649,7 @@ function SessionContent({
               <div className="workout-session__movement-footer">
                 <span>
                   <Clock3 size={15} />
-                  {exercise.rest}s rest between sets
+                  {restFor}s rest between sets
                 </span>
                 <Tooltip
                   content={
@@ -846,19 +848,25 @@ function SessionContent({
                     <div>
                       {(
                         [
-                          ['easy', 'Easy'],
-                          ['good', 'Just right'],
-                          ['hard', 'Challenging'],
+                          ['easy', 'Easy', '4+ more in me'],
+                          ['good', 'Just right', '2–3 more'],
+                          ['hard', 'Challenging', '0–1 more'],
                         ] as const
-                      ).map(([value, label]) => (
+                      ).map(([value, label, reserve]) => (
                         <button
                           key={value}
+                          aria-label={label}
+                          aria-describedby={`${inputId}-effort-${value}`}
                           aria-pressed={draft.effort === value}
                           className={draft.effort === value ? 'active' : ''}
                           onClick={() => changeEffort(value)}
                         >
-                          {draft.effort === value && <Check size={12} />}
-                          {label}
+                          <span>
+                            {draft.effort === value && <Check size={12} />}
+                            {label}
+                          </span>
+                          {/* Reps left in reserve anchor each rating to the same scale. */}
+                          <small id={`${inputId}-effort-${value}`}>{reserve}</small>
                         </button>
                       ))}
                     </div>
@@ -974,7 +982,7 @@ function SessionContent({
                 </section>
               ) : (
                 <p className="workout-session__rest-idle">
-                  <Clock3 size={16} /> {exercise.rest}s rest after each set. Go at your pace.
+                  <Clock3 size={16} /> {restFor}s rest after each set. Go at your pace.
                 </p>
               )}
             </div>

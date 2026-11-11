@@ -54,12 +54,12 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
-  ).toHaveValue('3')
+  ).toHaveValue('4')
   await page.reload()
   await expect(page).toHaveURL(/\/workout$/)
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
-  ).toHaveValue('3')
+  ).toHaveValue('4')
   await finishPartial(page)
   await expect(page.locator('.earned-xp')).toContainText('40')
   await page.getByRole('button', { name: 'See my journey', exact: true }).click()
