@@ -914,3 +914,48 @@ describe('return after a break', () => {
     expect(prescribe(byId.squat, defaultProfile, history, after(30)).sets[0].target).toBe(11)
   })
 })
+
+describe('stalled progress', () => {
+  const unrated = () => session('squat', 10, { effortConfirmed: false })
+  it('asks for ratings after three unrated sessions at the same met target', () => {
+    const two = prescribe(byId.squat, defaultProfile, [unrated(), unrated()])
+    expect(two.sets[0].target).toBe(10)
+    expect(two.note).not.toContain('three sessions')
+    const three = prescribe(byId.squat, defaultProfile, [unrated(), unrated(), unrated()])
+    expect(three.sets[0].target).toBe(10)
+    expect(three.note).toBe(
+      'Same target three sessions running. Rate how each set felt: Easy or Just right moves you on.',
+    )
+  })
+  it('does not nudge when targets were missed or changed', () => {
+    const missed = session('squat', 10, { effortConfirmed: false })
+    missed.exercises[0].sets[2].reps = 8
+    expect(
+      prescribe(byId.squat, defaultProfile, [unrated(), unrated(), missed]).note,
+    ).not.toContain('three sessions')
+    expect(
+      prescribe(byId.squat, defaultProfile, [
+        session('squat', 9, { effortConfirmed: false }),
+        unrated(),
+        unrated(),
+      ]).note,
+    ).not.toContain('three sessions')
+  })
+  it('suggests a slower lowering, or a vest, at the top of a range with nowhere to go', () => {
+    const top = targetRange(byId['reverse-lunge'], 'health')[1]
+    const history = [session('reverse-lunge', top), session('reverse-lunge', top)]
+    expect(prescribe(byId['reverse-lunge'], defaultProfile, history).note).toBe(
+      'You’ve reached this range. Lower over three seconds each rep, or add a weighted vest in Settings.',
+    )
+    const holdTop = targetRange(byId['hollow-hold'], 'health')[1]
+    const holds = [session('hollow-hold', holdTop), session('hollow-hold', holdTop)]
+    expect(prescribe(byId['hollow-hold'], defaultProfile, holds).note).toBe(
+      'You’ve reached this range. Brace harder and keep the position strict to keep progressing.',
+    )
+    const pikeTop = targetRange(byId['pike-pushup'], 'health')[1]
+    const pikes = [session('pike-pushup', pikeTop), session('pike-pushup', pikeTop)]
+    expect(prescribe(byId['pike-pushup'], defaultProfile, pikes).note).toBe(
+      'You’ve reached this range. Lower over three seconds each rep to keep progressing.',
+    )
+  })
+})

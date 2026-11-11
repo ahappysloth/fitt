@@ -53,6 +53,16 @@ app opens with a Today plan two or more weeks old and no workout in progress, it
 rebuilds the plan and says so. The 14/42-day thresholds and percentages are
 judgement calls informed by detraining research, not validated estimates.
 
+## Stalled progress
+
+Increases need explicit comfortable ratings, so someone who logs without rating
+could repeat a target indefinitely. When the last three sessions of a movement met
+the same targets at the same load but weren't all rated comfortably, the note asks
+for a rating ("Easy or Just right moves you on"); the evidence rule itself is
+unchanged. At the top of a range with no available harder variation and no vest,
+the note suggests a three-second lowering (or a vest, for vest-loadable
+movements); holds get a stricter-position cue instead.
+
 ## Session planning
 
 When a goal's session holds fewer movement patterns than the focus covers, the
@@ -75,7 +85,7 @@ calls informed by that evidence.
 
 Recommended by the review and left for follow-up: new movements to close ladder dead ends (decline/archer push-ups,
 dips, rows that lead to pull-ups, step-ups, single-leg RDLs, L-sits), weekly volume
-targets per pattern with upper/lower splits at 4+ sessions a week, plateau and
-optional deload suggestions, conditioning
+targets per pattern with upper/lower splits at 4+ sessions a week, optional
+deload suggestions, conditioning
 finishers for the fat-loss goal, using a swapped-in movement's own history, and a
 one-time "Choose your goal" card for people who set up before goals existed.

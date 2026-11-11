@@ -9,6 +9,7 @@ import {
   orderedHistory,
   originalLoad,
   originalTarget,
+  stalledWithoutRatings,
 } from './training-evidence'
 import type {
   AppState,
@@ -252,12 +253,24 @@ export function prescribe(
             note = `Two strong sessions. Add ${increase} kg and build your reps again.`
           }
         } else {
-          note = 'You’ve reached this rep range. Keep each rep controlled.'
+          // Without a harder rung or added load, a slower lowering keeps the
+          // stimulus rising at the same reps.
+          note =
+            exercise.unit === 'sec'
+              ? 'You’ve reached this range. Brace harder and keep the position strict to keep progressing.'
+              : exercise.weighted && !profile.equipment.includes('vest')
+                ? 'You’ve reached this range. Lower over three seconds each rep, or add a weighted vest in Settings.'
+                : 'You’ve reached this range. Lower over three seconds each rep to keep progressing.'
         }
       } else {
         target = Math.min(high, target + step(exercise))
         note = `Two strong sessions. ${exercise.unit === 'sec' ? 'Five more seconds' : 'One more rep'} per set.`
       }
+    } else if (stalledWithoutRatings(previous, desiredSets)) {
+      // Progress needs explicit comfortable ratings; say so instead of
+      // silently repeating the same target.
+      note =
+        'Same target three sessions running. Rate how each set felt: Easy or Just right moves you on.'
     } else {
       note =
         full && changedLoad
