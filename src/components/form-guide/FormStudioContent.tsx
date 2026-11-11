@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { ArrowUpRight, Check, CirclePlay, Move3D, ShieldCheck } from 'lucide-react'
-import KneePushupGuide from './KneePushupGuide'
+import { FormGuide } from './KneePushupGuide'
+import { kneePushupMotion } from './knee-pushup'
+import { squatMotion } from './squat'
+import { pullupMotion } from './pull-up'
+import { byId, equipmentList } from '../../lib/catalog'
+import { Select } from '../ui'
 import ModelInspector from './ModelInspector'
 import { BodyModelPreferenceProvider } from '../BodyModelPreference'
 import type { BodyModel, Muscle } from '../../lib/types'
@@ -9,6 +14,10 @@ import '../../form-preview/preview.css'
 
 /** Shared studio content. The local provider keeps model experiments out of account preferences. */
 export default function FormStudioContent({ embedded = false }: { embedded?: boolean }) {
+  const motions = [kneePushupMotion, squatMotion, pullupMotion]
+  const [exerciseId, setExerciseId] = useState('knee-pushup')
+  const motion = motions.find((item) => item.id === exerciseId)!
+  const exercise = byId[exerciseId]
   const [bodyModel, setBodyModel] = useState<BodyModel>('male')
   const [previewEnabled, setPreviewEnabled] = useState(false)
   const [previewRegions, setPreviewRegions] = useState<readonly Muscle[]>(kneePushupMuscles)
@@ -28,26 +37,37 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
             A quiet space to understand the exercise. Take it slowly, find your angle, and make the
             next rep yours.
           </p>
+          <div className="form-study__exercise-picker">
+            <label htmlFor="studio-exercise">Preview exercise</label>
+            <Select
+              id="studio-exercise"
+              label="Preview exercise"
+              value={exerciseId}
+              onValueChange={setExerciseId}
+              options={motions.map((item) => ({ value: item.id, label: item.name }))}
+            />
+          </div>
           <div className="form-study__movement">
-            <span>01</span>
+            <span>{String(motions.indexOf(motion) + 1).padStart(2, '0')}</span>
             <div>
-              <MovementHeading>Knee push-up</MovementHeading>
-              <p>Foundation · Bodyweight · Push</p>
+              <MovementHeading>{motion.name}</MovementHeading>
+              <p>
+                {exercise.level <= 1 ? 'Foundation' : 'Progression'} ·{' '}
+                {exercise.equipment.length
+                  ? exercise.equipment
+                      .map((id) => equipmentList.find((item) => item.id === id)!.name)
+                      .join(', ')
+                  : 'Bodyweight'}
+              </p>
             </div>
           </div>
           <ol className="form-study__cues">
-            <li>
-              <Check size={16} />
-              <span>Hands just wider than your shoulders.</span>
-            </li>
-            <li>
-              <Check size={16} />
-              <span>Knees, hips, and head move together.</span>
-            </li>
-            <li>
-              <Check size={16} />
-              <span>Elbows travel back as you lower.</span>
-            </li>
+            {motion.steps.map((step) => (
+              <li key={step}>
+                <Check size={16} />
+                <span>{step}</span>
+              </li>
+            ))}
           </ol>
           <div className="form-study__hint">
             <Move3D size={19} />
@@ -60,7 +80,9 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
         </div>
         <div className="form-study__viewer">
           <BodyModelPreferenceProvider value={{ bodyModel, onBodyModelChange: setBodyModel }}>
-            <KneePushupGuide
+            <FormGuide
+              key={motion.id}
+              motion={motion}
               inspectionControls
               previewMuscles={previewEnabled ? previewRegions : undefined}
             />
@@ -84,7 +106,7 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
             <h2>Your model. A consistent way to learn.</h2>
           </div>
           <span>
-            FIRST EXERCISE STUDY <ArrowUpRight size={14} />
+            EXERCISE PREVIEWS <ArrowUpRight size={14} />
           </span>
         </div>
         <div className="form-study__principles">
@@ -114,9 +136,9 @@ export default function FormStudioContent({ embedded = false }: { embedded?: boo
           </article>
         </div>
         <p className="form-study__footnote">
-          Knee Push-up is the first prototype. Surface highlights indicate approximate muscle
-          regions. Detailed anatomical layers and the remaining exercises come after this foundation
-          is approved.
+          Knee Push-up, Bodyweight Squat, and Pull-up are available for review here. Inspect each
+          setup, lower position, and return from the front and side. Muscle highlights indicate
+          approximate regions.
         </p>
       </section>
     </>

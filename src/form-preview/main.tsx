@@ -16,7 +16,7 @@ function FormStudioPreview() {
           </span>
         </a>
         <span className="form-study__edition">
-          FORM STUDIO <i /> MOVEMENT 01
+          FORM STUDIO <i /> EXERCISE STUDIES
         </span>
         <a href="#the-system" className="form-study__about">
           The approach <ArrowDown size={14} />

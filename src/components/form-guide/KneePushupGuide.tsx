@@ -168,6 +168,7 @@ export function FormGuide({
       className="form-3d"
       aria-label={`${motion.name} animated guide`}
       data-ready={ready}
+      data-exercise={motion.id}
       data-model={bodyModel}
       data-muscle-preview={previewMuscles !== undefined}
       data-highlighted-muscles={previewMuscles?.join(',')}
