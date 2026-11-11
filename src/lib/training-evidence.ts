@@ -53,6 +53,42 @@ export function successfulExposure(entry: WorkoutExercise, desiredSets: number):
   )
 }
 
+/** Complete work that met every original target at one consistent original load. */
+export function metTargets(entry: WorkoutExercise, desiredSets: number): boolean {
+  return (
+    completeWork(entry, desiredSets) &&
+    entry.sets.every(
+      (set) => set.reps > 0 && set.reps >= originalTarget(set) && set.load === originalLoad(set),
+    ) &&
+    entry.sets.every((set) => set.load === entry.sets[0].load)
+  )
+}
+
+const sameTargets = (a: WorkoutExercise, b: WorkoutExercise) =>
+  a.sets.length === b.sets.length &&
+  a.sets.every(
+    (set, index) =>
+      originalTarget(set) === originalTarget(b.sets[index]) &&
+      originalLoad(set) === originalLoad(b.sets[index]),
+  )
+
+/**
+ * Several sessions met the same targets, but missing comfortable ratings kept
+ * them from counting as progression evidence. Newest exposure first.
+ */
+export function stalledWithoutRatings(
+  exposures: WorkoutExercise[],
+  desiredSets: number,
+  sessions = 3,
+): boolean {
+  const recent = exposures.slice(0, sessions)
+  return (
+    recent.length === sessions &&
+    recent.every((entry) => metTargets(entry, desiredSets) && sameTargets(entry, recent[0])) &&
+    recent.some((entry) => !completeEvidence(entry, desiredSets))
+  )
+}
+
 export function comparableExposures(
   latest: WorkoutExercise,
   previous: WorkoutExercise,
