@@ -43,6 +43,16 @@ the next available harder variation. The flag is stored on the set (`calibration
 and syncs with history; older builds ignore it. A level set logged below the
 movement's minimum is treated like a missed target, so the next session regresses.
 
+## Returning after a break
+
+After two weeks or more away from a movement, its next target restarts at 90% of
+the last prescription (80% after six weeks), rounded (holds to 5 s) and never
+below the movement's minimum, with the vest one step lighter per threshold. That
+session awards no progression; the usual evidence rules resume from it. When the
+app opens with a Today plan two or more weeks old and no workout in progress, it
+rebuilds the plan and says so. The 14/42-day thresholds and percentages are
+judgement calls informed by detraining research, not validated estimates.
+
 ## Session planning
 
 When a goal's session holds fewer movement patterns than the focus covers, the
@@ -66,6 +76,6 @@ calls informed by that evidence.
 Recommended by the review and left for follow-up: new movements to close ladder dead ends (decline/archer push-ups,
 dips, rows that lead to pull-ups, step-ups, single-leg RDLs, L-sits), weekly volume
 targets per pattern with upper/lower splits at 4+ sessions a week, plateau and
-optional deload suggestions, a return-after-a-break reduction, conditioning
+optional deload suggestions, conditioning
 finishers for the fat-loss goal, using a swapped-in movement's own history, and a
 one-time "Choose your goal" card for people who set up before goals existed.
