@@ -247,7 +247,7 @@ export default function JourneyView({
                       className="journey-bar-fill"
                       style={{ height: `${(week.count / maxActivity) * 100}%` }}
                     >
-                      <strong>{week.count}</strong>
+                      {week.count > 0 && <strong>{week.count}</strong>}
                     </div>
                   </div>
                   <span className="journey-bar-date" aria-hidden="true">

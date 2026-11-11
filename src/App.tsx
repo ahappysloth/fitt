@@ -87,7 +87,8 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
   // Standalone, sandboxed previews keep memory navigation and need no framework router.
   const [localPathname, setLocalPathname] = useState(appRoutes.today)
   const pathname = routeNavigation?.pathname ?? localPathname
-  const page = pageForPathname(pathname) ?? 'today'
+  const matchedPage = pageForPathname(pathname)
+  const page = matchedPage ?? 'today'
   const changePath = useCallback(
     (next: string, options?: NavigationOptions) => {
       if (routeNavigation) routeNavigation.navigate(next, options)
@@ -108,9 +109,19 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
       !['checking', 'loading'].includes(store.account.status) &&
       !admin.checking &&
       !admin.allowed
-    )
+    ) {
       changePath(appRoutes.settings, { replace: true })
+      setToast('Admin Studio needs a signed-in admin account.')
+    }
   }, [page, store.account.status, admin.allowed, admin.checking, changePath])
+  // The server redirects restricted /admin documents to /settings?admin=restricted.
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('admin') !== 'restricted') return
+    setToast('Admin Studio needs a signed-in admin account.')
+    url.searchParams.delete('admin')
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+  }, [])
   const [dialog, setDialog] = useState<AppDialog | null>(null)
   const [toast, setToastMessage] = useState('')
   const [toastDestination, setToastDestination] = useState<Page | null>(null)
@@ -493,21 +504,24 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
               </a>
             ))}
           </nav>
-          <button className="sidebar-challenge" onClick={() => requestNavigation(startQuick)}>
-            <span className="challenge-symbol">
-              <Zap size={19} fill="currentColor" />
-            </span>
-            <strong>
-              Five minutes.
-              <br />
-              That’s a start.
-            </strong>
-            <span>A small win for a low-energy day.</span>
-            <span className="text-link">
-              Try a quick win
-              <ArrowUpRight size={15} />
-            </span>
-          </button>
+          {/* Keep the active workout free of competing calls to action. */}
+          {!state.active && (
+            <button className="sidebar-challenge" onClick={() => requestNavigation(startQuick)}>
+              <span className="challenge-symbol">
+                <Zap size={19} fill="currentColor" />
+              </span>
+              <strong>
+                Five minutes.
+                <br />
+                That’s a start.
+              </strong>
+              <span>A small win for a low-energy day.</span>
+              <span className="text-link">
+                Try a quick win
+                <ArrowUpRight size={15} />
+              </span>
+            </button>
+          )}
           <div className="sidebar-bottom">
             <span className="on-device">
               <ShieldCheck size={14} />
@@ -638,7 +652,13 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
             </div>
           )}
           <main id="main-content" tabIndex={-1} className="main-content">
-            {page === 'workout' && state.active ? (
+            {!matchedPage ? (
+              <section className="not-found-view" aria-labelledby="not-found-title">
+                <h1 id="not-found-title">A fresh start is this way.</h1>
+                <p>That page isn’t part of your training space.</p>
+                <Button onClick={() => changePath(appRoutes.today)}>Back to Today</Button>
+              </section>
+            ) : page === 'workout' && state.active ? (
               <SessionView
                 session={state.active}
                 profile={state.profile}

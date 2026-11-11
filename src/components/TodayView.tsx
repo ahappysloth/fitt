@@ -86,7 +86,8 @@ export default function TodayView({
           <span className="live-dot" /> Your pace. Always.
         </Pill>
       </div>
-      {!state.preferences?.onboarded && (
+      {/* Once someone has trained, the welcome prompt no longer competes with Start. */}
+      {!state.preferences?.onboarded && state.history.length === 0 && (
         <section className="welcome-note" aria-label="Welcome to Fitt">
           <Sparkles size={20} />
           <div>
@@ -200,6 +201,7 @@ export default function TodayView({
             />
             <Week
               days={weekDays(now)}
+              today={now}
               completedDays={week.days.filter((day) => day.done).map((day) => day.date)}
               selected={selectedDay}
               onSelect={selectDay}
