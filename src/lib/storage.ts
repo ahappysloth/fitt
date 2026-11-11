@@ -48,7 +48,8 @@ function workoutSet(s: unknown): boolean {
     (s.recommendationSource === undefined ||
       ['prescribed', 'adapted'].includes(s.recommendationSource as string)) &&
     (s.effortConfirmed === undefined || typeof s.effortConfirmed === 'boolean') &&
-    (s.targetLocked === undefined || typeof s.targetLocked === 'boolean')
+    (s.targetLocked === undefined || typeof s.targetLocked === 'boolean') &&
+    (s.calibration === undefined || s.calibration === true)
   )
 }
 function workout(x: unknown, session = false, finished = false): boolean {

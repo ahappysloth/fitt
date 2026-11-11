@@ -74,6 +74,7 @@ function cleanSet(set: WorkoutSet): WorkoutSet {
     }),
     ...(set.effortConfirmed !== undefined && { effortConfirmed: set.effortConfirmed }),
     ...(set.targetLocked !== undefined && { targetLocked: set.targetLocked }),
+    ...(set.calibration && { calibration: true as const }),
   }
 }
 

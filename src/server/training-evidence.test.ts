@@ -51,6 +51,7 @@ function stripEvidence<T extends Workout>(workout: T): T {
       delete set.recommendationSource
       delete set.effortConfirmed
       delete set.targetLocked
+      delete set.calibration
     }
   }
   return result

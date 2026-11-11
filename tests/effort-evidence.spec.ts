@@ -4,11 +4,18 @@ import type { AppState, Session } from '../src/lib/types'
 import { defaultProfile, emptyState, generateWorkout, prescribe } from '../src/lib/workout'
 
 const storageKey = 'form.training.v1'
+// These checks cover in-session effort rules, so the squats are not a
+// first-time "find your level" exposure.
+const squatsWithoutLevelSet = () => {
+  const entry = prescribe(byId.squat, defaultProfile, [])
+  for (const set of entry.sets) delete set.calibration
+  return entry
+}
 const activeSquats = (): Session => ({
   ...generateWorkout(defaultProfile, []),
   title: 'Effort and targets',
   startedAt: new Date().toISOString(),
-  exercises: [prescribe(byId.squat, defaultProfile, [])],
+  exercises: [squatsWithoutLevelSet()],
 })
 async function seed(page: Page, active = activeSquats()) {
   const state = emptyState()

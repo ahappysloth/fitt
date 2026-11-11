@@ -12,6 +12,7 @@ function legacyCore(workout: Workout) {
           recommendationSource: _recommendation,
           effortConfirmed: _effort,
           targetLocked: _locked,
+          calibration: _calibration,
           ...set
         }) => set,
       ),
@@ -32,11 +33,19 @@ function canonical(value: unknown): unknown {
 }
 
 function preserveSet(before: WorkoutSet, incoming: WorkoutSet): WorkoutSet {
-  const { prescription, recommendationSource, effortConfirmed, targetLocked, ...core } = incoming
+  const {
+    prescription,
+    recommendationSource,
+    effortConfirmed,
+    targetLocked,
+    calibration,
+    ...core
+  } = incoming
   const original = prescription ?? before.prescription
   const recommendation = recommendationSource ?? before.recommendationSource
   const effort = effortConfirmed ?? before.effortConfirmed
   const locked = targetLocked ?? before.targetLocked
+  const level = calibration ?? before.calibration
   // Keep the cloud contract's field order, so metadata restoration alone does
   // not turn an otherwise identical snapshot into a new revision.
   return {
@@ -45,6 +54,7 @@ function preserveSet(before: WorkoutSet, incoming: WorkoutSet): WorkoutSet {
     ...(recommendation !== undefined && { recommendationSource: recommendation }),
     ...(effort !== undefined && { effortConfirmed: effort }),
     ...(locked !== undefined && { targetLocked: locked }),
+    ...(level && { calibration: true as const }),
   }
 }
 

@@ -33,6 +33,16 @@ lowers the next plan. On top of those rules:
   without one, a weighted vest adds 2.5 kg (5 kg for squat and hinge patterns) and
   the target drops three reps rather than to the bottom of the range.
 
+## Find your level
+
+The first time a movement appears, set 1 is a level set: do clean reps (or hold)
+until about two reps (five seconds) are left, then log the result. The remaining
+sets that session become 85% of it, rounded (holds to 5 s), capped at the top of
+the goal range. If that level is already above the range, the next session starts
+the next available harder variation. The flag is stored on the set (`calibration`)
+and syncs with history; older builds ignore it. A level set logged below the
+movement's minimum is treated like a missed target, so the next session regresses.
+
 ## Session planning
 
 When a goal's session holds fewer movement patterns than the focus covers, the
@@ -53,8 +63,7 @@ calls informed by that evidence.
 
 ## Not yet implemented
 
-Recommended by the review and left for follow-up: a first-session "find your level"
-calibration set, new movements to close ladder dead ends (decline/archer push-ups,
+Recommended by the review and left for follow-up: new movements to close ladder dead ends (decline/archer push-ups,
 dips, rows that lead to pull-ups, step-ups, single-leg RDLs, L-sits), weekly volume
 targets per pattern with upper/lower splits at 4+ sessions a week, plateau and
 optional deload suggestions, a return-after-a-break reduction, conditioning

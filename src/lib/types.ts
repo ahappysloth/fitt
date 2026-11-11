@@ -59,6 +59,8 @@ export interface WorkoutSet {
   effortConfirmed?: boolean
   /** Preserve intentional input even when it equals the suggested value. */
   targetLocked?: boolean
+  /** A first-time "find your level" set; later targets follow from its result. */
+  calibration?: true
 }
 export interface WorkoutExercise {
   exerciseId: string

@@ -427,7 +427,7 @@ function SessionContent({
           : set,
       ),
     }
-    const result = completeSet(corrected, current.id)
+    const result = completeSet(corrected, current.id, profileGoal(profile))
     const firstLog = !loggedIds.current.has(current.id)
     loggedIds.current.add(current.id)
     replaceEntry(result)
@@ -824,18 +824,30 @@ function SessionContent({
                     </button>
                   </div>
                   <p id={`${inputId}-target`} className="workout-session__target">
-                    Target: {current.target} {exercise.unit}
-                    {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} ·{' '}
-                    {draft.targetLocked &&
-                    (!validReps ||
-                      !validLoad ||
-                      Number(draft.reps) !== current.target ||
-                      (weighted && Number(draft.load) !== current.targetLoad)) ? (
-                      <button type="button" onClick={followSuggestion}>
-                        Reset to target
-                      </button>
+                    {current.calibration && !current.done ? (
+                      // Without history, the first set measures the starting point.
+                      <>
+                        <strong>Find your level.</strong>{' '}
+                        {exercise.unit === 'sec'
+                          ? 'Stop with about 5 seconds left.'
+                          : 'Stop with about 2 reps left.'}
+                      </>
                     ) : (
-                      'log what you did.'
+                      <>
+                        Target: {current.target} {exercise.unit}
+                        {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} ·{' '}
+                        {draft.targetLocked &&
+                        (!validReps ||
+                          !validLoad ||
+                          Number(draft.reps) !== current.target ||
+                          (weighted && Number(draft.load) !== current.targetLoad)) ? (
+                          <button type="button" onClick={followSuggestion}>
+                            Reset to target
+                          </button>
+                        ) : (
+                          'log what you did.'
+                        )}
+                      </>
                     )}
                   </p>
                   {!validReps && (
@@ -1097,7 +1109,9 @@ function SessionContent({
                             : set.effort === 'hard'
                               ? 'Too hard'
                               : 'Just right'
-                        : 'Suggested target'}
+                        : set.calibration
+                          ? 'Find your level'
+                          : 'Suggested target'}
                     </small>
                   </div>
                   {set.done ? (
