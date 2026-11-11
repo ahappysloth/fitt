@@ -1,3 +1,4 @@
+import { profileGoal } from './goals'
 import { parseBackup } from './storage'
 import { emptyState } from './workout'
 import type { AppState, Profile, Session, UserPreferences, Workout, WorkoutSet } from './types'
@@ -148,6 +149,7 @@ export function parseCloudData(raw: unknown): CloudTrainingData {
       duration: state.profile.duration,
       focus: state.profile.focus,
       weeklyGoal: state.profile.weeklyGoal,
+      goal: profileGoal(state.profile),
     },
     preferences: {
       displayName: cleanText(preferences.displayName),

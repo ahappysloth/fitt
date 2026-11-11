@@ -126,6 +126,14 @@ test('app dropdowns save preferences and close on an outside pointer press', asy
   await duration.click()
   const menu = page.getByRole('listbox')
   await expect(menu).toBeVisible()
+  // Opening can scroll the taller settings page; act once the menu has settled.
+  await expect
+    .poll(async () => {
+      const before = JSON.stringify(await menu.boundingBox())
+      await page.waitForTimeout(100)
+      return before === JSON.stringify(await menu.boundingBox())
+    })
+    .toBe(true)
   const bounds = (await menu.boundingBox())!
   const viewport = page.viewportSize()!
   const outsidePoint = [

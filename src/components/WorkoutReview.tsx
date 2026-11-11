@@ -1,10 +1,12 @@
 import { ArrowLeft, ArrowRight, Bookmark, Check, Clock3 } from 'lucide-react'
 import { byId } from '../lib/catalog'
 import { totalSets } from '../lib/workout'
-import type { Workout } from '../lib/types'
+import type { Goal, Workout } from '../lib/types'
+import { restSeconds } from '../lib/goals'
 
 export default function WorkoutReview({
   workout,
+  goal,
   saved,
   onEdit,
   onStart,
@@ -12,6 +14,7 @@ export default function WorkoutReview({
   onInfo,
 }: {
   workout: Workout
+  goal: Goal
   saved: boolean
   onEdit: () => void
   onStart: () => void
@@ -49,8 +52,8 @@ export default function WorkoutReview({
                   <strong>{exercise.name}</strong>
                   <small>
                     {entry.sets.length} sets · {first.target} {exercise.unit}
-                    {first.targetLoad > 0 ? ` + ${first.targetLoad} kg` : ''} · {exercise.rest}s
-                    rest
+                    {first.targetLoad > 0 ? ` + ${first.targetLoad} kg` : ''} ·{' '}
+                    {restSeconds(exercise, goal)}s rest
                   </small>
                 </div>
                 <button

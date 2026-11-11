@@ -13,6 +13,7 @@ import {
   accountStorageKey,
   parseAccountUser,
   readAccountCache,
+  serializeAccountCache,
   type AccountCache,
   type KeyValueStorage,
 } from './cache'
@@ -90,6 +91,11 @@ export class TrainingManager {
   private connection: WebSocket | null = null
   private socketAttempts = 0
   private retryAt = 0
+  private retryTimer: ReturnType<typeof setTimeout> | null = null
+  /** The server permanently refused the last write; wait for a change or a manual retry. */
+  private rejected = false
+  /** A sync was requested while another was running. */
+  private resync = false
   private enabled = false
   private snapshot: TrainingSnapshot
 
@@ -167,7 +173,7 @@ export class TrainingManager {
       requestMagicLink: this.requestMagicLink,
       refreshSession: this.refreshSession,
       importGuestData: this.importGuestData,
-      syncNow: this.syncNow,
+      syncNow: this.refreshSession,
       resolveConflict: this.resolveConflict,
       signOut: this.signOut,
       exportConflictBackup: this.exportConflictBackup,
@@ -228,6 +234,9 @@ export class TrainingManager {
     this.operation = false
     if (this.debounce) clearTimeout(this.debounce)
     this.debounce = null
+    if (this.retryTimer) clearTimeout(this.retryTimer)
+    this.retryTimer = null
+    this.resync = false
     this.closeSocket()
   }
   private loadGuest() {
@@ -270,7 +279,7 @@ export class TrainingManager {
         }
       }
       if (this.cache) this.cache = { ...this.cache, state: this.state }
-      const raw = JSON.stringify(this.cache ?? this.state)
+      const raw = this.cache ? serializeAccountCache(this.cache) : JSON.stringify(this.state)
       storage.setItem(this.key(), raw)
       this.lastRaw = raw
       this.storageError = null
@@ -284,6 +293,7 @@ export class TrainingManager {
   }
   setState: Dispatch<SetStateAction<AppState>> = (update) => {
     this.state = typeof update === 'function' ? update(this.state) : update
+    this.rejected = false
     if (this.cache) this.cache = { ...this.cache, state: this.state }
     this.validateSharedState()
     this.persist()
@@ -374,6 +384,8 @@ export class TrainingManager {
     )
       return
     if (this.debounce) clearTimeout(this.debounce)
+    // During a rate-limit pause the retry timer owns the next attempt.
+    if (Date.now() < this.retryAt) return
     this.debounce = setTimeout(() => {
       this.debounce = null
       void this.syncNow()
@@ -459,7 +471,12 @@ export class TrainingManager {
             this.updateStatus()
             return false
           }
-          if (response.status === 503 || response.status === 404) {
+          if (response.status === 503)
+            throw new ApiError(
+              503,
+              'Account services are temporarily unavailable. Your workouts remain on this device and will sync when they’re back.',
+            )
+          if (response.status === 404) {
             this.available = false
             this.providers = { google: false, magicLink: false }
             this.error = null
@@ -522,7 +539,7 @@ export class TrainingManager {
         this.updateStatus()
         this.openSocket()
         return !this.blocked && this.durable
-      } catch {
+      } catch (error) {
         if (epoch !== this.epoch) return false
         this.authenticated = false
         // navigator.onLine often remains true on a network without internet.
@@ -536,7 +553,9 @@ export class TrainingManager {
           }
         }
         this.error =
-          'We couldn’t reach your account. Your workouts remain on this device; retry when you’re online.'
+          error instanceof ApiError
+            ? error.message
+            : 'We couldn’t reach your account. Your workouts remain on this device; retry when you’re online.'
         this.updateStatus()
         return false
       } finally {
@@ -589,12 +608,20 @@ export class TrainingManager {
         'Saved account data could not be loaded. Export the existing data before resetting storage. Cloud sync is paused to protect it.'
     }
   }
+  /** User-initiated sync and sign-in checks also retry a write the server refused. */
   refreshSession = async () => {
+    this.rejected = false
     await this.syncNow()
   }
   syncNow = async (): Promise<void> => {
     if (this.syncPromise) return this.syncPromise
-    if (!this.enabled || !this.runtime?.online() || this.operation || Date.now() < this.retryAt) {
+    if (
+      !this.enabled ||
+      !this.runtime?.online() ||
+      this.operation ||
+      this.rejected ||
+      Date.now() < this.retryAt
+    ) {
       this.updateStatus()
       this.emit()
       return
@@ -605,6 +632,10 @@ export class TrainingManager {
       await task
     } finally {
       if (this.syncPromise === task) this.syncPromise = null
+    }
+    if (this.resync) {
+      this.resync = false
+      await this.syncNow()
     }
   }
   private async sync() {
@@ -657,13 +688,27 @@ export class TrainingManager {
             Date.now() +
             Math.min(600, Number.isFinite(seconds) && seconds > 0 ? seconds : 60) * 1000
           if (this.debounce) clearTimeout(this.debounce)
-          this.debounce = setTimeout(() => {
-            this.debounce = null
+          this.debounce = null
+          if (this.retryTimer) clearTimeout(this.retryTimer)
+          this.retryTimer = setTimeout(() => {
+            this.retryTimer = null
             void this.syncNow()
           }, this.retryAt - Date.now())
           throw new ApiError(
             429,
             'Sync is taking a short break. Your changes are saved on this device and will retry automatically.',
+          )
+        }
+        if (response.status === 400 || response.status === 413 || response.status === 422) {
+          // Retrying the same write cannot succeed. Drop the unapplied outbox
+          // entry; the data stays on this device and a new write is made after
+          // the next change or a manual sync.
+          this.cache = { ...this.cache!, pending: null }
+          this.persist()
+          this.rejected = true
+          throw new ApiError(
+            response.status,
+            'Your account couldn’t accept these changes. They remain on this device. Export a backup, then edit or sync again to retry.',
           )
         }
         if (response.status !== 409 && !response.ok)
@@ -957,8 +1002,11 @@ export class TrainingManager {
             message.type === 'revision' &&
             Number.isSafeInteger(message.revision) &&
             (message.revision as number) > (this.cache.baseline?.revision ?? -1)
-          )
+          ) {
+            // A notice can arrive while a sync is running; check again once it settles.
+            if (this.syncPromise) this.resync = true
             void this.syncNow()
+          }
         } catch {
           /* Hints only: HTTP remains authoritative. */
         }

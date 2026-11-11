@@ -1,6 +1,7 @@
 import {
   parseCloudSnapshot,
   parseSyncWrite,
+  toCloudData,
   type CloudSnapshot,
   type SyncWrite,
   type CloudTrainingData,
@@ -8,6 +9,13 @@ import {
 import { parseBackup } from '../storage'
 import type { AppState } from '../types'
 import type { AccountUser } from './types'
+import { sameValue } from './merge'
+
+/**
+ * Stored in place of a baseline or queued write whose data matches the visible
+ * state, so the usual cache holds one copy of the history instead of three.
+ */
+const SAME_AS_STATE = '$state'
 
 export const ACCOUNT_POINTER_KEY = 'fitt.account.current.v1'
 export const accountStorageKey = (id: string) => `fitt.account.${encodeURIComponent(id)}.v1`
@@ -52,8 +60,13 @@ export function readAccountCache(storage: KeyValueStorage, userId: string): Acco
   if (parsed.version !== 1 || parsed.user?.id !== userId) throw new Error('Invalid account cache')
   const user = parseAccountUser(parsed.user)
   const state = parseBackup(JSON.stringify(parsed.state))
-  const baseline = parsed.baseline === null ? null : parseCloudSnapshot(parsed.baseline)
-  const pending = parsed.pending === null ? null : parseSyncWrite(parsed.pending)
+  let stateData: CloudTrainingData | undefined
+  const expand = <T extends { data: unknown }>(value: T | null): T | null =>
+    value && value.data === SAME_AS_STATE
+      ? { ...value, data: (stateData ??= toCloudData(state)) }
+      : value
+  const baseline = parsed.baseline === null ? null : parseCloudSnapshot(expand(parsed.baseline))
+  const pending = parsed.pending === null ? null : parseSyncWrite(expand(parsed.pending))
   if (pending && (!baseline || pending.baseRevision !== baseline.revision)) {
     throw new Error('The saved sync queue does not match its account revision.')
   }
@@ -82,7 +95,26 @@ export function readAccountCache(storage: KeyValueStorage, userId: string): Acco
   }
 }
 
+/** Serialises a cache, replacing data that duplicates the visible state with a reference. */
+export function serializeAccountCache(cache: AccountCache): string {
+  let stateData: CloudTrainingData | null = null
+  try {
+    stateData = toCloudData(cache.state)
+  } catch {
+    /* Unsyncable state: keep every copy in full. */
+  }
+  const compact = <T extends { data: CloudTrainingData }>(value: T | null) =>
+    value && stateData && sameValue(value.data, stateData)
+      ? { ...value, data: SAME_AS_STATE }
+      : value
+  return JSON.stringify({
+    ...cache,
+    baseline: compact(cache.baseline),
+    pending: compact(cache.pending),
+  })
+}
+
 /** One atomic write persists the visible data and immutable outbox together. */
 export function writeAccountCache(storage: KeyValueStorage, cache: AccountCache) {
-  storage.setItem(accountStorageKey(cache.user.id), JSON.stringify(cache))
+  storage.setItem(accountStorageKey(cache.user.id), serializeAccountCache(cache))
 }

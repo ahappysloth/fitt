@@ -721,6 +721,75 @@ describe('durable account queue', () => {
     expect(fixture.server.get(userA.id).data.profile.weeklyGoal).toBe(6)
   })
 
+  it('keeps the rate-limit retry when the user edits during the pause', async () => {
+    const fixture = harness()
+    await start(fixture)
+    vi.useFakeTimers()
+    const request = fixture.runtime.request
+    let attempts = 0
+    fixture.runtime.request = async (path, init) => {
+      if (init?.method === 'PUT' && attempts++ === 0)
+        return Response.json({}, { status: 429, headers: { 'Retry-After': '60' } })
+      return request(path, init)
+    }
+    fixture.manager.setState((previous) => ({
+      ...previous,
+      profile: { ...previous.profile, weeklyGoal: 6 },
+    }))
+    await fixture.manager.syncNow()
+    fixture.manager.setState((previous) => ({
+      ...previous,
+      profile: { ...previous.profile, weeklyGoal: 5 },
+    }))
+    await vi.advanceTimersByTimeAsync(61_000)
+    expect(fixture.server.get(userA.id).data.profile.weeklyGoal).toBe(5)
+  })
+  it('stops retrying a write the server refuses until the next change or manual sync', async () => {
+    const fixture = harness()
+    await start(fixture)
+    const request = fixture.runtime.request
+    let refused = 0
+    fixture.runtime.request = async (path, init) => {
+      if (init?.method === 'PUT' && refused < 1) {
+        refused += 1
+        return Response.json({ error: 'invalid' }, { status: 400 })
+      }
+      return request(path, init)
+    }
+    fixture.manager.setState((previous) => ({
+      ...previous,
+      profile: { ...previous.profile, weeklyGoal: 6 },
+    }))
+    await fixture.manager.syncNow()
+    expect(fixture.manager.getSnapshot().account.error).toContain('couldn’t accept')
+    expect(readAccountCache(fixture.storage, userA.id)!.pending).toBeNull()
+    await fixture.manager.syncNow()
+    expect(fixture.server.writes).toHaveLength(0)
+    await fixture.manager.getSnapshot().account.syncNow()
+    expect(fixture.server.get(userA.id).data.profile.weeklyGoal).toBe(6)
+  })
+  it('stores one copy of the history when the baseline and outbox match it', async () => {
+    const fixture = harness()
+    await start(fixture)
+    fixture.manager.setState((previous) => ({
+      ...previous,
+      history: [completed('compact-1')],
+    }))
+    await fixture.manager.syncNow()
+    const raw = fixture.storage.getItem(accountStorageKey(userA.id))!
+    expect(raw.split('compact-1').length - 1).toBe(1)
+    const cache = readAccountCache(fixture.storage, userA.id)!
+    expect(cache.baseline!.data.history[0].id).toBe('compact-1')
+  })
+  it('reports an account outage as retryable instead of unavailable', async () => {
+    const fixture = harness()
+    fixture.runtime.request = async () => Response.json({}, { status: 503 })
+    await start(fixture)
+    const account = fixture.manager.getSnapshot().account
+    expect(account.status).not.toBe('unavailable')
+    expect(account.error).toContain('temporarily unavailable')
+  })
+
   it('counts local edits before the first account snapshot as pending and prevents destructive sign-out', async () => {
     const fixture = harness()
     fixture.runtime.request = async (path, init) =>

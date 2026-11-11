@@ -93,7 +93,7 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   await strip.click()
   expect((await read(page)).active!.id).toBe(started.id)
   await page.getByLabel('Session options', { exact: true }).click()
-  await page.getByRole('button', { name: 'Discard session', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Discard session', exact: true }).click()
   await page
     .getByRole('dialog')
     .getByRole('button', { name: 'Discard session', exact: true })
@@ -120,6 +120,16 @@ test('keeps logging first, preserves edits between tabs, and adapts an explicit 
     expect(log!.y).toBeGreaterThan(0)
     expect(log!.y + log!.height).toBeLessThanOrEqual(nav!.y - 16)
   }
+  if (test.info().project.name.startsWith('mobile')) {
+    // iPhone SE/8 class screens keep the main action clear of the bottom nav.
+    await page.setViewportSize({ width: 375, height: 667 })
+    const log = await page
+      .getByRole('button', { name: 'Log Bodyweight squat set 1', exact: true })
+      .boundingBox()
+    const nav = await page.getByRole('navigation', { name: 'Mobile navigation' }).boundingBox()
+    expect(log!.y + log!.height).toBeLessThanOrEqual(nav!.y - 8)
+    await page.setViewportSize({ width: 393, height: 727 })
+  }
   const input = page.getByRole('spinbutton', { name: 'Bodyweight squat set 1 reps', exact: true })
   await input.fill('20')
   await page.getByRole('tab', { name: 'Form guide', exact: true }).click()
@@ -130,7 +140,14 @@ test('keeps logging first, preserves edits between tabs, and adapts an explicit 
   const logger = await documentTop(page.locator('.workout-session__logger'))
   const setsBefore = await documentTop(page.locator('.workout-session__sets'))
   const coming = await documentTop(page.locator('.workout-session__coming-up'))
-  expect(logger).toBeLessThan(setsBefore)
+  if (test.info().project.name.startsWith('mobile')) expect(logger).toBeLessThan(setsBefore)
+  else {
+    // Wide screens put logging first in the left column, with the set list beside it.
+    const loggerBox = await page.locator('.workout-session__logger').boundingBox()
+    const setsBox = await page.locator('.workout-session__sets').boundingBox()
+    expect(loggerBox!.x).toBeLessThan(setsBox!.x)
+    expect(setsBox!.y + setsBox!.height).toBeLessThanOrEqual(1000)
+  }
   expect(setsBefore).toBeLessThan(coming)
   await page.getByRole('button', { name: 'Just right', exact: true }).click()
   await page.getByRole('button', { name: 'Log Bodyweight squat set 1', exact: true }).click()

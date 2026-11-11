@@ -18,6 +18,17 @@ function savedState(): AppState {
 }
 
 describe('data migration and saved routines', () => {
+  it('rejects timestamps outside the range the account database stores', () => {
+    for (const completedAt of [
+      '0000-01-01T00:00:00Z',
+      '+010000-01-01T00:00:00Z',
+      '1969-12-31T00:00:00Z',
+    ]) {
+      const state = savedState()
+      state.history[0] = { ...state.history[0], startedAt: completedAt, completedAt }
+      expect(() => parseBackup(JSON.stringify(state))).toThrow()
+    }
+  })
   it('keeps legacy workouts and freezes their calendar/goal reward context on first migration', () => {
     const legacy = savedState()
     delete legacy.preferences

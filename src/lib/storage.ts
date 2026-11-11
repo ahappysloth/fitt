@@ -1,6 +1,7 @@
 import { byId, equipmentList } from './catalog'
 import { emptyState, localDay } from './workout'
-import type { AppState } from './types'
+import type { AppState, Goal } from './types'
+import { goalIds, profileGoal } from './goals'
 import { MAX_ADDED_LOAD_KG } from './limits'
 
 export const STORAGE_KEY = 'form.training.v1'
@@ -8,7 +9,15 @@ const object = (x: unknown): x is Record<string, unknown> =>
   !!x && typeof x === 'object' && !Array.isArray(x)
 const numberIn = (n: unknown, min: number, max: number) =>
   typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max
-const date = (s: unknown) => typeof s === 'string' && !Number.isNaN(Date.parse(s))
+// Keep timestamps inside the range Postgres timestamptz and four-digit ISO
+// strings both represent; Date.parse also accepts year 0 and six-digit years.
+const MIN_DATE = Date.UTC(1970, 0, 1)
+const MAX_DATE = Date.UTC(10000, 0, 1)
+const date = (s: unknown) => {
+  if (typeof s !== 'string') return false
+  const time = Date.parse(s)
+  return time >= MIN_DATE && time < MAX_DATE
+}
 const text = (s: unknown, max: number) => typeof s === 'string' && s.length > 0 && s.length <= max
 const calendarDay = (s: unknown) => {
   if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
@@ -114,7 +123,8 @@ export function parseBackup(raw: string): AppState {
     ![20, 30, 45].includes(p.duration as number) ||
     !['full', 'upper', 'lower', 'core'].includes(p.focus as string) ||
     !numberIn(p.weeklyGoal, 1, 7) ||
-    !Number.isInteger(p.weeklyGoal)
+    !Number.isInteger(p.weeklyGoal) ||
+    (p.goal !== undefined && !goalIds.includes(p.goal as Goal))
   )
     throw new Error('The training preferences in this backup are invalid.')
   if (
@@ -154,6 +164,7 @@ export function parseBackup(raw: string): AppState {
     throw new Error('This backup contains duplicate saved routines.')
   return {
     ...state,
+    profile: { ...state.profile, goal: profileGoal(state.profile) },
     preferences: {
       ...(state.preferences || { displayName: '', celebration: 'playful', onboarded: true }),
       bodyModel: state.preferences?.bodyModel ?? 'male',

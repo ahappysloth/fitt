@@ -388,3 +388,12 @@
     display: none;
   }
 }
+
+.pref-subheading {
+  margin: 20px 0 12px;
+  font-size: var(--type-body);
+  font-weight: 550;
+}
+.pref-goal-note {
+  margin: 10px 0 0;
+}

@@ -18,6 +18,7 @@ import {
   Trash2,
   Zap,
 } from 'lucide-react'
+import { profileGoal, restSeconds } from '../lib/goals'
 import { byId, muscleNames } from '../lib/catalog'
 import type { Effort, Profile, Session, WorkoutExercise, WorkoutSet } from '../lib/types'
 import { completeSet, doneSets, totalSets, uid } from '../lib/workout'
@@ -158,6 +159,9 @@ function SessionContent({
   const lastSubmitted = useRef<string | null>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const inputId = useId()
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const optionsRef = useRef<HTMLDivElement>(null)
+  const optionsToggleRef = useRef<HTMLButtonElement>(null)
   const entry = session.exercises[Math.min(exerciseIndex, session.exercises.length - 1)]
   const exercise = byId[entry.exerciseId]
   const editing = entry.sets.find((set) => set.id === editingId && set.done)
@@ -181,6 +185,8 @@ function SessionContent({
   const rest = timers.restEnd ? Math.max(0, Math.ceil((timers.restEnd - timerNow) / 1000)) : null
   const hold = timers.holdEnd ? Math.max(0, Math.ceil((timers.holdEnd - timerNow) / 1000)) : null
   const elapsed = sessionElapsedSeconds(session, now)
+  const restFor = restSeconds(exercise, profileGoal(profile))
+  const resting = rest !== null && rest > 0 && !!current && !editing
   const validReps = validNumber(draft.reps, 600, true)
   const validLoad = !weighted || validNumber(draft.load, 300)
   // Valid pending inputs are persisted immediately. Corrections to logged sets
@@ -259,8 +265,59 @@ function SessionContent({
     }
   }, [session.id, timers])
 
+  useEffect(() => {
+    if (!optionsOpen) return
+    const close = (event: PointerEvent) => {
+      if (!optionsRef.current?.contains(event.target as Node)) setOptionsOpen(false)
+    }
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOptionsOpen(false)
+      optionsToggleRef.current?.focus()
+    }
+    document.addEventListener('pointerdown', close)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [optionsOpen])
+
+  // Keep the screen on during an active session so the rest timer stays visible.
+  useEffect(() => {
+    if (paused || typeof navigator === 'undefined' || !('wakeLock' in navigator)) return
+    let lock: WakeLockSentinel | null = null
+    let cancelled = false
+    const acquire = async () => {
+      if (document.visibilityState !== 'visible' || (lock && !lock.released)) return
+      try {
+        const next = await navigator.wakeLock.request('screen')
+        if (cancelled) void next.release()
+        else lock = next
+      } catch {
+        // Battery saver or browser policy can refuse; the timers still work.
+      }
+    }
+    void acquire()
+    document.addEventListener('visibilitychange', acquire)
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', acquire)
+      void lock?.release().catch(() => {})
+    }
+  }, [paused])
+
   const restFinished = rest === 0
   const holdFinished = hold === 0
+  useEffect(() => {
+    if (restFinished || holdFinished) {
+      try {
+        navigator.vibrate?.([180, 90, 180])
+      } catch {
+        // Vibration is a courtesy; unsupported devices ignore it.
+      }
+    }
+  }, [restFinished, holdFinished])
   useEffect(() => {
     if (holdFinished)
       setFeedback({
@@ -379,7 +436,7 @@ function SessionContent({
     setNow(timestamp)
     if (!editing)
       setTimers({
-        restEnd: timestamp + exercise.rest * 1000,
+        restEnd: timestamp + restFor * 1000,
         holdEnd: null,
         loggedIds: [...loggedIds.current],
       })
@@ -463,12 +520,33 @@ function SessionContent({
             {paused ? <Play size={15} /> : <Pause size={15} />}
             <span>{paused ? 'Resume session' : 'Pause session'}</span>
           </button>
-          <details className="workout-session__options">
-            <summary aria-label="Session options">•••</summary>
-            <button onClick={onDiscard}>
-              <Trash2 size={15} /> Discard session
+          <div className="workout-session__options" ref={optionsRef}>
+            <button
+              ref={optionsToggleRef}
+              className="workout-session__options-toggle"
+              aria-label="Session options"
+              aria-haspopup="menu"
+              aria-expanded={optionsOpen}
+              aria-controls={`${inputId}-options`}
+              onClick={() => setOptionsOpen((open) => !open)}
+            >
+              •••
             </button>
-          </details>
+            {optionsOpen && (
+              <div id={`${inputId}-options`} role="menu" aria-label="Session options">
+                <button
+                  role="menuitem"
+                  autoFocus
+                  onClick={() => {
+                    setOptionsOpen(false)
+                    onDiscard()
+                  }}
+                >
+                  <Trash2 size={15} /> Discard session
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -626,7 +704,7 @@ function SessionContent({
               <div className="workout-session__movement-footer">
                 <span>
                   <Clock3 size={15} />
-                  {exercise.rest}s rest between sets
+                  {restFor}s rest between sets
                 </span>
                 <Tooltip
                   content={
@@ -700,7 +778,7 @@ function SessionContent({
                   </label>
                   <div className="workout-session__stepper">
                     <button
-                      aria-label={`Decrease ${exercise.unit === 'sec' ? 'seconds' : 'reps'}`}
+                      aria-label={`Decrease ${exercise.name} ${exercise.unit === 'sec' ? 'seconds' : 'reps'}`}
                       disabled={Number(draft.reps) <= 0}
                       onClick={() =>
                         changeReps(
@@ -729,7 +807,7 @@ function SessionContent({
                       onChange={(event) => changeReps(event.target.value)}
                     />
                     <button
-                      aria-label={`Increase ${exercise.unit === 'sec' ? 'seconds' : 'reps'}`}
+                      aria-label={`Increase ${exercise.name} ${exercise.unit === 'sec' ? 'seconds' : 'reps'}`}
                       disabled={Number(draft.reps) >= 600}
                       onClick={() =>
                         changeReps(
@@ -859,16 +937,43 @@ function SessionContent({
                       ))}
                     </div>
                   </fieldset>
-                  <button
-                    className="primary-button workout-session__log-button"
-                    disabled={!validReps || !validLoad}
-                    aria-label={`${editing ? 'Save changes to' : 'Log'} ${exercise.name} set ${currentNumber}`}
-                    onClick={submitSet}
-                  >
-                    <Check size={18} />
-                    {editing ? 'Save changes' : 'Log this set'}
-                    {!editing && isFirstLog && <span>+5 XP</span>}
-                  </button>
+                  <div className={`workout-session__log-row${resting ? ' resting' : ''}`}>
+                    {resting && (
+                      // The countdown sits beside the log button, where the user is
+                      // already looking, so it stays visible on every screen size.
+                      <section
+                        className="workout-session__rest-chip"
+                        aria-label="Rest between sets"
+                      >
+                        <span>
+                          <Clock3 size={15} aria-hidden="true" />
+                          <strong
+                            role="timer"
+                            aria-live="off"
+                            aria-label={`${rest} seconds of rest left`}
+                          >
+                            {clock(rest!)}
+                          </strong>
+                        </span>
+                        <button
+                          disabled={paused}
+                          onClick={() => setTimers((value) => ({ ...value, restEnd: null }))}
+                        >
+                          Skip rest
+                        </button>
+                      </section>
+                    )}
+                    <button
+                      className="primary-button workout-session__log-button"
+                      disabled={!validReps || !validLoad}
+                      aria-label={`${editing ? 'Save changes to' : 'Log'} ${exercise.name} set ${currentNumber}`}
+                      onClick={submitSet}
+                    >
+                      <Check size={18} />
+                      {editing ? 'Save changes' : resting ? 'Log set' : 'Log this set'}
+                      {!editing && !resting && isFirstLog && <span>+5 XP</span>}
+                    </button>
+                  </div>
                   <p className="workout-session__effort-help">
                     {draft.effortConfirmed
                       ? effortDescriptions[draft.effort]
@@ -924,14 +1029,12 @@ function SessionContent({
             </div>
 
             <div className="workout-session__rest-slot">
-              {rest !== null ? (
+              {rest !== null && rest > 0 && !current ? (
                 <section className="workout-session__rest">
                   <div>
-                    <span className="eyebrow">
-                      {rest > 0 ? 'TAKE A BREATHER' : 'YOUR PACE, ALWAYS'}
-                    </span>
+                    <span className="eyebrow">TAKE A BREATHER</span>
                     <strong role="timer" aria-live="off">
-                      {rest > 0 ? clock(rest) : 'Ready when you are'}
+                      {clock(rest)}
                     </strong>
                   </div>
                   <button
@@ -939,13 +1042,13 @@ function SessionContent({
                     disabled={paused}
                     onClick={() => setTimers((value) => ({ ...value, restEnd: null }))}
                   >
-                    {rest > 0 ? 'Skip rest' : 'Let’s go'}
+                    Skip rest
                     <ArrowRight size={15} />
                   </button>
                 </section>
               ) : (
                 <p className="workout-session__rest-idle">
-                  <Clock3 size={16} /> {exercise.rest}s rest after each set. Go at your pace.
+                  <Clock3 size={16} /> {restFor}s rest after each set. Go at your pace.
                 </p>
               )}
             </div>

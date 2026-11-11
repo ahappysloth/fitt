@@ -18,6 +18,7 @@ import {
 import type { AppState, Focus, Muscle, Profile, Workout } from '../lib/types'
 import { byId, muscleNames } from '../lib/catalog'
 import { doneSets, focusNames, localDay, totalSets, weekDays } from '../lib/workout'
+import { useNow } from '../lib/useNow'
 import { getRewards } from '../lib/rewards'
 import { SparkBuddy, TrophyArt } from './FittArtwork'
 import { Button, IconButton, Pill, ProgressBar, SectionTitle, Select, Week, XPCard } from './ui'
@@ -56,11 +57,15 @@ export default function TodayView({
   onRegenerate: () => void
   onDismissWelcome: () => void
 }) {
-  const rewards = getRewards(state.history, state.profile.weeklyGoal)
+  const now = useNow()
+  const rewards = getRewards(state.history, state.profile.weeklyGoal, now)
   const week = rewards.currentWeek
   const plan = state.active || state.plan!
-  const today = localDay(new Date())
-  const [selectedDay, selectDay] = useState(today)
+  const today = localDay(now)
+  // null follows the current day, so a page left open overnight moves to the new day.
+  const [chosenDay, setChosenDay] = useState<string | null>(null)
+  const selectedDay = chosenDay ?? today
+  const selectDay = (day: string) => setChosenDay(day === today ? null : day)
   const selected = week.days.find((day) => day.date === selectedDay)
   const completedToday = week.days.some((day) => day.isToday && day.done)
   const muscles = [...new Set(plan.exercises.flatMap((entry) => byId[entry.exerciseId].muscles))]
@@ -81,7 +86,8 @@ export default function TodayView({
           <span className="live-dot" /> Your pace. Always.
         </Pill>
       </div>
-      {!state.preferences?.onboarded && (
+      {/* Once someone has trained, the welcome prompt no longer competes with Start. */}
+      {!state.preferences?.onboarded && state.history.length === 0 && (
         <section className="welcome-note" aria-label="Welcome to Fitt">
           <Sparkles size={20} />
           <div>
@@ -194,7 +200,8 @@ export default function TodayView({
               }
             />
             <Week
-              days={weekDays()}
+              days={weekDays(now)}
+              today={now}
               completedDays={week.days.filter((day) => day.done).map((day) => day.date)}
               selected={selectedDay}
               onSelect={selectDay}

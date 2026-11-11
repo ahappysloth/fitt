@@ -65,6 +65,8 @@ The approved component study remains in `design-preview/` for reference. It is s
 
 ## Validate
 
+Both type checks first regenerate the ignored `cloudflare-env.d.ts` with `npm run cf:typegen`, which supplies the `cloudflare:workers` and binding types. Rerun it after changing `wrangler.jsonc` if your editor reports missing Worker types.
+
 ```sh
 npm run typecheck
 npm run typecheck:worker
