@@ -38,7 +38,27 @@ export function pullupPose(progress: number) {
       wrist,
       shoulder.clone().add(new Vector3(sign * 0.25, -0.3, -0.03)),
       handRotation,
+      // Carry the anatomical front through arm elevation. Projecting world X
+      // into an upward-pointing arm reverses its front/back frame and twists
+      // the upper arm 180 degrees, collapsing the shoulder skin blend.
+      new Vector3(0, 0, 1),
     )
+    // Carry the upper-arm orientation through elbow flexion. A fixed world
+    // normal for the forearm would reverse its natural fold at the top.
+    const upper = frame.transforms.get(`upperarm01.${side}`)!
+    const lower = frame.transforms.get(`lowerarm01.${side}`)!
+    const lowerDirection = head(`wrist.${side}`)
+      .sub(head(`lowerarm01.${side}`))
+      .normalize()
+    const posedDirection = wrist
+      .clone()
+      .sub(frame.elbows[frame.elbows.length - 1])
+      .normalize()
+    const lowerRotation = new Quaternion()
+      .setFromUnitVectors(lowerDirection.applyQuaternion(upper.rotation), posedDirection)
+      .multiply(upper.rotation)
+    for (const name of [`lowerarm01.${side}`, `lowerarm02.${side}`])
+      frame.transforms.set(name, { ...lower, rotation: lowerRotation })
     barGrip(frame, side)
     frame.knees.push(apply(frame.transforms.get('root')!, head(`lowerleg01.${side}`)))
   }

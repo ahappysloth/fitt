@@ -107,6 +107,7 @@ export function arm(
   wrist: Vector3,
   pole: Vector3,
   handRotation: Quaternion,
+  anatomicalAxis = new Vector3(1, 0, 0),
 ) {
   const shoulder = apply(frame.transforms.get(`upperarm01.${side}`)!, head(`upperarm01.${side}`))
   const elbow = solveJoint(
@@ -116,8 +117,8 @@ export function arm(
     head(`upperarm01.${side}`).distanceTo(head(`lowerarm01.${side}`)),
     head(`lowerarm01.${side}`).distanceTo(head(`wrist.${side}`)),
   )
-  limb(frame, `upperarm01.${side}`, `lowerarm01.${side}`, shoulder, elbow)
-  limb(frame, `lowerarm01.${side}`, `wrist.${side}`, elbow, wrist)
+  limb(frame, `upperarm01.${side}`, `lowerarm01.${side}`, shoulder, elbow, anatomicalAxis)
+  limb(frame, `lowerarm01.${side}`, `wrist.${side}`, elbow, wrist, anatomicalAxis)
   subtree(frame, `wrist.${side}`, {
     original: head(`wrist.${side}`),
     anchor: wrist,

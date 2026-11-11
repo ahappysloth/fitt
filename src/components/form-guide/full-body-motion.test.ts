@@ -106,3 +106,101 @@ describe('full-body pose foundation', () => {
     }
   })
 })
+
+describe('pull-up shoulder skinning regression', () => {
+  it('keeps the humeral anterior axis forward throughout overhead elevation', () => {
+    for (let step = 0; step <= 100; step++) {
+      const frame = pullupMotion.sample(step / 100)
+      for (const side of ['L', 'R']) {
+        const forward = new Vector3(0, 0, 1).applyQuaternion(
+          frame.transforms.get(`upperarm01.${side}`)!.rotation,
+        )
+        // The old world-X frame reversed this axis at hang while every IK
+        // length/endpoint check still passed; the shoulder skin collapsed.
+        expect(forward.z).toBeGreaterThan(0.9)
+      }
+    }
+  })
+  it.each(['male', 'female'] as const)(
+    'retains area across the %s shoulder attachment',
+    (model) => {
+      const athlete = createAthlete(model)
+      try {
+        const geometry = athlete.mesh.geometry
+        const canonical = geometry.attributes.canonicalPosition
+        const position = geometry.attributes.position
+        const triangles: { ids: number[]; area: number }[] = []
+        const area = (points: Vector3[]) =>
+          points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0])).length()
+        for (let index = 0; index < geometry.index!.count; index += 3) {
+          const ids = [0, 1, 2].map((offset) => geometry.index!.getX(index + offset))
+          const center = ids
+            .map((id) => new Vector3().fromBufferAttribute(canonical, id))
+            .reduce((sum, point) => sum.add(point), new Vector3())
+            .divideScalar(3)
+          if (
+            Math.abs(center.x) < 0.12 ||
+            Math.abs(center.x) > 0.22 ||
+            center.y < 0.45 ||
+            center.y > 0.56
+          )
+            continue
+          triangles.push({
+            ids,
+            area: area(ids.map((id) => new Vector3().fromBufferAttribute(position, id))),
+          })
+        }
+        expect(triangles.length).toBeGreaterThan(400)
+        for (const progress of [0, 0.16, 0.2, 0.24, 0.28, 0.4, 0.53, 0.75, 1]) {
+          athlete.applyPose(pullupMotion.sample(progress))
+          const ratios = triangles
+            .map(
+              (triangle) =>
+                area(triangle.ids.map((id) => athlete.mesh.getVertexPosition(id, new Vector3()))) /
+                triangle.area,
+            )
+            .sort((a, b) => a - b)
+          // Check the lower tail, not average volume: averaging hid the pinched
+          // seam among heavily stretched neighbouring triangles. Before the
+          // correction the fifth percentile fell to .30 on both body surfaces.
+          expect(ratios[Math.floor(ratios.length * 0.05)]).toBeGreaterThan(0.35)
+        }
+      } finally {
+        athlete.dispose()
+      }
+    },
+  )
+  it.each(['male', 'female'] as const)('preserves the %s elbow fold at the top', (model) => {
+    const athlete = createAthlete(model)
+    try {
+      athlete.applyPose(pullupMotion.sample(0.53))
+      const geometry = athlete.mesh.geometry
+      const canonical = geometry.attributes.canonicalPosition
+      const position = geometry.attributes.position
+      const ratios: number[] = []
+      const area = (points: Vector3[]) =>
+        points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0])).length()
+      for (let index = 0; index < geometry.index!.count; index += 3) {
+        const ids = [0, 1, 2].map((offset) => geometry.index!.getX(index + offset))
+        const center = ids
+          .map((id) => new Vector3().fromBufferAttribute(canonical, id))
+          .reduce((sum, point) => sum.add(point), new Vector3())
+          .divideScalar(3)
+        center.x = Math.abs(center.x)
+        if (center.distanceTo(head('lowerarm01.L')) >= 0.075) continue
+        ratios.push(
+          area(ids.map((id) => athlete.mesh.getVertexPosition(id, new Vector3()))) /
+            area(ids.map((id) => new Vector3().fromBufferAttribute(position, id))),
+        )
+      }
+      ratios.sort((a, b) => a - b)
+      expect(ratios.length).toBeGreaterThan(100)
+      // Forcing the forearm's front to world Z repaired the hang but flattened
+      // the flexed elbow: p10 fell to .37/.36. Transporting the humeral frame
+      // through flexion retains the reviewed rounded elbow on both surfaces.
+      expect(ratios[Math.floor(ratios.length * 0.1)]).toBeGreaterThan(0.42)
+    } finally {
+      athlete.dispose()
+    }
+  })
+})
