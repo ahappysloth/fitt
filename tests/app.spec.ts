@@ -52,14 +52,15 @@ test('adjusts a hard set, resumes saved inputs, awards once, and round-trips bac
   await page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }).fill('4')
   await page.getByRole('button', { name: 'Challenging', exact: true }).click()
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
+  // Set 1 of a new movement finds the level: later sets take 85% of it.
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
-  ).toHaveValue('4')
+  ).toHaveValue('3')
   await page.reload()
   await expect(page).toHaveURL(/\/workout$/)
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
-  ).toHaveValue('4')
+  ).toHaveValue('3')
   await finishPartial(page)
   await expect(page.locator('.earned-xp')).toContainText('40')
   await page.getByRole('button', { name: 'See my journey', exact: true }).click()

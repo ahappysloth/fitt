@@ -386,7 +386,7 @@ function SessionContent({
           : set,
       ),
     }
-    const result = completeSet(corrected, current.id)
+    const result = completeSet(corrected, current.id, profileGoal(profile))
     const firstLog = !loggedIds.current.has(current.id)
     loggedIds.current.add(current.id)
     replaceEntry(result)
@@ -769,9 +769,21 @@ function SessionContent({
                     </button>
                   </div>
                   <p id={`${inputId}-target`} className="workout-session__target">
-                    Target: {current.target} {exercise.unit}
-                    {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} · log what you
-                    did.
+                    {current.calibration && !current.done ? (
+                      // Without history, the first set measures the starting point.
+                      <>
+                        <strong>Find your level.</strong>{' '}
+                        {exercise.unit === 'sec'
+                          ? 'Stop with about 5 seconds left.'
+                          : 'Stop with about 2 reps left.'}
+                      </>
+                    ) : (
+                      <>
+                        Target: {current.target} {exercise.unit}
+                        {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} · log what you
+                        did.
+                      </>
+                    )}
                   </p>
                   {!validReps && (
                     <p className="workout-session__error">Enter a whole number from 0 to 600.</p>
@@ -1029,7 +1041,9 @@ function SessionContent({
                           : set.effort === 'hard'
                             ? 'Challenging'
                             : 'Just right'
-                        : 'Suggested target'}
+                        : set.calibration
+                          ? 'Find your level'
+                          : 'Suggested target'}
                     </small>
                   </div>
                   {set.done ? (

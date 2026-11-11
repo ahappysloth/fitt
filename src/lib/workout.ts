@@ -4,6 +4,7 @@ import { goalParams, profileGoal, targetRange } from './goals'
 import type {
   AppState,
   Effort,
+  Goal,
   Exercise,
   Focus,
   Pattern,
@@ -48,16 +49,29 @@ export const focusNames: Record<Focus, string> = {
   core: 'Core & control',
 }
 
-function makeSets(_exercise: Exercise, count: number, target: number, load = 0): WorkoutSet[] {
-  return Array.from({ length: count }, () => ({
+function makeSets(
+  _exercise: Exercise,
+  count: number,
+  target: number,
+  load = 0,
+  calibrate = false,
+): WorkoutSet[] {
+  return Array.from({ length: count }, (_, index) => ({
     id: uid(),
     target,
     reps: target,
     load,
     targetLoad: load,
-    effort: 'good',
+    effort: 'good' as const,
     done: false,
+    ...(calibrate && index === 0 ? { calibration: true as const } : {}),
   }))
+}
+/** Sustainable working sets after a "find your level" set stopped about two reps short. */
+const CALIBRATION_FACTOR = 0.85
+function calibratedLevel(exercise: Exercise, reps: number) {
+  const level = reps * CALIBRATION_FACTOR
+  return Math.max(1, exercise.unit === 'sec' ? Math.round(level / 5) * 5 : Math.round(level))
 }
 const completed = (entry: WorkoutExercise) => entry.sets.filter((s) => s.done)
 // A set logged at zero is a skipped set, not evidence about the right target.
@@ -143,6 +157,16 @@ export function prescribe(
           note = 'Start at the bottom of the range. Rest longer between sets if you need to.'
         }
       }
+    } else if (
+      done[0]?.calibration &&
+      calibratedLevel(exercise, done[0].reps) > high &&
+      nextAvailable(exercise, 'harder', profile)
+    ) {
+      // The level set showed this variation is already too easy for the range.
+      selected = nextAvailable(exercise, 'harder', profile)!
+      target = targetRange(selected, goal)[0]
+      load = 0
+      note = 'Your level is above this range, so you start the next variation.'
     } else {
       const effort = overallEffort(done)
       // Extra comfortable reps at the planned load reveal an underestimated target.
@@ -194,9 +218,18 @@ export function prescribe(
       }
     }
   }
+  // The first time a movement appears, set 1 finds the right working target.
+  const firstTime = !history.some((h) =>
+    h.exercises.some((e) => e.exerciseId === selected.id && worked(e).length > 0),
+  )
+  if (firstTime)
+    note =
+      selected.unit === 'sec'
+        ? 'Find your level: hold set 1 until you could hold about five more seconds.'
+        : 'Find your level: on set 1, stop when you could do about two more reps.'
   return {
     exerciseId: selected.id,
-    sets: makeSets(selected, setsPerExercise(profile), target, load),
+    sets: makeSets(selected, setsPerExercise(profile), target, load, firstTime),
     note,
   }
 }
@@ -323,7 +356,11 @@ export function replaceExercise(entry: WorkoutExercise, exercise: Exercise): Wor
   }
 }
 
-export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise {
+export function completeSet(
+  entry: WorkoutExercise,
+  id: string,
+  goal: Goal = 'health',
+): WorkoutExercise {
   const index = entry.sets.findIndex((s) => s.id === id)
   const set = entry.sets[index]
   if (!set) return entry
@@ -336,21 +373,25 @@ export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise
   // Only a missed target lowers the remaining sets. "Challenging" means 0–1 reps
   // were left, which is productive work, not a reason to cut the next set.
   const missedTarget = missedSet(set)
-  const target = Math.min(
-    600,
-    Math.max(
-      1,
-      missedTarget
-        ? Math.min(set.target, set.reps)
-        : Math.max(
-            set.target,
-            // Leave headroom for fatigue; an easy set can repeat its result.
-            set.effort === 'easy'
-              ? set.reps
-              : Math.round(set.reps * (set.effort === 'hard' ? 0.8 : 0.9)),
-          ),
-    ),
-  )
+  const high = targetRange(exercise, goal)[1]
+  // A level set ends about two reps short; the working sets follow from it.
+  const target = set.calibration
+    ? Math.min(high, calibratedLevel(exercise, set.reps))
+    : Math.min(
+        600,
+        Math.max(
+          1,
+          missedTarget
+            ? Math.min(set.target, set.reps)
+            : Math.max(
+                set.target,
+                // Leave headroom for fatigue; an easy set can repeat its result.
+                set.effort === 'easy'
+                  ? set.reps
+                  : Math.round(set.reps * (set.effort === 'hard' ? 0.8 : 0.9)),
+              ),
+        ),
+      )
   const load = exercise.weighted ? Math.min(MAX_ADDED_LOAD_KG, Math.max(0, set.load)) : 0
   const nextCompleted = entry.sets.findIndex((s, i) => i > index && s.done)
   let adjusted = false
@@ -371,11 +412,14 @@ export function completeSet(entry: WorkoutExercise, id: string): WorkoutExercise
     adjusted = true
     return { ...s, target, reps: target, load, targetLoad: load }
   })
+  const aboveRange = set.calibration && calibratedLevel(exercise, set.reps) > high
   return {
     ...entry,
-    note: adjusted
-      ? `Next suggested target: ${target} ${exercise.unit}${load > 0 ? ` + ${load} kg` : ''}. Quality comes first.`
-      : entry.note,
+    note: aboveRange
+      ? `Strong start. Today’s sets stay at the top of the range, ${target} ${exercise.unit}; next time moves you on.`
+      : adjusted
+        ? `Next suggested target: ${target} ${exercise.unit}${load > 0 ? ` + ${load} kg` : ''}. Quality comes first.`
+        : entry.note,
     sets,
   }
 }

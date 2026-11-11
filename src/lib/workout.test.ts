@@ -14,6 +14,7 @@ import {
 } from './workout'
 import { parseBackup } from './storage'
 import { restSeconds, targetRange } from './goals'
+import { toCloudData } from './cloud-contract'
 import { demos } from '../components/ExerciseGuide'
 import type { AppState, Profile, Session, WorkoutExercise } from './types'
 
@@ -272,6 +273,7 @@ describe('progression responds to actual performance', () => {
   })
   it('adapts unlogged sets while keeping completed sets and original targets intact', () => {
     const entry = prescribe(byId.pushup, defaultProfile, [])
+    delete entry.sets[0].calibration
     entry.sets[0].reps = 4
     entry.sets[0].effort = 'hard'
     const result = completeSet(entry, entry.sets[0].id)
@@ -419,6 +421,48 @@ describe('progression responds to actual performance', () => {
     const entry = session('deadbug', 8, { load: 5 }).exercises[0]
     const result = replaceExercise(entry, byId.plank)
     expect(result.sets[0]).toMatchObject({ target: 20, reps: 20, load: 0, done: false })
+  })
+})
+
+describe('find your level', () => {
+  const muscle: Profile = { ...defaultProfile, goal: 'muscle' }
+  it('marks only the first set of a first-time movement', () => {
+    const first = prescribe(byId.squat, defaultProfile, [])
+    expect(first.sets.map((set) => !!set.calibration)).toEqual([true, false, false])
+    expect(first.note).toContain('Find your level')
+    const later = prescribe(byId.squat, defaultProfile, [session('squat', 10)])
+    expect(later.sets.some((set) => set.calibration)).toBe(false)
+  })
+  it('sets the working sets to 85% of the level result, within the goal range', () => {
+    const entry = prescribe(byId.squat, muscle, [])
+    entry.sets[0].reps = 16
+    const result = completeSet(entry, entry.sets[0].id, 'muscle')
+    expect(result.sets.slice(1).map((set) => set.target)).toEqual([14, 14])
+    const holds = prescribe(byId.plank, muscle, [])
+    holds.sets[0].reps = 50
+    expect(completeSet(holds, holds.sets[0].id, 'muscle').sets[1].target).toBe(45)
+  })
+  it('caps the working sets at the top of the range and starts the harder variation next', () => {
+    const entry = prescribe(byId.squat, defaultProfile, [])
+    entry.sets[0].reps = 40
+    const result = completeSet(entry, entry.sets[0].id, 'health')
+    expect(result.sets[1].target).toBe(targetRange(byId.squat, 'health')[1])
+    expect(result.note).toContain('Strong start')
+    const done: Session = {
+      ...session('squat'),
+      exercises: [{ ...result, sets: result.sets.map((set) => ({ ...set, done: true })) }],
+    }
+    expect(prescribe(byId.squat, defaultProfile, [done]).exerciseId).toBe('reverse-lunge')
+  })
+  it('keeps the level flag through backups and account sync', () => {
+    const entry = prescribe(byId.squat, defaultProfile, [])
+    const state = { ...emptyState(), plan: { ...session('squat'), exercises: [entry] } }
+    expect(parseBackup(JSON.stringify(state)).plan!.exercises[0].sets[0].calibration).toBe(true)
+    const history = [{ ...session('squat'), exercises: [entry] }]
+    history[0].exercises[0].sets = entry.sets.map((set) => ({ ...set, done: true }))
+    const cloud = toCloudData({ ...emptyState(), history })
+    expect(cloud.history[0].exercises[0].sets[0].calibration).toBe(true)
+    expect('calibration' in cloud.history[0].exercises[0].sets[1]).toBe(false)
   })
 })
 

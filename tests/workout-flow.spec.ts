@@ -95,7 +95,7 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   expect((await read(page)).active).toBeNull()
 })
 
-test('keeps logging first, preserves edits between tabs, and adapts a good20 squat to18', async ({
+test('keeps logging first, preserves edits between tabs, and sets targets from a level set', async ({
   page,
 }) => {
   if (test.info().project.name.startsWith('mobile'))
@@ -123,6 +123,7 @@ test('keeps logging first, preserves edits between tabs, and adapts a good20 squ
     await page.setViewportSize({ width: 393, height: 727 })
   }
   const input = page.getByRole('spinbutton', { name: 'Bodyweight squat set 1 reps', exact: true })
+  await expect(page.getByText('Find your level.', { exact: true })).toBeVisible()
   await input.fill('20')
   await page.getByRole('tab', { name: 'Form guide', exact: true }).click()
   await expect(page.getByRole('button', { name: 'All form instructions' })).toBeVisible()
@@ -144,7 +145,7 @@ test('keeps logging first, preserves edits between tabs, and adapts a good20 squ
   await page.getByRole('button', { name: 'Log Bodyweight squat set 1', exact: true }).click()
   await expect(
     page.getByRole('spinbutton', { name: 'Bodyweight squat set 2 reps', exact: true }),
-  ).toHaveValue('18')
+  ).toHaveValue('15') // 85% of 20, capped at the top of the squat range
   const setsAfter = await documentTop(page.locator('.workout-session__sets'))
   expect(Math.abs(setsBefore - setsAfter)).toBeLessThanOrEqual(3)
   await page.getByRole('button', { name: 'Edit Bodyweight squat set 1', exact: true }).click()

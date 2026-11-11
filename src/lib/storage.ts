@@ -76,7 +76,8 @@ function workout(x: unknown, session = false, finished = false): boolean {
           numberIn(s.load, 0, MAX_ADDED_LOAD_KG) &&
           numberIn(s.targetLoad, 0, MAX_ADDED_LOAD_KG) &&
           ['easy', 'good', 'hard'].includes(s.effort as string) &&
-          typeof s.done === 'boolean',
+          typeof s.done === 'boolean' &&
+          (s.calibration === undefined || s.calibration === true),
       ),
   )
   if (!valid) return false

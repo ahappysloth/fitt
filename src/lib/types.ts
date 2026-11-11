@@ -52,6 +52,8 @@ export interface WorkoutSet {
   targetLoad: number
   effort: Effort
   done: boolean
+  /** A first-time "find your level" set; later targets follow from its result. */
+  calibration?: true
 }
 export interface WorkoutExercise {
   exerciseId: string

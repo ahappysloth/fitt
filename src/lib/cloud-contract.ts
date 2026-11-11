@@ -62,6 +62,7 @@ function cleanSet(set: WorkoutSet): WorkoutSet {
     targetLoad: set.targetLoad,
     effort: set.effort,
     done: set.done,
+    ...(set.calibration ? { calibration: true as const } : {}),
   }
 }
 
