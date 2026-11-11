@@ -107,8 +107,14 @@ describe('progression responds to actual performance', () => {
     const calibrated = prescribe(byId.squat, defaultProfile, history)
     expect(calibrated.exerciseId).toBe('squat')
     expect(calibrated.sets[0].target).toBe(byId.squat.max)
+    const once = prescribe(byId.squat, defaultProfile, [
+      ...history,
+      session('squat', byId.squat.max),
+    ])
+    expect(once.exerciseId).toBe('squat')
     const progressed = prescribe(byId.squat, defaultProfile, [
       ...history,
+      session('squat', byId.squat.max),
       session('squat', byId.squat.max),
     ])
     expect(progressed.exerciseId).toBe('reverse-lunge')
@@ -129,7 +135,8 @@ describe('progression responds to actual performance', () => {
     const reduced = prescribe(byId.pushup, weighted, [
       session('pushup', 6, { reps: 10, load: 5, targetLoad: 10 }),
     ])
-    expect(reduced.sets[0]).toMatchObject({ target: 6, targetLoad: 2.5 })
+    // The lower demonstrated load is the next load; it is not reduced again.
+    expect(reduced.sets[0]).toMatchObject({ target: 6, targetLoad: 5 })
   })
   it('calibrates holds in seconds and keeps next-session targets in their prescribed range', () => {
     const calibrated = prescribe(byId.plank, defaultProfile, [session('plank', 20, { reps: 30 })])
@@ -156,9 +163,8 @@ describe('progression responds to actual performance', () => {
     ).toBe(6)
     const weighted = { ...defaultProfile, equipment: ['vest'] as Profile['equipment'] }
     const reduced = session('pushup', 8, { load: 5, targetLoad: 10 })
-    expect(
-      prescribe(byId.pushup, weighted, [session('pushup', 8), reduced]).sets[0].load,
-    ).toBeLessThan(5)
+    const next = prescribe(byId.pushup, weighted, [session('pushup', 8), reduced]).sets[0]
+    expect(next).toMatchObject({ target: 8, load: 5 })
   })
   it('uses five-second increments for holds and never progresses by reps', () => {
     const entry = prescribe(byId.plank, defaultProfile, [
@@ -186,6 +192,51 @@ describe('progression responds to actual performance', () => {
     ])
     expect(next.exerciseId).toBe('pushup')
     expect(next.sets[0].load).toBe(7.5)
+  })
+  it('never prescribes below the movement minimum', () => {
+    const skipped = session('squat', 8, { reps: 0 })
+    skipped.exercises[0].sets[0].reps = 8
+    const squat = prescribe(byId.squat, defaultProfile, [skipped])
+    expect(squat.exerciseId).toBe('squat')
+    expect(squat.sets[0].target).toBeGreaterThanOrEqual(byId.squat.min)
+    const knee = prescribe(byId['knee-pushup'], defaultProfile, [
+      session('knee-pushup', 10, { reps: 5 }),
+    ])
+    expect(knee.exerciseId).toBe('wall-pushup')
+    expect(knee.sets[0].target).toBe(byId['wall-pushup'].min)
+  })
+  it('treats a session of zero-rep sets as skipped', () => {
+    const next = prescribe(byId.squat, defaultProfile, [
+      session('squat', 12),
+      session('squat', 12, { reps: 0 }),
+    ])
+    expect(next.sets[0].target).toBe(12)
+  })
+  it('does not penalise a hard set twice', () => {
+    const last = session('squat', 11)
+    last.exercises[0].sets[0] = {
+      ...last.exercises[0].sets[0],
+      target: 12,
+      reps: 12,
+      effort: 'hard',
+    }
+    expect(prescribe(byId.squat, defaultProfile, [last]).sets[0].target).toBe(11)
+    const weighted: Profile = { ...defaultProfile, equipment: ['vest'] }
+    const loaded = session('pushup', 8, { load: 7.5, targetLoad: 7.5 })
+    loaded.exercises[0].sets[0] = {
+      ...loaded.exercises[0].sets[0],
+      load: 10,
+      targetLoad: 10,
+      effort: 'hard',
+    }
+    expect(prescribe(byId.pushup, weighted, [loaded]).sets[0].load).toBe(7.5)
+  })
+  it('requires two successes at the same target before each increase', () => {
+    const history = [session('squat', 8), session('squat', 8), session('squat', 9)]
+    expect(prescribe(byId.squat, defaultProfile, history).sets[0].target).toBe(9)
+    expect(
+      prescribe(byId.squat, defaultProfile, [...history, session('squat', 9)]).sets[0].target,
+    ).toBe(10)
   })
   it('regresses to an easier variation when the minimum target is too hard', () => {
     const next = prescribe(byId.pushup, defaultProfile, [
@@ -252,14 +303,14 @@ describe('progression responds to actual performance', () => {
     expect(reduced.sets[2]).toMatchObject({ target: 13, reps: 13, done: false })
   })
   it.each(['good', 'hard'] as const)(
-    'preserves a zero-rep %s result and keeps recommendations valid',
+    'treats a zero-rep %s log as a skipped set and keeps later targets',
     (effort) => {
       const entry = session('squat', 10, { done: false }).exercises[0]
       entry.sets[0].reps = 0
       entry.sets[0].effort = effort
       const result = completeSet(entry, entry.sets[0].id)
       expect(result.sets[0]).toMatchObject({ target: 10, reps: 0, done: true })
-      expect(result.sets[1]).toMatchObject({ target: 1, reps: 1, done: false })
+      expect(result.sets[1]).toMatchObject({ target: 10, reps: 10, done: false })
     },
   )
   it('uses seconds for hold calibration and five-second reductions for hard holds', () => {
