@@ -8,7 +8,15 @@ const object = (x: unknown): x is Record<string, unknown> =>
   !!x && typeof x === 'object' && !Array.isArray(x)
 const numberIn = (n: unknown, min: number, max: number) =>
   typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max
-const date = (s: unknown) => typeof s === 'string' && !Number.isNaN(Date.parse(s))
+// Keep timestamps inside the range Postgres timestamptz and four-digit ISO
+// strings both represent; Date.parse also accepts year 0 and six-digit years.
+const MIN_DATE = Date.UTC(1970, 0, 1)
+const MAX_DATE = Date.UTC(10000, 0, 1)
+const date = (s: unknown) => {
+  if (typeof s !== 'string') return false
+  const time = Date.parse(s)
+  return time >= MIN_DATE && time < MAX_DATE
+}
 const text = (s: unknown, max: number) => typeof s === 'string' && s.length > 0 && s.length <= max
 const calendarDay = (s: unknown) => {
   if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
