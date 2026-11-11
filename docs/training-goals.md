@@ -65,10 +65,14 @@ movements); holds get a stricter-position cue instead.
 
 ## Session planning
 
-When a goal's session holds fewer movement patterns than the focus covers, the
-patterns trained longest ago are chosen first, so short sessions rotate through
-squat, push, pull, hinge, shoulder and core instead of always dropping the last
-ones.
+Each goal's movements × sets for the chosen length is a set budget. When a session
+has room for fewer patterns than the focus covers, the patterns trained longest ago
+are chosen first, so short sessions rotate through them instead of always dropping
+the last ones. When the focus covers fewer patterns than the budget allows (Upper,
+Lower and Core), the remaining time adds a second variation of each focus pattern
+in turn: at the profile's level first, otherwise one level up, which starts with a
+level set. If no further variation is available, existing exercises gain sets, up
+to five each. Longer sessions therefore always add work, whatever the focus.
 
 ## Evidence and judgement calls
 
