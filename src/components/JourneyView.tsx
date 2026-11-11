@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   ArrowRight,
   Award,
@@ -24,6 +24,7 @@ import { byId } from '../lib/catalog'
 import { getRewards, type AwardId } from '../lib/rewards'
 import type { Profile, Session, UserPreferences } from '../lib/types'
 import { localDay, weekDays } from '../lib/workout'
+import { useNow } from '../lib/useNow'
 import { SparkBuddy } from './FittArtwork'
 import { Button, Pill, ProgressBar, SectionTitle, Select, Week, XPCard } from './ui'
 import './journey.css'
@@ -66,32 +67,11 @@ export default function JourneyView({
   onSession: (session: Session) => void
   onAward: (id: string) => void
 }) {
-  const [now, setNow] = useState(() => new Date())
+  const now = useNow()
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [historyLimit, setHistoryLimit] = useState(6)
   const [recordFilter, setRecordFilter] = useState('all')
   const [recordLimit, setRecordLimit] = useState(6)
-
-  // Keep the local calendar honest when the app stays open overnight or resumes from sleep.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
-    const refresh = () => {
-      const date = new Date()
-      setNow(date)
-      const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1)
-      clearTimeout(timer)
-      timer = setTimeout(refresh, midnight.getTime() - date.getTime() + 100)
-    }
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh()
-    }
-    refresh()
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
-  }, [])
 
   const rewards = useMemo(
     () => getRewards(history, profile.weeklyGoal, now),

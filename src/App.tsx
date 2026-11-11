@@ -241,15 +241,13 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
     if (next === page && (next !== 'workout' || state.active || !reviewWorkout)) return
     requestNavigation(() => {
       if (next === 'workout' && !state.active) {
+        // Open the builder with a fresh suggestion without replacing the
+        // customised plan saved on Today.
         setReviewWorkout(null)
-        setBuilderInitial(undefined)
+        setBuilderInitial(generateWorkout(state.profile, state.history))
         setBuilderFocus(undefined)
         setBuilderVersion((version) => version + 1)
         setBuilderDirty(false)
-        setState((previous) => ({
-          ...previous,
-          plan: generateWorkout(previous.profile, previous.history),
-        }))
       }
       showPage(next)
     })
@@ -266,10 +264,7 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
       ...previous,
       profile,
       preferences: { ...(previous.preferences || defaultPreferences), onboarded: true },
-      plan: generateWorkout(
-        profile,
-        profile.level === previous.profile.level ? previous.history : [],
-      ),
+      plan: generateWorkout(profile, previous.history),
     }))
   }
   function start(workout?: Workout) {

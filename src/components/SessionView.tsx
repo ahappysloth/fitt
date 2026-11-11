@@ -368,7 +368,16 @@ function SessionContent({
   function addSet() {
     if (entry.sets.length >= 6) return
     const previous = entry.sets[entry.sets.length - 1]
-    replaceEntry({ ...entry, sets: [...entry.sets, { ...previous, id: uid(), done: false }] })
+    // Carry the recommendation forward, not the previous set's logged result.
+    const added = {
+      ...previous,
+      id: uid(),
+      reps: previous.target,
+      load: previous.targetLoad,
+      effort: 'good' as const,
+      done: false,
+    }
+    replaceEntry({ ...entry, sets: [...entry.sets, added] })
     setEditingId(null)
   }
   function removeLastSet() {
