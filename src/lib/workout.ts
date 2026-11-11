@@ -109,10 +109,26 @@ function nextAvailable(exercise: Exercise, direction: 'easier' | 'harder', profi
 export const setsPerExercise = (profile: Profile) =>
   goalParams[profileGoal(profile)].sets[profile.duration]
 
+/** Days away from a movement before its targets restart a little lighter. */
+export const BREAK_DAYS = 14
+/** A longer break restarts lighter still. */
+export const LONG_BREAK_DAYS = 42
+const DAY_MS = 86_400_000
+
+/** Days since this movement was last completed, or null without history. */
+function daysAway(exerciseId: string, history: Session[], now: Date) {
+  const last = orderedHistory(history).find((session) =>
+    session.exercises.some((e) => e.exerciseId === exerciseId && worked(e).length > 0),
+  )
+  if (!last?.completedAt) return null
+  return Math.max(0, (now.getTime() - Date.parse(last.completedAt)) / DAY_MS)
+}
+
 export function prescribe(
   exercise: Exercise,
   profile: Profile,
   history: Session[],
+  now = new Date(),
 ): WorkoutExercise {
   const desiredSets = setsPerExercise(profile)
   // The goal sets the ceiling; each movement keeps its own floor.
@@ -161,7 +177,22 @@ export function prescribe(
         (hasReportedEffort(s) && s.effort === 'hard') ||
         (s.load === originalLoad(s) && s.reps < originalTarget(s)),
     )
-    if (struggled) {
+    const away = daysAway(exercise.id, history, now) ?? 0
+    if (away >= BREAK_DAYS) {
+      // Strength and work capacity fade over weeks away. Restart from the last
+      // prescription at 90% (80% after six weeks) and one lighter vest step per
+      // threshold, so the first session back is achievable; progress resumes
+      // from there through the usual evidence rules.
+      const long = away >= LONG_BREAK_DAYS
+      const reduced = plannedTarget * (long ? 0.8 : 0.9)
+      target = Math.max(
+        exercise.min,
+        exercise.unit === 'sec' ? Math.round(reduced / 5) * 5 : Math.round(reduced),
+      )
+      load = Math.max(0, load - (long ? 2 : 1) * loadStep(exercise))
+      const weeks = Math.floor(away / 7)
+      note = `Welcome back. After ${weeks} ${weeks === 1 ? 'week' : 'weeks'} away, today starts a little lighter.`
+    } else if (struggled) {
       const easier = nextAvailable(exercise, 'easier', profile)
       if (load > 0) {
         load = Math.max(0, load - loadStep(exercise))
@@ -282,7 +313,12 @@ function sessionPatterns(profile: Profile, history: Session[]): Pattern[] {
   return group.filter((pattern) => chosen.has(pattern))
 }
 
-export function generateWorkout(profile: Profile, history: Session[], seed = 0): Workout {
+export function generateWorkout(
+  profile: Profile,
+  history: Session[],
+  seed = 0,
+  now = new Date(),
+): Workout {
   const selected = sessionPatterns(profile, history).map((pattern) => {
     const pool = exercises.filter(
       (e) =>
@@ -306,7 +342,7 @@ export function generateWorkout(profile: Profile, history: Session[], seed = 0):
       seed === 0 && last
         ? byId[last.exerciseId]
         : alternatives[seed % alternatives.length] || pool[0]
-    return prescribe(exercise, profile, history)
+    return prescribe(exercise, profile, history, now)
   })
   return {
     id: uid(),

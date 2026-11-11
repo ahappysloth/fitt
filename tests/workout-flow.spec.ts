@@ -226,3 +226,55 @@ test('freezes and restores the hold timer during a session pause', async ({ page
   await page.clock.fastForward(5000)
   await expect(page.getByRole('timer')).not.toHaveText(frozen)
 })
+
+test('rebuilds an old plan after a break and starts returning targets lighter', async ({
+  page,
+}) => {
+  const day = 86_400_000
+  const then = new Date(Date.now() - 30 * day)
+  const state = emptyState()
+  state.preferences!.onboarded = true
+  // A full workout before the break, so every pattern was trained equally recently.
+  const before = generateWorkout(defaultProfile, [], 0, then)
+  const session: Session = {
+    ...before,
+    id: 'before-the-break',
+    createdAt: then.toISOString(),
+    startedAt: then.toISOString(),
+    completedAt: new Date(then.getTime() + 20 * 60_000).toISOString(),
+    elapsedSeconds: 1200,
+    exercises: before.exercises.map((entry) => {
+      const target = entry.exerciseId === 'knee-pushup' ? 10 : entry.sets[0].target
+      return {
+        ...entry,
+        sets: entry.sets.map((set) => ({
+          ...set,
+          target,
+          reps: target,
+          prescription: { target, load: 0, source: 'generated' as const },
+          effortConfirmed: true,
+          done: true,
+        })),
+      }
+    }),
+  }
+  state.history = [session]
+  state.plan = {
+    ...generateWorkout(defaultProfile, [session], 0, then),
+    createdAt: then.toISOString(),
+  }
+  await page.addInitScript(
+    ({ storageKey, state }) => {
+      if (!localStorage.getItem(storageKey)) localStorage.setItem(storageKey, JSON.stringify(state))
+    },
+    { storageKey, state },
+  )
+  await page.goto('/')
+  await expect(
+    page.getByText('Welcome back. Today’s plan starts a little lighter after your break.'),
+  ).toBeVisible()
+  const plan = (await read(page)).plan!
+  const knee = plan.exercises.find((item) => item.exerciseId === 'knee-pushup')!
+  expect(knee.sets[0].target).toBe(9)
+  expect(Date.now() - Date.parse(plan.createdAt)).toBeLessThan(day)
+})

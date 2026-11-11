@@ -30,6 +30,7 @@ import type {
 } from './lib/types'
 import { available, byId } from './lib/catalog'
 import {
+  BREAK_DAYS,
   doneSets,
   emptyState,
   freshWorkout,
@@ -188,6 +189,18 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
       window.removeEventListener('focus', wake)
     }
   }, [])
+  // Today's plan is built after each workout. After two weeks or more without
+  // a new one, rebuild it so returning targets start lighter.
+  useEffect(() => {
+    if (!ready || state.active || !state.plan) return
+    if (now - Date.parse(state.plan.createdAt) < BREAK_DAYS * 86_400_000) return
+    const plan = generateWorkout(state.profile, state.history, 0, new Date(now))
+    setState((previous) =>
+      previous.active || previous.plan?.id !== state.plan?.id ? previous : { ...previous, plan },
+    )
+    if (plan.exercises.some((entry) => entry.note.startsWith('Welcome back')))
+      setToast('Welcome back. Today’s plan starts a little lighter after your break.')
+  }, [ready, now, state.active, state.plan, state.profile, state.history, setState])
   useEffect(() => {
     // Keep actionable notices available until followed or dismissed.
     if (!toast || toastDestination) return

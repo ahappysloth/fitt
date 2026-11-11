@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { byId, equipmentList, exercises, available } from './catalog'
 import {
   completeSet,
@@ -20,6 +20,16 @@ import { demos } from '../components/ExerciseGuide'
 import type { AppState, Profile, Session, WorkoutExercise } from './types'
 
 let sessionNumber = 0
+
+// Fixture sessions complete on 2026-10-01; plan the next day unless a test
+// is about time away.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-02T12:00:00.000Z'))
+})
+afterAll(() => {
+  vi.useRealTimers()
+})
 
 function session(
   exerciseId = 'knee-pushup',
@@ -870,5 +880,37 @@ describe('find your level', () => {
     const cloud = toCloudData({ ...emptyState(), history })
     expect(cloud.history[0].exercises[0].sets[0].calibration).toBe(true)
     expect('calibration' in cloud.history[0].exercises[0].sets[1]).toBe(false)
+  })
+})
+
+describe('return after a break', () => {
+  const after = (days: number) =>
+    new Date(Date.parse('2026-10-01T12:30:00.000Z') + days * 86_400_000)
+  it('keeps targets unchanged for a gap under two weeks', () => {
+    const next = prescribe(byId.squat, defaultProfile, [session('squat', 12)], after(13))
+    expect(next.sets[0].target).toBe(12)
+    expect(next.note).not.toContain('Welcome back')
+  })
+  it('restarts at 90% after two weeks and 80% after six, never below the minimum', () => {
+    const two = prescribe(byId.squat, defaultProfile, [session('squat', 12)], after(15))
+    expect(two.sets[0].target).toBe(11)
+    expect(two.note).toBe('Welcome back. After 2 weeks away, today starts a little lighter.')
+    const six = prescribe(byId.squat, defaultProfile, [session('squat', 12)], after(50))
+    expect(six.sets[0].target).toBe(10)
+    const floor = prescribe(byId.squat, defaultProfile, [session('squat', 8)], after(50))
+    expect(floor.sets[0].target).toBe(byId.squat.min)
+  })
+  it('rounds holds to five seconds and lightens the vest by one step per threshold', () => {
+    const plank = prescribe(byId.plank, defaultProfile, [session('plank', 40)], after(20))
+    expect(plank.sets[0].target).toBe(35)
+    const vest: Profile = { ...defaultProfile, equipment: ['vest'] }
+    const loaded = () => session('pushup', 10, { load: 10, targetLoad: 10 })
+    expect(prescribe(byId.pushup, vest, [loaded()], after(20)).sets[0].load).toBe(7.5)
+    expect(prescribe(byId.pushup, vest, [loaded()], after(60)).sets[0].load).toBe(5)
+  })
+  it('does not award a progression on the first session back', () => {
+    const history = [session('squat', 12), session('squat', 12)]
+    expect(prescribe(byId.squat, defaultProfile, history, after(1)).sets[0].target).toBe(13)
+    expect(prescribe(byId.squat, defaultProfile, history, after(30)).sets[0].target).toBe(11)
   })
 })
