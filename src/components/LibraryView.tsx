@@ -34,7 +34,7 @@ export default function LibraryView({ profile, onInfo }: LibraryViewProps) {
     <div className="library-view">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">KNOW YOUR MOVEMENT</p>
+          <p className="eyebrow">KNOW YOUR EXERCISES</p>
           <h1>
             Good form starts here<span className="greeting-dot">.</span>
           </h1>
@@ -51,7 +51,7 @@ export default function LibraryView({ profile, onInfo }: LibraryViewProps) {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Find a movement…"
+            placeholder="Find an exercise…"
             aria-label="Search exercises"
           />
           {search && (
@@ -83,7 +83,7 @@ export default function LibraryView({ profile, onInfo }: LibraryViewProps) {
       </div>
       <div className="library-results">
         <p role="status">
-          {filtered.length} {filtered.length === 1 ? 'movement' : 'movements'}
+          {filtered.length} {filtered.length === 1 ? 'exercise' : 'exercises'}
           {onlyAvailable ? ' for your equipment' : ' to explore'}
         </p>
         {(search || muscle !== 'all' || onlyAvailable) && (
@@ -143,7 +143,7 @@ export default function LibraryView({ profile, onInfo }: LibraryViewProps) {
           <span>
             <Search size={28} />
           </span>
-          <h2>No movements found.</h2>
+          <h2>No exercises found.</h2>
           <p>
             Try another name or muscle group, or include exercises beyond your current equipment.
           </p>
@@ -153,7 +153,7 @@ export default function LibraryView({ profile, onInfo }: LibraryViewProps) {
         </div>
       )}
       <p className="library-bottom-note">
-        Open a movement for the existing animated guide, form cues, and muscles worked. Choose a
+        Open an exercise for the existing animated guide, form cues, and muscles worked. Choose a
         variation you can control.
       </p>
     </div>

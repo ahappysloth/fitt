@@ -19,8 +19,8 @@ export async function openWorkoutFormGuide(page: WorkoutPage) {
   await expect(page.locator('.form-3d[data-ready=true]')).toBeVisible()
 }
 
-export async function addBuilderMovement(page: WorkoutPage, name: string) {
-  await page.getByRole('button', { name: 'Add movement', exact: true }).click()
+export async function addBuilderExercise(page: WorkoutPage, name: string) {
+  await page.getByRole('button', { name: 'Add exercise', exact: true }).click()
   const picker = page.getByRole('dialog', { name: 'Add exercises', exact: true })
   await expect(picker).toBeVisible()
   await picker.getByRole('button', { name: `Add ${name}`, exact: true }).click()

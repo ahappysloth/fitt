@@ -52,6 +52,13 @@ export interface WorkoutSet {
   targetLoad: number
   effort: Effort
   done: boolean
+  /** The starting prescription; later recommendations never rewrite it. */
+  prescription?: { target: number; load: number; source: 'generated' | 'manual' }
+  recommendationSource?: 'prescribed' | 'adapted'
+  /** Missing on older records. A default rating is not an explicit report. */
+  effortConfirmed?: boolean
+  /** Preserve intentional input even when it equals the suggested value. */
+  targetLocked?: boolean
   /** A first-time "find your level" set; later targets follow from its result. */
   calibration?: true
 }
@@ -59,6 +66,8 @@ export interface WorkoutExercise {
   exerciseId: string
   sets: WorkoutSet[]
   note: string
+  /** Captured before the session, so removing sets cannot manufacture completion. */
+  plannedSetCount?: number
 }
 export interface Workout {
   id: string

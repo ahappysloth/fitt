@@ -24,6 +24,34 @@ const calendarDay = (s: unknown) => {
   const d = new Date(`${s}T12:00:00`)
   return !Number.isNaN(d.getTime()) && localDay(d) === s
 }
+function workoutSet(s: unknown): boolean {
+  if (
+    !object(s) ||
+    !text(s.id, 128) ||
+    !numberIn(s.target, 1, 600) ||
+    !numberIn(s.reps, 0, 600) ||
+    !numberIn(s.load, 0, MAX_ADDED_LOAD_KG) ||
+    !numberIn(s.targetLoad, 0, MAX_ADDED_LOAD_KG) ||
+    !['easy', 'good', 'hard'].includes(s.effort as string) ||
+    typeof s.done !== 'boolean'
+  )
+    return false
+  if (
+    s.prescription !== undefined &&
+    (!object(s.prescription) ||
+      !numberIn(s.prescription.target, 1, 600) ||
+      !numberIn(s.prescription.load, 0, MAX_ADDED_LOAD_KG) ||
+      !['generated', 'manual'].includes(s.prescription.source as string))
+  )
+    return false
+  return (
+    (s.recommendationSource === undefined ||
+      ['prescribed', 'adapted'].includes(s.recommendationSource as string)) &&
+    (s.effortConfirmed === undefined || typeof s.effortConfirmed === 'boolean') &&
+    (s.targetLocked === undefined || typeof s.targetLocked === 'boolean') &&
+    (s.calibration === undefined || s.calibration === true)
+  )
+}
 function workout(x: unknown, session = false, finished = false): boolean {
   if (
     !object(x) ||
@@ -64,21 +92,12 @@ function workout(x: unknown, session = false, finished = false): boolean {
       Object.hasOwn(byId, e.exerciseId) &&
       typeof e.note === 'string' &&
       e.note.length <= 2000 &&
+      (e.plannedSetCount === undefined ||
+        (numberIn(e.plannedSetCount, 1, 10) && Number.isInteger(e.plannedSetCount))) &&
       Array.isArray(e.sets) &&
       e.sets.length > 0 &&
       e.sets.length <= 10 &&
-      e.sets.every(
-        (s) =>
-          object(s) &&
-          text(s.id, 128) &&
-          numberIn(s.target, 1, 600) &&
-          numberIn(s.reps, 0, 600) &&
-          numberIn(s.load, 0, MAX_ADDED_LOAD_KG) &&
-          numberIn(s.targetLoad, 0, MAX_ADDED_LOAD_KG) &&
-          ['easy', 'good', 'hard'].includes(s.effort as string) &&
-          typeof s.done === 'boolean' &&
-          (s.calibration === undefined || s.calibration === true),
-      ),
+      e.sets.every(workoutSet),
   )
   if (!valid) return false
   const setIds = (x.exercises as { sets: { id: string }[] }[]).flatMap((e) =>
@@ -152,14 +171,19 @@ export function parseBackup(raw: string): AppState {
       bodyModel: state.preferences?.bodyModel ?? 'male',
     },
     routines: state.routines || [],
-    history: state.history.map((session) => ({
-      ...session,
-      rewardContext: session.rewardContext || {
-        version: 1,
-        weeklyGoal: 3,
-        localDay: localDay(new Date(session.completedAt!)),
-      },
-    })),
+    history: state.history
+      .map((session) => ({
+        ...session,
+        rewardContext: session.rewardContext || {
+          version: 1,
+          weeklyGoal: 3,
+          localDay: localDay(new Date(session.completedAt!)),
+        },
+      }))
+      .sort((left, right) => {
+        const elapsed = Date.parse(left.completedAt!) - Date.parse(right.completedAt!)
+        return elapsed || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
+      }),
   }
 }
 export function loadState(): { state: AppState; error: string | null } {

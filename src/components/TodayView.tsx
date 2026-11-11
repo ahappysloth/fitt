@@ -380,7 +380,7 @@ export default function TodayView({
                 <Dumbbell size={25} />
                 <div>
                   <strong>Make a routine you’ll look forward to.</strong>
-                  <p>Choose your movements, reps, and sets. Keep your favorites here.</p>
+                  <p>Choose your exercises, reps, and sets. Keep your favorites here.</p>
                 </div>
               </div>
             )}

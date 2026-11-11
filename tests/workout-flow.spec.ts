@@ -41,15 +41,15 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   await expect(page.getByRole('heading', { name: 'Your workout. Your way.' })).toBeVisible()
   expect((await read(page)).active).toBeNull()
   await page.getByRole('button', { name: /^Legs/ }).click()
-  await page.getByRole('button', { name: 'Add movement', exact: true }).click()
+  await page.getByRole('button', { name: 'Add exercise', exact: true }).click()
   const picker = page.getByRole('dialog', { name: 'Add exercises', exact: true })
   await expect(
-    picker.getByRole('combobox', { name: 'Filter movements by workout focus' }),
+    picker.getByRole('combobox', { name: 'Filter exercises by workout focus' }),
   ).toContainText('Lower body')
   await expect(picker.getByRole('button', { name: 'Add Knee push-up', exact: true })).toHaveCount(0)
-  await choose(page, 'Filter movements by workout focus', 'Any focus')
-  await choose(page, 'Filter movements by category', 'Push')
-  await choose(page, 'Filter routine movements by muscle', 'Chest')
+  await choose(page, 'Filter exercises by workout focus', 'Any focus')
+  await choose(page, 'Filter exercises by category', 'Push')
+  await choose(page, 'Filter routine exercises by muscle', 'Chest')
   await picker.getByRole('button', { name: 'Add Knee push-up', exact: true }).click()
   await picker.getByRole('button', { name: 'Close dialog' }).click()
   await page.getByRole('spinbutton', { name: 'Knee push-up target reps', exact: true }).fill('11')
@@ -60,9 +60,9 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up target reps', exact: true }),
   ).toHaveValue('11')
-  await page.getByRole('button', { name: 'Add movement', exact: true }).click()
+  await page.getByRole('button', { name: 'Add exercise', exact: true }).click()
   await expect(
-    picker.getByRole('combobox', { name: 'Filter movements by workout focus' }),
+    picker.getByRole('combobox', { name: 'Filter exercises by workout focus' }),
   ).toContainText('Lower body')
   await picker.getByRole('button', { name: 'Close dialog' }).click()
   await page.getByRole('button', { name: 'Review workout', exact: true }).click()
@@ -74,6 +74,14 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   await page.getByRole('button', { name: 'Review workout', exact: true }).click()
   await continueReviewedWorkout(page)
   const started = (await read(page)).active!
+  const authored = started.exercises.find((entry) => entry.exerciseId === 'knee-pushup')
+  expect(authored?.plannedSetCount).toBe(authored?.sets.length)
+  expect(authored?.sets[0]).toMatchObject({
+    prescription: { target: 11, load: 0, source: 'manual' },
+    recommendationSource: 'prescribed',
+    effortConfirmed: false,
+    targetLocked: false,
+  })
   await page.getByRole('link', { name: 'Library', exact: true }).click()
   const strip = page.getByRole('button', { name: /Return to active workout/ })
   await expect(strip).toBeVisible()
@@ -95,7 +103,7 @@ test('builds from a focus, adds outside it, reviews, edits, and explicitly start
   expect((await read(page)).active).toBeNull()
 })
 
-test('keeps logging first, preserves edits between tabs, and sets targets from a level set', async ({
+test('keeps logging first, preserves edits between tabs, and adapts an explicit Just right 20 squat to 18', async ({
   page,
 }) => {
   if (test.info().project.name.startsWith('mobile'))
@@ -142,6 +150,7 @@ test('keeps logging first, preserves edits between tabs, and sets targets from a
     expect(setsBox!.y + setsBox!.height).toBeLessThanOrEqual(1000)
   }
   expect(setsBefore).toBeLessThan(coming)
+  await page.getByRole('button', { name: 'Just right', exact: true }).click()
   await page.getByRole('button', { name: 'Log Bodyweight squat set 1', exact: true }).click()
   await expect(
     page.getByRole('spinbutton', { name: 'Bodyweight squat set 2 reps', exact: true }),
@@ -150,7 +159,7 @@ test('keeps logging first, preserves edits between tabs, and sets targets from a
   expect(Math.abs(setsBefore - setsAfter)).toBeLessThanOrEqual(3)
   await page.getByRole('button', { name: 'Edit Bodyweight squat set 1', exact: true }).click()
   await input.fill('21')
-  await choose(page, 'Current movement', '2. Forearm plank · 0/3 sets')
+  await choose(page, 'Current exercise', '2. Forearm plank · 0/3 sets')
   await expect(page.getByRole('dialog', { name: 'Leave this set edit?' })).toBeVisible()
   await page.getByRole('button', { name: 'Keep editing', exact: true }).click()
   await expect(input).toHaveValue('21')

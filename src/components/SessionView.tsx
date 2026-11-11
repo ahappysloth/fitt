@@ -22,6 +22,7 @@ import { profileGoal, restSeconds } from '../lib/goals'
 import { byId, muscleNames } from '../lib/catalog'
 import type { Effort, Profile, Session, WorkoutExercise, WorkoutSet } from '../lib/types'
 import { completeSet, doneSets, totalSets, uid } from '../lib/workout'
+import { hasReportedEffort } from '../lib/training-evidence'
 import { sessionElapsedSeconds } from '../lib/session-clock'
 import ExerciseGuide from './ExerciseGuide'
 import { MuscleMap } from './Visuals'
@@ -51,6 +52,8 @@ interface Draft {
   reps: string
   load: string
   effort: Effort
+  effortConfirmed: boolean
+  targetLocked: boolean
 }
 interface Feedback {
   id: number
@@ -58,6 +61,11 @@ interface Feedback {
   reward: boolean
 }
 const emptyTimers: TimerState = { restEnd: null, holdEnd: null, loggedIds: [] }
+const effortDescriptions: Record<Effort, string> = {
+  easy: 'Plenty left in reserve.',
+  good: 'Effort felt manageable, with some in reserve.',
+  hard: 'Couldn’t finish comfortably or keep good form.',
+}
 const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 const timerKey = (sessionId: string) => `fitt.session-ui.${sessionId}`
@@ -101,10 +109,15 @@ function restoredTimers(session: Session): TimerState {
     return { ...emptyTimers, loggedIds }
   }
 }
+const effortWasReported = (set?: WorkoutSet) => !!set && hasReportedEffort(set)
+const targetWasLocked = (set?: WorkoutSet) =>
+  !!set && (set.targetLocked ?? (set.reps !== set.target || set.load !== set.targetLoad))
 const draftFor = (set?: WorkoutSet): Draft => ({
   reps: String(set?.reps ?? 0),
   load: String(set?.load ?? 0),
   effort: set?.effort ?? 'good',
+  effortConfirmed: effortWasReported(set),
+  targetLocked: targetWasLocked(set),
 })
 const validNumber = (raw: string, max: number, integer = false) => {
   if (raw.trim() === '') return false
@@ -185,7 +198,9 @@ function SessionContent({
       (!!editing &&
         (Number(draft.reps) !== current.reps ||
           (weighted && Number(draft.load) !== current.load) ||
-          draft.effort !== current.effort)))
+          draft.effort !== current.effort ||
+          draft.effortConfirmed !== effortWasReported(current) ||
+          draft.targetLocked !== targetWasLocked(current))))
   const isFirstLog = !!current && !loggedIds.current.has(current.id)
   const nextIndex = session.exercises.findIndex(
     (item, index) => index > exerciseIndex && item.sets.some((set) => !set.done),
@@ -338,16 +353,40 @@ function SessionContent({
     })
   }
   function changeReps(raw: string) {
-    setDraftState({ key: selectionKey, value: { ...draft, reps: raw } })
-    if (validNumber(raw, 600, true)) updatePending({ reps: Number(raw) })
+    const valid = validNumber(raw, 600, true)
+    setDraftState({
+      key: selectionKey,
+      value: { ...draft, reps: raw, targetLocked: valid || draft.targetLocked },
+    })
+    if (valid) updatePending({ reps: Number(raw), targetLocked: true })
   }
   function changeLoad(raw: string) {
-    setDraftState({ key: selectionKey, value: { ...draft, load: raw } })
-    if (validNumber(raw, 300)) updatePending({ load: Number(raw) })
+    const valid = validNumber(raw, 300)
+    setDraftState({
+      key: selectionKey,
+      value: { ...draft, load: raw, targetLocked: valid || draft.targetLocked },
+    })
+    if (valid) updatePending({ load: Number(raw), targetLocked: true })
   }
   function changeEffort(effort: Effort) {
-    setDraftState({ key: selectionKey, value: { ...draft, effort } })
-    updatePending({ effort })
+    setDraftState({
+      key: selectionKey,
+      value: { ...draft, effort, effortConfirmed: true, targetLocked: true },
+    })
+    updatePending({ effort, effortConfirmed: true, targetLocked: true })
+  }
+  function followSuggestion() {
+    if (!current) return
+    setDraftState({
+      key: selectionKey,
+      value: {
+        ...draft,
+        reps: String(current.target),
+        load: String(current.targetLoad),
+        targetLocked: false,
+      },
+    })
+    updatePending({ reps: current.target, load: current.targetLoad, targetLocked: false })
   }
   function selectExercise(index: number) {
     if (dirty) {
@@ -381,6 +420,8 @@ function SessionContent({
               reps: Number(draft.reps),
               load: weighted ? Number(draft.load) : set.load,
               effort: draft.effort,
+              effortConfirmed: draft.effortConfirmed,
+              targetLocked: draft.targetLocked,
               done: false,
             }
           : set,
@@ -425,22 +466,36 @@ function SessionContent({
   function addSet() {
     if (entry.sets.length >= 6) return
     const previous = entry.sets[entry.sets.length - 1]
-    // Carry the recommendation forward, not the previous set's logged result.
-    const added = {
-      ...previous,
+    const target = previous.target
+    const load = previous.targetLoad
+    const added: WorkoutSet = {
       id: uid(),
-      reps: previous.target,
-      load: previous.targetLoad,
-      effort: 'good' as const,
+      target,
+      reps: target,
+      load,
+      targetLoad: load,
+      effort: 'good',
       done: false,
+      prescription: { target, load, source: 'manual' },
+      recommendationSource: 'prescribed',
+      effortConfirmed: false,
+      targetLocked: false,
     }
-    replaceEntry({ ...entry, sets: [...entry.sets, added] })
+    replaceEntry({
+      ...entry,
+      plannedSetCount: entry.plannedSetCount ?? entry.sets.length,
+      sets: [...entry.sets, added],
+    })
     setEditingId(null)
   }
   function removeLastSet() {
     const last = entry.sets[entry.sets.length - 1]
     if (entry.sets.length <= 1 || last.done) return
-    replaceEntry({ ...entry, sets: entry.sets.slice(0, -1) })
+    replaceEntry({
+      ...entry,
+      plannedSetCount: entry.plannedSetCount ?? entry.sets.length,
+      sets: entry.sets.slice(0, -1),
+    })
   }
 
   return (
@@ -568,10 +623,10 @@ function SessionContent({
         </div>
       )}
       <div className="workout-session__selection">
-        <label htmlFor={`${inputId}-exercise`}>Current movement</label>
+        <label htmlFor={`${inputId}-exercise`}>Current exercise</label>
         <Select
           id={`${inputId}-exercise`}
-          label="Current movement"
+          label="Current exercise"
           value={String(exerciseIndex)}
           onValueChange={(value) => selectExercise(Number(value))}
           options={session.exercises.map((item, index) => ({
@@ -602,7 +657,7 @@ function SessionContent({
                     className={artView === 'movement' ? 'active' : ''}
                     onClick={() => setArtView('movement')}
                   >
-                    Movement
+                    Exercise
                   </button>
                   <button
                     aria-pressed={artView === 'muscles'}
@@ -629,7 +684,7 @@ function SessionContent({
                       </span>
                     ))}
                   </div>
-                  <p>Highlighted muscles work together in this movement.</p>
+                  <p>Highlighted muscles work together in this exercise.</p>
                 </div>
               )}
               <div className="workout-session__technique">
@@ -654,7 +709,7 @@ function SessionContent({
                 <Tooltip
                   content={
                     exerciseDone > 0
-                      ? 'Keep logged sets intact. Swap before logging this movement.'
+                      ? 'Keep logged sets intact. Swap before logging this exercise.'
                       : 'Choose another variation'
                   }
                 >
@@ -684,7 +739,7 @@ function SessionContent({
           <section className="panel workout-session__logger">
             <div className="workout-session__current-heading">
               <span className="eyebrow">
-                MOVEMENT {exerciseIndex + 1} OF {session.exercises.length}
+                EXERCISE {exerciseIndex + 1} OF {session.exercises.length}
               </span>
               <h2 ref={headingRef} tabIndex={-1}>
                 {exercise.name}
@@ -780,8 +835,18 @@ function SessionContent({
                     ) : (
                       <>
                         Target: {current.target} {exercise.unit}
-                        {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} · log what you
-                        did.
+                        {current.targetLoad > 0 ? ` + ${current.targetLoad} kg` : ''} ·{' '}
+                        {draft.targetLocked &&
+                        (!validReps ||
+                          !validLoad ||
+                          Number(draft.reps) !== current.target ||
+                          (weighted && Number(draft.load) !== current.targetLoad)) ? (
+                          <button type="button" onClick={followSuggestion}>
+                            Reset to target
+                          </button>
+                        ) : (
+                          'log what you did.'
+                        )}
                       </>
                     )}
                   </p>
@@ -856,29 +921,30 @@ function SessionContent({
                     </div>
                   )}
                   <fieldset className="workout-session__effort">
-                    <legend className="eyebrow">HOW DID THAT FEEL?</legend>
+                    <legend className="eyebrow">HOW DID THAT FEEL? · OPTIONAL</legend>
                     <div>
                       {(
                         [
-                          ['easy', 'Easy', '4+ more in me'],
-                          ['good', 'Just right', '2–3 more'],
-                          ['hard', 'Challenging', '0–1 more'],
+                          ['easy', 'Easy'],
+                          ['good', 'Just right'],
+                          ['hard', 'Too hard'],
                         ] as const
-                      ).map(([value, label, reserve]) => (
+                      ).map(([value, label]) => (
                         <button
                           key={value}
                           aria-label={label}
                           aria-describedby={`${inputId}-effort-${value}`}
-                          aria-pressed={draft.effort === value}
-                          className={draft.effort === value ? 'active' : ''}
+                          aria-pressed={draft.effortConfirmed && draft.effort === value}
+                          className={
+                            draft.effortConfirmed && draft.effort === value ? 'active' : ''
+                          }
                           onClick={() => changeEffort(value)}
                         >
-                          <span>
-                            {draft.effort === value && <Check size={12} />}
-                            {label}
+                          {draft.effortConfirmed && draft.effort === value && <Check size={12} />}
+                          {label}
+                          <span id={`${inputId}-effort-${value}`} className="sr-only">
+                            {effortDescriptions[value]}
                           </span>
-                          {/* Reps left in reserve anchor each rating to the same scale. */}
-                          <small id={`${inputId}-effort-${value}`}>{reserve}</small>
                         </button>
                       ))}
                     </div>
@@ -920,7 +986,12 @@ function SessionContent({
                       {!editing && !resting && isFirstLog && <span>+5 XP</span>}
                     </button>
                   </div>
-                  {editing ? (
+                  <p className="workout-session__effort-help">
+                    {draft.effortConfirmed
+                      ? effortDescriptions[draft.effort]
+                      : 'Choose how much you had left, or log without a rating.'}
+                  </p>
+                  {editing && (
                     <div className="workout-session__edit-actions">
                       <button
                         className="workout-session__text-button"
@@ -932,11 +1003,6 @@ function SessionContent({
                         Remove log
                       </button>
                     </div>
-                  ) : (
-                    <p className="workout-session__kind-note">
-                      <Heart size={12} />
-                      Honest effort is always a win.
-                    </p>
                   )}
                 </>
               ) : (
@@ -944,11 +1010,11 @@ function SessionContent({
                   <span>
                     <CheckCircle2 size={30} />
                   </span>
-                  <h3>{allDone ? 'You did the work.' : 'Movement complete.'}</h3>
+                  <h3>{allDone ? 'You did the work.' : 'Exercise complete.'}</h3>
                   <p>
                     {allDone
                       ? 'Save your session and take that good feeling with you.'
-                      : `${exerciseDone} sets logged. Take a breath before the next movement.`}
+                      : `${exerciseDone} sets logged. Take a breath before the next exercise.`}
                   </p>
                   <button
                     className="primary-button"
@@ -1036,11 +1102,13 @@ function SessionContent({
                     </strong>
                     <small>
                       {set.done
-                        ? set.effort === 'easy'
-                          ? 'Easy'
-                          : set.effort === 'hard'
-                            ? 'Challenging'
-                            : 'Just right'
+                        ? !effortWasReported(set)
+                          ? 'Effort not rated'
+                          : set.effort === 'easy'
+                            ? 'Easy'
+                            : set.effort === 'hard'
+                              ? 'Too hard'
+                              : 'Just right'
                         : set.calibration
                           ? 'Find your level'
                           : 'Suggested target'}
@@ -1100,7 +1168,7 @@ function SessionContent({
                 ),
               )
             ) : (
-              <p>This is your only movement. Add a set above whenever you like.</p>
+              <p>This is your only exercise. Add a set above whenever you like.</p>
             )}
           </section>
           <div className="workout-session__finish-area">
@@ -1128,7 +1196,7 @@ function SessionContent({
       {pendingExerciseIndex !== null && (
         <Modal title="Leave this set edit?" onClose={() => setPendingExerciseIndex(null)}>
           <p className="modal-description">
-            Save your correction first, or discard it to switch movements.
+            Save your correction first, or discard it to switch exercises.
           </p>
           <div className="modal-actions">
             <button className="secondary-button" onClick={() => setPendingExerciseIndex(null)}>

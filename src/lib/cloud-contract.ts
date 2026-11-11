@@ -62,7 +62,19 @@ function cleanSet(set: WorkoutSet): WorkoutSet {
     targetLoad: set.targetLoad,
     effort: set.effort,
     done: set.done,
-    ...(set.calibration ? { calibration: true as const } : {}),
+    ...(set.prescription !== undefined && {
+      prescription: {
+        target: set.prescription.target,
+        load: set.prescription.load,
+        source: set.prescription.source,
+      },
+    }),
+    ...(set.recommendationSource !== undefined && {
+      recommendationSource: set.recommendationSource,
+    }),
+    ...(set.effortConfirmed !== undefined && { effortConfirmed: set.effortConfirmed }),
+    ...(set.targetLocked !== undefined && { targetLocked: set.targetLocked }),
+    ...(set.calibration && { calibration: true as const }),
   }
 }
 
@@ -76,6 +88,9 @@ function cleanWorkout(workout: Workout): Workout {
       exerciseId: exercise.exerciseId,
       sets: exercise.sets.map(cleanSet),
       note: cleanText(exercise.note),
+      ...(exercise.plannedSetCount !== undefined && {
+        plannedSetCount: exercise.plannedSetCount,
+      }),
     })),
   }
 }

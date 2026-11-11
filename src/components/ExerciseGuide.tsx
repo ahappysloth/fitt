@@ -775,9 +775,7 @@ function LegacyExerciseGuide({ exercise }: { exercise: Exercise }) {
           {speed}×
         </button>
       </div>
-      <p className="guide-caption">
-        Original movement illustration · Reps per side where indicated below.
-      </p>
+      <p className="guide-caption">Exercise illustration · Reps per side where indicated below.</p>
     </section>
   )
 }

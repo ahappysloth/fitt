@@ -348,7 +348,7 @@ export default function JourneyView({
                     setRecordLimit(6)
                   }}
                   options={[
-                    { value: 'all', label: 'All movements' },
+                    { value: 'all', label: 'All exercises' },
                     ...recordExercises.map((value) => ({ value, label: byId[value].name })),
                   ]}
                 />
@@ -356,7 +356,7 @@ export default function JourneyView({
             }
           />
           <p className="journey-section-note">
-            Each movement and added load has its own baseline. Holds stay in seconds.
+            Each exercise and added load has its own baseline. Holds stay in seconds.
           </p>
           <ul className="journey-record-list">
             {filteredRecords.slice(0, recordLimit).map((record) => (
