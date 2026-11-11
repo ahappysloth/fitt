@@ -172,7 +172,7 @@ for (const action of ['finish', 'discard'] as const) {
       await page.getByRole('button', { name: 'Close dialog', exact: true }).click()
     } else {
       await page.getByLabel('Session options', { exact: true }).click()
-      await page.getByRole('button', { name: 'Discard session', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Discard session', exact: true }).click()
       await page
         .getByRole('dialog', { name: 'Discard this session?', exact: true })
         .getByRole('button', { name: 'Discard session', exact: true })

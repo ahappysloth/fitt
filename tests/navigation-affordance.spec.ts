@@ -75,7 +75,7 @@ test('blocked actions explain their controls and share one return to the saved w
   await strip.click()
   await expect(page).toHaveURL(/\/workout$/)
   await page.getByLabel('Session options', { exact: true }).click()
-  await page.getByRole('button', { name: 'Discard session', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Discard session', exact: true }).click()
   await page
     .getByRole('dialog')
     .getByRole('button', { name: 'Discard session', exact: true })
