@@ -33,6 +33,17 @@ test('public pages support direct links and refresh without starting a workout',
   }
 })
 
+test('unknown paths show the not-found view without highlighting a tab', async ({ page }) => {
+  await page.goto('/not-a-fitt-page')
+  await expect(
+    page.getByRole('heading', { name: 'A fresh start is this way.', exact: true }),
+  ).toBeVisible()
+  await expect(page.locator('[aria-current="page"]')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Back to Today', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Your next chapter.', exact: true })).toBeVisible()
+  await expect(page.locator('[aria-current="page"]:visible')).not.toHaveCount(0)
+})
+
 test('Back and Forward protect unsaved routines without replacing history entries', async ({
   page,
 }) => {

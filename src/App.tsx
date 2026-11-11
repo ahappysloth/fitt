@@ -464,7 +464,8 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
     if (outcome === 'manual') setDialog({ type: 'install' })
     else if (outcome === 'accepted') setToast('Fitt is ready for your home screen.')
   }
-  const activeNavigation = page === 'builder' ? 'workout' : page
+  // An unknown path belongs to no tab, so none is highlighted.
+  const activeNavigation = !matchedPage ? null : page === 'builder' ? 'workout' : page
   if (!ready)
     return (
       <div className="app-loading" role="status">
@@ -559,9 +560,11 @@ export default function App({ navigation: routeNavigation }: { navigation?: AppN
               Your training space
               <ChevronRight size={13} />
               <strong>
-                {page === 'builder'
-                  ? 'Create workout'
-                  : navigationItems.find((item) => item.id === page)?.label}
+                {!matchedPage
+                  ? 'Page not found'
+                  : page === 'builder'
+                    ? 'Create workout'
+                    : navigationItems.find((item) => item.id === page)?.label}
               </strong>
             </div>
             <div className="topbar-right">
