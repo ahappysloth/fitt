@@ -158,7 +158,9 @@ export function createAthlete(initialModel: BodyModel = 'male') {
   }
   function applyPose(frame: PoseFrame) {
     data.bones.forEach((info, i) => {
-      const transform = frame.transforms.get(transformKey(info.name))!
+      // Exact anatomical overrides support full-body motion; legacy segment maps remain valid.
+      const transform =
+        frame.transforms.get(info.name) ?? frame.transforms.get(transformKey(info.name))!
       position
         .copy(v(info.head))
         .sub(transform.original)
