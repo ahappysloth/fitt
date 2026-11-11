@@ -326,20 +326,25 @@ function sessionPatterns(profile: Profile, history: Session[]): Pattern[] {
   return group.filter((pattern) => chosen.has(pattern))
 }
 
+/** Exercises a pattern can draw on for this profile, most advanced first. */
+function patternPool(pattern: Pattern, profile: Profile, stretch = 0) {
+  const cap = (profile.level === 'beginner' ? 1 : 2) + stretch
+  return exercises
+    .filter((e) => e.pattern === pattern && available(e, profile.equipment) && e.level <= cap)
+    .sort((a, b) => b.level - a.level || b.equipment.length - a.equipment.length)
+}
+/** Most sets one exercise grows to when a session has time to fill. */
+const MAX_FILL_SETS = 5
+
 export function generateWorkout(
   profile: Profile,
   history: Session[],
   seed = 0,
   now = new Date(),
 ): Workout {
-  const selected = sessionPatterns(profile, history).map((pattern) => {
-    const pool = exercises.filter(
-      (e) =>
-        e.pattern === pattern &&
-        available(e, profile.equipment) &&
-        e.level <= (profile.level === 'beginner' ? 1 : 2),
-    )
-    pool.sort((a, b) => b.level - a.level || b.equipment.length - a.equipment.length)
+  const patterns = sessionPatterns(profile, history)
+  const selected = patterns.map((pattern) => {
+    const pool = patternPool(pattern, profile)
     // Keep the most recent variation so progress is earned over consecutive sessions.
     const last = orderedHistory(history)
       .flatMap((h) => h.exercises)
@@ -357,6 +362,31 @@ export function generateWorkout(
         : alternatives[seed % alternatives.length] || pool[0]
     return prescribe(exercise, profile, history, now)
   })
+  // A focus can cover fewer patterns than the chosen time allows. Fill the
+  // goal's set budget with a second variation per pattern, then extra sets.
+  const params = goalParams[profileGoal(profile)]
+  const budget = params.exercises[profile.duration] * params.sets[profile.duration]
+  const planned = () => selected.reduce((n, entry) => n + entry.sets.length, 0)
+  const perExercise = setsPerExercise(profile)
+  for (let index = 0; planned() + perExercise <= budget && index < patterns.length * 2; index++) {
+    const pattern = patterns[index % patterns.length]
+    const used = new Set(selected.map((entry) => entry.exerciseId))
+    // Prefer the profile's level; a movement one level up is acceptable for an
+    // extra slot because its first set finds the user's level.
+    const extra =
+      patternPool(pattern, profile).find((e) => !used.has(e.id)) ??
+      patternPool(pattern, profile, 1).find((e) => !used.has(e.id))
+    if (extra) selected.push(prescribe(extra, profile, history, now))
+  }
+  for (let index = 0; planned() < budget; index++) {
+    const growable = selected.filter((entry) => entry.sets.length < MAX_FILL_SETS)
+    if (!growable.length) break
+    const entry = growable[index % growable.length]
+    // Copy the last set's prescription; only set 1 can be a level set.
+    const { calibration: _level, ...last } = entry.sets[entry.sets.length - 1]
+    entry.sets.push({ ...last, id: uid() })
+    entry.plannedSetCount = entry.sets.length
+  }
   return {
     id: uid(),
     title: `${focusNames[profile.focus]} foundations`,

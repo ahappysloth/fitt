@@ -84,11 +84,22 @@ describe('equipment-aware plans', () => {
             expect(new Set(workout.exercises.map((e) => e.exerciseId)).size).toBe(
               workout.exercises.length,
             )
+            const cap = level === 'beginner' ? 1 : 2
+            const budget = { 20: 8, 30: 15, 45: 18 }[duration]
+            const total = workout.exercises.reduce((n, entry) => n + entry.sets.length, 0)
+            expect(total).toBeLessThanOrEqual(budget)
+            // Extra slots may reach one level up; the core patterns stay at level.
+            expect(
+              workout.exercises.filter((entry) => byId[entry.exerciseId].level > cap).length,
+            ).toBeLessThanOrEqual(Math.max(0, workout.exercises.length - 1))
             for (const entry of workout.exercises) {
               const e = byId[entry.exerciseId]
               expect(available(e, profile.equipment)).toBe(true)
-              expect(e.level).toBeLessThanOrEqual(level === 'beginner' ? 1 : 2)
-              expect(entry.sets).toHaveLength(duration === 20 ? 2 : 3)
+              expect(e.level).toBeLessThanOrEqual(cap + 1)
+              expect(entry.sets.length).toBeGreaterThanOrEqual(duration === 20 ? 2 : 3)
+              expect(entry.sets.length).toBeLessThanOrEqual(5)
+              expect(entry.plannedSetCount).toBe(entry.sets.length)
+              expect(entry.sets.filter((s) => s.calibration).length).toBeLessThanOrEqual(1)
               expect(
                 entry.sets.every((s) => s.target >= e.min && s.target <= e.max && !s.done),
               ).toBe(true)
@@ -956,6 +967,29 @@ describe('stalled progress', () => {
     const pikes = [session('pike-pushup', pikeTop), session('pike-pushup', pikeTop)]
     expect(prescribe(byId['pike-pushup'], defaultProfile, pikes).note).toBe(
       'You’ve reached this range. Lower over three seconds each rep to keep progressing.',
+    )
+  })
+})
+
+describe('time scales every focus', () => {
+  it.each(['full', 'upper', 'lower', 'core'] as const)(
+    'gives %s more work at 30 and 45 minutes than at 20 and 30',
+    (focus) => {
+      const total = (duration: Profile['duration']) =>
+        generateWorkout({ ...defaultProfile, focus, duration }, []).exercises.reduce(
+          (n, entry) => n + entry.sets.length,
+          0,
+        )
+      expect(total(30)).toBeGreaterThan(total(20))
+      expect(total(45)).toBeGreaterThan(total(30))
+    },
+  )
+  it('fills with a second variation of a focus pattern before adding sets', () => {
+    const plan = generateWorkout({ ...defaultProfile, focus: 'lower', duration: 45 }, [])
+    const patterns = plan.exercises.map((entry) => byId[entry.exerciseId].pattern)
+    expect(patterns.filter((pattern) => pattern === 'squat').length).toBe(2)
+    expect(new Set(plan.exercises.map((entry) => entry.exerciseId)).size).toBe(
+      plan.exercises.length,
     )
   })
 })
