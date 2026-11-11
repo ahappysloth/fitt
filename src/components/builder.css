@@ -110,7 +110,8 @@
   min-width: 0;
 }
 .builder-entry-heading {
-  display: flex;
+  display: grid;
+  grid-template-columns: 21px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -123,7 +124,6 @@
   flex-shrink: 0;
 }
 .builder-entry-name {
-  flex: 1;
   text-align: left;
   min-height: 44px;
   padding: 3px 0;
@@ -435,15 +435,6 @@
     grid-template-columns: minmax(0, 1fr) 300px;
     gap: 18px;
   }
-  .builder-entry-heading {
-    flex-wrap: wrap;
-  }
-  .builder-entry-actions {
-    margin-left: auto;
-  }
-  .builder-entry-name {
-    flex-basis: calc(100% - 40px);
-  }
   .builder-picker {
     padding: 18px;
   }
@@ -466,12 +457,6 @@
   }
   .builder-choices {
     max-height: 420px;
-  }
-  .builder-entry-heading {
-    flex-wrap: nowrap;
-  }
-  .builder-entry-name {
-    flex-basis: auto;
   }
   .builder-picker-heading {
     margin-bottom: 12px;
@@ -498,10 +483,11 @@
     padding: 16px;
   }
   .builder-entry-heading {
-    flex-wrap: wrap;
+    grid-template-columns: 21px minmax(0, 1fr);
   }
-  .builder-entry-name {
-    flex-basis: calc(100% - 40px);
+  .builder-entry-actions {
+    grid-column: 2;
+    justify-self: end;
   }
   .builder-entry-fields.with-load {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -617,14 +603,8 @@
 .builder-add-link {
   display: inline-flex;
 }
-.builder-entry-heading {
-  flex-wrap: wrap;
-}
-.builder-entry-name {
-  flex-basis: calc(100% - 42px);
-}
 .builder-entry-actions {
-  margin-left: auto;
+  justify-self: end;
 }
 .builder-picker {
   position: static;

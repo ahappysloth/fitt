@@ -1,15 +1,15 @@
 # Training goals and progression
 
-Settings → Your rhythm asks for a training goal. The goal changes rep ranges, sets,
-session size, rest, and how quickly targets rise. Parameters live in
+Settings → Your rhythm asks for a training goal. The goal changes rep ceilings, sets,
+session size and rest. Parameters live in
 `src/lib/goals.ts`; prescriptions in `src/lib/workout.ts`.
 
-| Goal               | Ceiling   | Movements × sets (20 / 30 / 45 min) | Rest  | Progression                 |
-| ------------------ | --------- | ----------------------------------- | ----- | --------------------------- |
-| Build muscle       | 20 (60 s) | 3×3 / 5×3 / 6×3                     | ×1.2  | by effort, every session    |
-| Get stronger       | 8 (30 s)  | 2×3 / 3×3 / 4×3                     | ×2    | by effort; harder variation |
-| Lose fat & get fit | 15 (45 s) | 4×3 / 5×3 / 6×4                     | ×0.75 | by effort, every session    |
-| Stay healthy       | 15 (45 s) | 4×2 / 5×3 / 6×3                     | ×1    | two successes per increase  |
+| Goal               | Ceiling   | Movements × sets (20 / 30 / 45 min) | Rest  |
+| ------------------ | --------- | ----------------------------------- | ----- |
+| Build muscle       | 20 (60 s) | 3×3 / 5×3 / 6×3                     | ×1.2  |
+| Get stronger       | 8 (30 s)  | 2×3 / 3×3 / 4×3                     | ×2    |
+| Lose fat & get fit | 15 (45 s) | 4×3 / 5×3 / 6×4                     | ×0.75 |
+| Stay healthy       | 15 (45 s) | 4×2 / 5×3 / 6×3                     | ×1    |
 
 Goals keep each movement's own starting point and set the ceiling: the lower of
 the goal ceiling and the movement's catalog maximum is where a harder variation (or
@@ -17,23 +17,21 @@ added load) takes over. Rest is the movement's base rest times the
 goal multiplier, rounded to 5 s and kept between 30 and 240 s. Existing profiles
 without a goal default to Stay healthy (beginner) or Build muscle (intermediate).
 
-## Effort means reps left
+## Progression
 
-The three ratings are anchored to reps in reserve: Easy = 4+ more, Just right = 2–3
-more, Challenging = 0–1 more. A completed Challenging set is productive work, not a
-failure:
+Goals change ceilings, session size and rest; they do not change how targets rise
+or fall. That follows the evidence rules in [training-engine.md](training-engine.md):
+effort feedback is optional, an increase needs two comparable, comfortably rated
+sessions at the same target and load, and "Too hard" or a missed original target
+lowers the next plan. On top of those rules:
 
-- **Missed target** (fewer reps or less load than planned): later sets in the session
-  drop to what was done, and the next session starts from what was demonstrated.
-  Below the range, the vest gets lighter, then the easier variation is used, and the
-  minimum is never undercut.
-- **Hit target**: Easy adds two reps (10 s), Just right one rep (5 s), Challenging
-  holds until it has been done twice at the same target. Stay healthy waits for two
-  successes before any increase.
-- At the top of the range, the next _available_ harder variation follows (rungs that
-  need missing equipment are skipped); without one, a weighted vest adds 2.5 kg
-  (5 kg for squat and hinge patterns) and the target drops three reps, not to the
-  bottom of the range.
+- A target never drops below the movement's minimum: the easier variation (skipping
+  rungs that need missing equipment) or the bottom of the range is used instead.
+- A set logged at zero is a skipped set. It doesn't lower later sets or count as a
+  one-rep result, and it keeps the exercise from counting as complete work.
+- At the top of the goal's range, the next _available_ harder variation follows;
+  without one, a weighted vest adds 2.5 kg (5 kg for squat and hinge patterns) and
+  the target drops three reps rather than to the bottom of the range.
 
 ## Session planning
 

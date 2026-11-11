@@ -25,7 +25,7 @@ const progressSteps = [
   {
     icon: Dumbbell,
     title: 'Start with what you have.',
-    copy: 'Choose your equipment and experience. Follow your plan, swap a movement, or build your own.',
+    copy: 'Choose your equipment and experience. Follow your plan, swap an exercise, or build your own.',
   },
   {
     icon: SlidersHorizontal,
@@ -35,7 +35,7 @@ const progressSteps = [
   {
     icon: TrendingUp,
     title: 'Grow when you’re ready.',
-    copy: 'Repeat a target with control. Fitt adds a little more when your recent sessions show you’re ready.',
+    copy: 'Repeat a target with control. Optional effort feedback helps Fitt decide when a small increase fits.',
   },
   {
     icon: Trophy,
@@ -84,9 +84,15 @@ export function ProgressHelp({ onClose }: { onClose: () => void }) {
         </summary>
         <div>
           <p>
-            Two complete, controlled sessions at your target unlock a small increase: one rep or
-            five seconds. At the top of the range, Fitt may introduce a harder available variation
-            or added load. A hard or incomplete set adjusts your remaining targets.
+            Two complete sessions at the same starting targets, added weight, and planned set count
+            can earn a small increase when you rate each set Easy or Just right. At the top of the
+            range, Fitt may suggest a harder available variation or added load.
+          </p>
+          <p>
+            Effort ratings are optional. Easy means you had plenty left; Just right means the target
+            felt manageable; Too hard means you could not finish comfortably or keep your form. Your
+            actual results can adjust untouched later sets. Any reps or weight you enter yourself
+            stay yours to control.
           </p>
           <p>
             Earn 5 XP per logged set, 35 for saving a workout, 15 for a new comparable personal

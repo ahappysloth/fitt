@@ -84,6 +84,8 @@ export function createGuideScene(
       }),
     )
     const camera = new THREE.OrthographicCamera(-1.4, 1.4, 1.2, -1.2, 0.01, 20)
+    const stage = motion.stage
+    const stageTarget = stage ? new THREE.Vector3(...stage.target) : null
     const controls = new OrbitControls(camera, renderer.domElement)
     cleanups.push(() => controls.dispose())
     controls.target.set(0, 0.3, 0.08)
@@ -122,6 +124,13 @@ export function createGuideScene(
     key.shadow.camera.bottom = -1.7
     key.shadow.camera.near = 0.1
     key.shadow.camera.far = 8
+    if (stage) {
+      const extent = Math.max(1.7, stage.height * 1.2)
+      key.shadow.camera.left = -extent
+      key.shadow.camera.right = extent
+      key.shadow.camera.top = extent
+      key.shadow.camera.bottom = -extent
+    }
     key.shadow.bias = -0.0004
     key.shadow.normalBias = 0.015
     scene.add(key)
@@ -169,6 +178,42 @@ export function createGuideScene(
       new THREE.LineBasicMaterial({ color: '#40443b', transparent: true, opacity: 0.4 }),
     )
     scene.add(edges)
+    if (stage?.bar) {
+      const { center, width, radius = 0.018 } = stage.bar
+      const material = new THREE.MeshStandardMaterial({
+        color: '#667064',
+        roughness: 0.4,
+        metalness: 0.3,
+      })
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, width, 24), material)
+      bar.rotation.z = Math.PI / 2
+      bar.position.set(...center)
+      bar.castShadow = true
+      scene.add(bar)
+      // Keep the upright supports behind the athlete in the side view.
+      const supportDepth = 0.35
+      for (const side of [-1, 1]) {
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius * 1.3, radius * 1.3, center[1], 16),
+          material.clone(),
+        )
+        post.position.set(center[0] + (side * width) / 2, center[1] / 2, center[2] - supportDepth)
+        post.castShadow = true
+        scene.add(post)
+        const bracket = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius * 1.3, radius * 1.3, supportDepth, 16),
+          material.clone(),
+        )
+        bracket.rotation.x = Math.PI / 2
+        bracket.position.set(
+          center[0] + (side * width) / 2,
+          center[1],
+          center[2] - supportDepth / 2,
+        )
+        bracket.castShadow = true
+        scene.add(bracket)
+      }
+    }
     for (const end of [-0.91, 0.91]) {
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
@@ -255,7 +300,9 @@ export function createGuideScene(
         height = host.clientHeight
       if (!width || !height || disposed) return
       const aspect = width / height
-      const halfHeight = Math.max(0.8, 1.0 / aspect)
+      const halfHeight = stage
+        ? Math.max(stage.height / 2, (stage.height * 0.42) / aspect)
+        : Math.max(0.8, 1.0 / aspect)
       camera.left = -halfHeight * aspect
       camera.right = halfHeight * aspect
       camera.top = halfHeight
@@ -287,13 +334,23 @@ export function createGuideScene(
     controls.addEventListener('start', () => onCameraChange('custom'))
     function view(value: CameraView) {
       onCameraChange(value)
-      controls.target.set(0, 0.29, 0.08)
+      controls.target.copy(stageTarget || new THREE.Vector3(0, 0.29, 0.08))
       camera.position.copy(
-        value === 'side'
-          ? new THREE.Vector3(3, 0.83, 0.08)
-          : value === 'front'
-            ? new THREE.Vector3(0, 1.18, 3)
-            : new THREE.Vector3(2.6, 1.8, 2.6),
+        stageTarget
+          ? stageTarget
+              .clone()
+              .add(
+                value === 'side'
+                  ? new THREE.Vector3(4, 0.12, 0)
+                  : value === 'front'
+                    ? new THREE.Vector3(0, 0.12, 4)
+                    : new THREE.Vector3(2.6, 0.85, 3.7),
+              )
+          : value === 'side'
+            ? new THREE.Vector3(3, 0.83, 0.08)
+            : value === 'front'
+              ? new THREE.Vector3(0, 1.18, 3)
+              : new THREE.Vector3(2.6, 1.8, 2.6),
       )
       camera.zoom = 1
       camera.updateProjectionMatrix()
@@ -382,7 +439,8 @@ export function createGuideScene(
       rotate,
       zoom,
       focus(enabled, region) {
-        athlete.focus(enabled, region)
+        const regions = motion.regions.flatMap(({ id }) => (id === 'all' ? [] : [id]))
+        athlete.highlight(enabled ? (region === 'all' ? regions : [region]) : [])
         render()
       },
       highlight(regions) {

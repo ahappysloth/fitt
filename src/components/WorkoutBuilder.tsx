@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   ArrowDown,
   ArrowLeft,
@@ -98,6 +98,9 @@ export default function WorkoutBuilder({
   const [pendingPreset, setPendingPreset] = useState<Focus | 'empty' | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [notice, setNotice] = useState('')
+  const [attemptedReview, setAttemptedReview] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const validationId = useId()
   useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
@@ -139,7 +142,7 @@ export default function WorkoutBuilder({
   const errors = entries.map((entry) => {
     const exercise = byId[entry.exerciseId]
     if (!available(exercise, profile.equipment))
-      return 'This movement needs equipment that is no longer selected. Remove it or update your equipment.'
+      return 'This exercise needs equipment that is no longer selected. Remove it or update your equipment.'
     if (!validNumber(entry.count, 1, 6)) return 'Choose between 1 and 6 whole sets.'
     if (!validNumber(entry.target, 1, exercise.unit === 'sec' ? 600 : 100))
       return `Choose a whole target from 1 to ${exercise.unit === 'sec' ? 600 : 100} ${exercise.unit === 'sec' ? 'seconds' : 'reps'}.`
@@ -147,17 +150,29 @@ export default function WorkoutBuilder({
       return `Choose an added load from 0 to ${MAX_ADDED_LOAD_KG} kg.`
     if ((!exercise.weighted || !hasVest) && (Number(entry.load) > 0 || entry.recordedLoad > 0))
       return exercise.weighted
-        ? 'A weighted vest is not selected. Switch this movement to bodyweight, or add a vest in Settings.'
-        : 'This movement uses bodyweight. Remove the saved added load before saving.'
+        ? 'A weighted vest is not selected. Switch this exercise to bodyweight, or add a vest in Settings.'
+        : 'This exercise uses bodyweight. Remove the saved added load before saving.'
     return null
   })
-  const ready =
-    !!title.trim() &&
-    title.trim().length <= 60 &&
-    entries.length > 0 &&
-    entries.length <= limit &&
-    errors.every((error) => !error) &&
-    validNumber(duration, 1, 180)
+  const titleError = !title.trim()
+    ? 'Give your routine a name.'
+    : title.trim().length > 60
+      ? 'Use a routine name of 60 characters or fewer.'
+      : null
+  const durationError = validNumber(duration, 1, 180)
+    ? null
+    : 'Choose a whole number of minutes from 1 to 180.'
+  const firstExerciseError = errors.findIndex(Boolean)
+  const reviewError = !entries.length
+    ? 'Add an exercise to get started.'
+    : titleError ||
+      durationError ||
+      (entries.length > limit
+        ? `Keep your workout to ${limit} exercises or fewer.`
+        : firstExerciseError >= 0
+          ? `${byId[entries[firstExerciseError].exerciseId].name}: ${errors[firstExerciseError]}`
+          : null)
+  const ready = !reviewError
   const totalSets = entries.reduce(
     (sum, entry) => sum + (validNumber(entry.count, 1, 6) ? Number(entry.count) : 0),
     0,
@@ -177,13 +192,14 @@ export default function WorkoutBuilder({
   function add(exerciseId: string) {
     if (selected.has(exerciseId) || (!swapKey && entries.length >= limit)) return
     const prescribed = prescribe(byId[exerciseId], profile, history)
-    // The selected movement stays the user's choice; prescribe may recommend a different variation.
+    // The selected exercise stays the user's choice; prescribe may recommend a different variation.
     const entry =
       prescribed.exerciseId === exerciseId
         ? prescribed
         : {
             exerciseId,
             note: '',
+            plannedSetCount: 1,
             sets: [
               {
                 id: uid(),
@@ -251,7 +267,25 @@ export default function WorkoutBuilder({
     setNotice(`${byId[entries[index].exerciseId].name} moved to position ${destination + 1}.`)
   }
   function save() {
-    if (!ready) return
+    if (!ready) {
+      setAttemptedReview(true)
+      const selector = !entries.length
+        ? '.builder-add-link'
+        : titleError
+          ? '[name="routine-name"]'
+          : durationError
+            ? '[role="combobox"]'
+            : entries.length > limit
+              ? '.builder-remove'
+              : '[aria-invalid="true"]'
+      const control =
+        formRef.current?.querySelector<HTMLElement>(selector) ||
+        formRef.current?.querySelector<HTMLElement>('.builder-field-error')
+      control?.focus({ preventScroll: true })
+      control?.scrollIntoView({ block: 'center', behavior: 'instant' })
+      return
+    }
+    setAttemptedReview(false)
     const workout: Workout = {
       id: initial?.id ?? uid(),
       title: title.trim(),
@@ -263,6 +297,7 @@ export default function WorkoutBuilder({
         return {
           exerciseId: exercise.id,
           note: 'Your routine. Adjust each set to match how you feel.',
+          plannedSetCount: Number(entry.count),
           sets: Array.from({ length: Number(entry.count) }, () => ({
             id: uid(),
             target: Number(entry.target),
@@ -271,6 +306,10 @@ export default function WorkoutBuilder({
             targetLoad: load,
             effort: 'good' as const,
             done: false,
+            prescription: { target: Number(entry.target), load, source: 'manual' as const },
+            recommendationSource: 'prescribed' as const,
+            effortConfirmed: false,
+            targetLocked: false,
           })),
         }
       }),
@@ -294,10 +333,10 @@ export default function WorkoutBuilder({
             Your workout. Your way
             <span className="greeting-dot">.</span>
           </h1>
-          <p>Pick your movements, set your targets, and make it yours.</p>
+          <p>Pick your exercises, set your targets, and make it yours.</p>
         </div>
         <span className="pill">
-          {entries.length} / {limit} movements
+          {entries.length} / {limit} exercises
         </span>
       </div>
       <div className="builder-presets" role="group" aria-label="Suggested workout presets">
@@ -330,6 +369,8 @@ export default function WorkoutBuilder({
         </button>
       </div>
       <form
+        ref={formRef}
+        noValidate
         onSubmit={(event) => {
           event.preventDefault()
           save()
@@ -338,13 +379,15 @@ export default function WorkoutBuilder({
         {mixedInitialTargets && (
           <p className="builder-import-note">
             This routine has different targets between sets. The builder uses one target per
-            movement; saving applies the targets shown below to every set.
+            exercise; saving applies the targets shown below to every set.
           </p>
         )}
         <section className="panel builder-basics">
           <label>
             Routine name
             <input
+              name="routine-name"
+              aria-label="Routine name"
               type="text"
               maxLength={60}
               value={title}
@@ -353,8 +396,15 @@ export default function WorkoutBuilder({
                 setDirty(true)
               }}
               placeholder="e.g. My full-body reset"
+              aria-invalid={!!titleError}
+              aria-describedby={titleError ? `${validationId}-name` : undefined}
               required
             />
+            {titleError && (
+              <span className="builder-field-error" id={`${validationId}-name`}>
+                {titleError}
+              </span>
+            )}
           </label>
           <label>
             <span>
@@ -370,6 +420,7 @@ export default function WorkoutBuilder({
               }}
               options={durations.map((n) => ({ value: String(n), label: `${n} minutes` }))}
             />
+            {durationError && <span className="builder-field-error">{durationError}</span>}
           </label>
         </section>
         <div className="builder-layout">
@@ -377,11 +428,11 @@ export default function WorkoutBuilder({
             <div className="builder-section-heading">
               <div>
                 <p className="eyebrow">YOUR LINEUP</p>
-                <h2 id="builder-plan-heading">One movement at a time.</h2>
+                <h2 id="builder-plan-heading">Your exercises.</h2>
               </div>
               <button type="button" className="builder-add-link" onClick={() => openPicker()}>
                 <Plus size={16} />
-                Add movement
+                Add exercise
               </button>
             </div>
             {!entries.length && (
@@ -389,9 +440,9 @@ export default function WorkoutBuilder({
                 <span>
                   <Plus size={25} />
                 </span>
-                <h3>Start with one good move.</h3>
+                <h3>Start with one exercise.</h3>
                 <p>
-                  Add a movement from your equipment-matched library. You can change the order and
+                  Add an exercise from your equipment-matched library. You can change the order and
                   targets anytime.
                 </p>
               </div>
@@ -427,7 +478,7 @@ export default function WorkoutBuilder({
                         <small>{exercise.muscles.map((id) => muscleNames[id]).join(' · ')}</small>
                       </button>
                       <div className="builder-entry-actions">
-                        <Tooltip content="Swap movement">
+                        <Tooltip content="Swap exercise">
                           <button
                             type="button"
                             aria-label={`Swap ${exercise.name}`}
@@ -456,7 +507,7 @@ export default function WorkoutBuilder({
                             <ArrowDown size={16} />
                           </button>
                         </Tooltip>
-                        <Tooltip content="Remove movement">
+                        <Tooltip content="Remove exercise">
                           <button
                             type="button"
                             className="builder-remove"
@@ -529,7 +580,7 @@ export default function WorkoutBuilder({
                             ? `Your saved targets include ${Math.max(entry.recordedLoad, Number(entry.load) || 0)} kg of added load. Choose bodyweight to change those targets to 0 kg.`
                             : exercise.weighted
                               ? 'Bodyweight selected. Add a weighted vest in Settings to set added load.'
-                              : 'This movement uses bodyweight.'}
+                              : 'This exercise uses bodyweight.'}
                         </p>
                         {needsBodyweightChoice && (
                           <button
@@ -548,7 +599,7 @@ export default function WorkoutBuilder({
                       </div>
                     )}
                     {errors[index] ? (
-                      <p className="builder-field-error" role="status">
+                      <p className="builder-field-error" role="status" tabIndex={-1}>
                         {errors[index]}
                       </p>
                     ) : (
@@ -569,7 +620,7 @@ export default function WorkoutBuilder({
               <div className="builder-summary">
                 <span>
                   <strong>{entries.length}</strong>{' '}
-                  {entries.length === 1 ? 'movement' : 'movements'}
+                  {entries.length === 1 ? 'exercise' : 'exercises'}
                 </span>
                 <span>
                   <strong>{totalSets}</strong> sets
@@ -583,22 +634,16 @@ export default function WorkoutBuilder({
         </div>
         <div className="builder-save-bar">
           <div>
-            <strong>Ready for a quick review?</strong>
-            <p>
-              {!entries.length
-                ? 'Add a movement to get started.'
-                : !title.trim()
-                  ? 'Give your routine a name.'
-                  : errors.some(Boolean)
-                    ? 'Review the highlighted targets before continuing.'
-                    : 'Review your plan next. Your timer has not started.'}
+            <strong>{ready ? 'Ready for a quick review?' : 'Let’s finish your plan.'}</strong>
+            <p id={validationId} role={attemptedReview && reviewError ? 'alert' : undefined}>
+              {reviewError || 'Review your plan next. Your timer has not started.'}
             </p>
           </div>
           <div>
             <button type="button" className="secondary-button" onClick={requestCancel}>
               Cancel
             </button>
-            <button type="submit" className="primary-button" disabled={!ready}>
+            <button type="submit" className="primary-button" aria-describedby={validationId}>
               Review workout
               <ArrowRight size={16} />
             </button>
@@ -610,29 +655,29 @@ export default function WorkoutBuilder({
       </p>
       {pickerOpen && (
         <Modal
-          title={swapKey ? 'Swap movement' : 'Add exercises'}
+          title={swapKey ? 'Swap exercise' : 'Add exercises'}
           onClose={() => setPickerOpen(false)}
           wide
         >
           <div className="builder-picker" aria-labelledby="builder-picker-heading">
             <div className="builder-picker-heading">
-              <p className="eyebrow">YOUR MOVEMENT LIBRARY</p>
-              <h2 id="builder-picker-heading">Find your next move.</h2>
-              <p>Choose any movement available with your equipment.</p>
+              <p className="eyebrow">YOUR EXERCISE LIBRARY</p>
+              <h2 id="builder-picker-heading">Find your next exercise.</h2>
+              <p>Choose any exercise available with your equipment.</p>
             </div>
             <label className="builder-search">
               <Search size={17} />
               <input
                 type="search"
-                aria-label="Find a movement for your routine"
-                placeholder="Search movements…"
+                aria-label="Find an exercise for your routine"
+                placeholder="Search exercises…"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
               {search && (
                 <button
                   type="button"
-                  aria-label="Clear movement search"
+                  aria-label="Clear exercise search"
                   onClick={() => setSearch('')}
                 >
                   <X size={15} />
@@ -641,7 +686,7 @@ export default function WorkoutBuilder({
             </label>
             <div className="builder-picker-filters">
               <Select
-                label="Filter movements by workout focus"
+                label="Filter exercises by workout focus"
                 value={pickerFocus}
                 onValueChange={(value) => setPickerFocus(value as Focus | 'all')}
                 options={[
@@ -650,7 +695,7 @@ export default function WorkoutBuilder({
                 ]}
               />
               <Select
-                label="Filter movements by category"
+                label="Filter exercises by category"
                 value={category}
                 onValueChange={(value) => setCategory(value as Pattern | 'all')}
                 options={[
@@ -665,7 +710,7 @@ export default function WorkoutBuilder({
               />
               <Select
                 className="builder-muscle-filter"
-                label="Filter routine movements by muscle"
+                label="Filter routine exercises by muscle"
                 value={muscle}
                 onValueChange={(value) => setMuscle(value as Muscle | 'all')}
                 options={[
@@ -676,8 +721,8 @@ export default function WorkoutBuilder({
             </div>
             <p className="builder-picker-note">
               {swapKey
-                ? 'Choose a replacement movement.'
-                : `${choices.length} movements · choose Any focus to explore outside your preset.`}
+                ? 'Choose a replacement exercise.'
+                : `${choices.length} exercises · choose Any focus to explore outside your preset.`}
             </p>
             <div className="builder-choices">
               {choices.map((exercise) => (
@@ -722,7 +767,7 @@ export default function WorkoutBuilder({
               ))}
               {!choices.length && (
                 <div className="builder-no-results">
-                  <p>No matching movements.</p>
+                  <p>No matching exercises.</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -739,7 +784,7 @@ export default function WorkoutBuilder({
             </div>
             {entries.length >= limit && (
               <p className="builder-picker-note">
-                Your routine has {limit} movements. Remove one to make room for another.
+                Your routine has {limit} exercises. Remove one to make room for another.
               </p>
             )}
           </div>
@@ -748,7 +793,7 @@ export default function WorkoutBuilder({
       {pendingPreset && (
         <Modal title="Replace your lineup?" onClose={() => setPendingPreset(null)}>
           <p className="modal-description">
-            Your current movements and targets will be replaced. You can edit the new lineup before
+            Your current exercises and targets will be replaced. You can edit the new lineup before
             starting.
           </p>
           <div className="modal-actions">

@@ -9,7 +9,9 @@ import {
   toCloudData,
 } from './cloud-contract'
 import { emptyState, generateWorkout } from './workout'
-import type { Session } from './types'
+import { parseBackup } from './storage'
+import { applyCloudData, importGuestRecords, mergeCloudData } from './cloud/merge'
+import type { Session, Workout } from './types'
 
 function session(id = 'workout-a', completedAt = '2026-11-01T12:10:00.000Z'): Session {
   const state = emptyState()
@@ -117,5 +119,161 @@ describe('cloud training contract', () => {
     }
     expect(parseCloudSnapshot({ revision: 0, data })).toEqual({ revision: 0, data })
     expect(() => parseCloudSnapshot({ revision: -1, data })).toThrow(CloudValidationError)
+  })
+})
+
+describe('cloud training evidence', () => {
+  function withEvidence(workout: Workout): Workout {
+    const exercise = workout.exercises[0]
+    exercise.plannedSetCount = exercise.sets.length
+    Object.assign(exercise.sets[0], {
+      prescription: { target: 8, load: 2.5, source: 'generated' },
+      recommendationSource: 'adapted',
+      effortConfirmed: false,
+      targetLocked: false,
+      target: 6,
+      targetLoad: 2,
+    })
+    Object.assign(exercise.sets[1], {
+      prescription: { target: 6.5, load: 0, source: 'manual' },
+      recommendationSource: 'prescribed',
+      effortConfirmed: true,
+      targetLocked: true,
+    })
+    return workout
+  }
+
+  it('round-trips a guest backup through import, cloud serialization, and a guest restore', () => {
+    const original = emptyState()
+    original.history = [session()]
+    withEvidence(original.history[0])
+    original.routines = [withEvidence(generateWorkout(original.profile, []))]
+    const guest = parseBackup(JSON.stringify(original))
+    const imported = importGuestRecords(emptyCloudData(), guest)
+    const snapshot = parseCloudSnapshot(JSON.parse(JSON.stringify({ revision: 1, data: imported })))
+    const restored = parseBackup(JSON.stringify(applyCloudData(emptyState(), snapshot.data)))
+    expect(restored.history).toEqual(guest.history)
+    expect(restored.routines).toEqual(guest.routines)
+    expect(restored.history[0].exercises[0].sets[0].prescription).toEqual({
+      target: 8,
+      load: 2.5,
+      source: 'generated',
+    })
+    expect(importGuestRecords(snapshot.data, guest)).toEqual(snapshot.data)
+  })
+
+  it('preserves the absence of evidence on legacy history and routines', () => {
+    const raw = { ...emptyCloudData(), history: [session()], routines: [session('routine')] }
+    for (const workout of [...raw.history, ...raw.routines]) {
+      for (const exercise of workout.exercises) {
+        delete exercise.plannedSetCount
+        for (const set of exercise.sets) {
+          delete set.prescription
+          delete set.recommendationSource
+          delete set.effortConfirmed
+          delete set.targetLocked
+        }
+      }
+    }
+    const data = parseCloudData(raw)
+    for (const workout of [...data.history, ...data.routines]) {
+      for (const exercise of workout.exercises) {
+        expect(exercise).not.toHaveProperty('plannedSetCount')
+        for (const set of exercise.sets) {
+          expect(set).not.toHaveProperty('prescription')
+          expect(set).not.toHaveProperty('recommendationSource')
+          expect(set).not.toHaveProperty('effortConfirmed')
+          expect(set).not.toHaveProperty('targetLocked')
+        }
+      }
+    }
+  })
+
+  it('rebuilds evidence in canonical field order and drops unrecognized nested fields', () => {
+    const item = session()
+    withEvidence(item)
+    const expected = parseCloudData({ ...emptyCloudData(), history: [item] })
+    const raw = JSON.parse(JSON.stringify(expected))
+    raw.history[0].exercises[0].sets[0].prescription = {
+      source: 'generated',
+      administrator: true,
+      load: 2.5,
+      target: 8,
+    }
+    const normalized = parseCloudData(raw)
+    expect(JSON.stringify(normalized)).toBe(JSON.stringify(expected))
+    expect(parseCloudData(normalized)).toEqual(normalized)
+    expect(normalized.history[0].exercises[0].sets[0].effortConfirmed).toBe(false)
+    expect(normalized.history[0].exercises[0].sets[0].targetLocked).toBe(false)
+  })
+
+  it.each([
+    { prescription: null },
+    { prescription: { target: 0, load: 0, source: 'generated' } },
+    { prescription: { target: 601, load: 0, source: 'generated' } },
+    { prescription: { target: 8, load: -1, source: 'manual' } },
+    { prescription: { target: 8, load: 301, source: 'manual' } },
+    { prescription: { target: 8, load: 0, source: 'guessed' } },
+    { recommendationSource: 'generated' },
+    { effortConfirmed: 1 },
+    { targetLocked: 'false' },
+  ])('rejects malformed metadata instead of silently stripping it: %j', (metadata) => {
+    const item = session()
+    Object.assign(item.exercises[0].sets[0], metadata)
+    expect(() => parseCloudData({ ...emptyCloudData(), history: [item] })).toThrow(
+      CloudValidationError,
+    )
+    expect(() => parseCloudData({ ...emptyCloudData(), routines: [item] })).toThrow(
+      CloudValidationError,
+    )
+  })
+
+  it.each([null, 0, 11, 1.5, '3'])(
+    'rejects malformed cloud planned set count %j',
+    (plannedSetCount) => {
+      const item = session()
+      Object.assign(item.exercises[0], { plannedSetCount })
+      expect(() => parseCloudData({ ...emptyCloudData(), history: [item] })).toThrow(
+        CloudValidationError,
+      )
+    },
+  )
+
+  it('keeps metadata changes in three-way conflict decisions', () => {
+    const item = session()
+    withEvidence(item)
+    const base = parseCloudData({ ...emptyCloudData(), history: [item] })
+    const local = structuredClone(base)
+    local.history[0].exercises[0].sets[0].effortConfirmed = true
+    const remote = structuredClone(base)
+    remote.history[0].exercises[0].sets[0].targetLocked = true
+    expect(mergeCloudData(base, local, base)).toEqual({ data: local, fields: [] })
+    expect(mergeCloudData(base, local, remote).fields).toHaveLength(1)
+    expect(mergeCloudData(base, local, remote, 'remote').data).toEqual(remote)
+    expect(() => importGuestRecords(base, { ...emptyState(), history: local.history })).toThrow(
+      'different versions',
+    )
+  })
+
+  it('sorts offset timestamps and ID ties canonically after timestamp corrections', () => {
+    const early = { ...session('b-tie'), startedAt: '2026-10-30T12:00:00Z' }
+    const raw = {
+      ...emptyCloudData(),
+      history: [
+        { ...early, id: 'z-later', completedAt: '2026-10-31T23:30:00-02:00' },
+        { ...early, id: 'b-tie', completedAt: '2026-11-01T01:00:00Z' },
+        { ...early, id: 'a-tie', completedAt: '2026-10-31T20:00:00-05:00' },
+      ],
+    }
+    const normalized = parseCloudData(raw)
+    expect(normalized.history.map((workout) => workout.id)).toEqual(['a-tie', 'b-tie', 'z-later'])
+    expect(parseCloudData({ ...raw, history: [...raw.history].reverse() })).toEqual(normalized)
+    expect(normalized.history[0].completedAt).toBe('2026-11-01T01:00:00.000Z')
+    normalized.history[0].completedAt = '2026-11-01T02:00:00Z'
+    expect(parseCloudData(normalized).history.map((workout) => workout.id)).toEqual([
+      'b-tie',
+      'z-later',
+      'a-tie',
+    ])
   })
 })

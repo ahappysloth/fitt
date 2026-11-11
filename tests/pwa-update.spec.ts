@@ -1,4 +1,4 @@
-import { continueReviewedWorkout, addBuilderMovement } from './helpers/workout'
+import { continueReviewedWorkout, addBuilderExercise } from './helpers/workout'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { test as base, expect, type Page } from '@playwright/test'
@@ -133,7 +133,7 @@ test('updates a saved active workout and preserves pending inputs and its rest d
   await page.getByRole('spinbutton', { name: 'Knee push-up set 1 reps', exact: true }).fill('4')
   await page.getByRole('button', { name: 'Log Knee push-up set 1', exact: true }).click()
   await page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }).fill('6')
-  await page.getByRole('button', { name: 'Challenging', exact: true }).click()
+  await page.getByRole('button', { name: 'Too hard', exact: true }).click()
   const before = (await readState(page)).active!
   const timerKey = `fitt.session-ui.${before.id}`
   const restEnd = await page.evaluate(
@@ -151,7 +151,7 @@ test('updates a saved active workout and preserves pending inputs and its rest d
   await expect(
     page.getByRole('spinbutton', { name: 'Knee push-up set 2 reps', exact: true }),
   ).toHaveValue('6')
-  await expect(page.getByRole('button', { name: 'Challenging', exact: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Too hard', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   )
@@ -239,7 +239,7 @@ test('another tab can activate an update without reloading a dirty routine, then
   await page.getByRole('button', { name: 'Create workout', exact: true }).click()
   await page.getByRole('button', { name: /^Start empty/ }).click()
   await page.getByRole('textbox', { name: 'Routine name' }).fill('Keep this routine')
-  await addBuilderMovement(page, 'Knee push-up')
+  await addBuilderExercise(page, 'Knee push-up')
   const other = await context.newPage()
   await boot(other, release.origin)
   await release.publish(other)

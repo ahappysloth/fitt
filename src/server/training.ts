@@ -14,6 +14,7 @@ import {
   type SyncWrite,
 } from '../lib/cloud-contract'
 import type { ServerDb } from './db'
+import { preserveTrainingEvidence } from './training-evidence'
 
 const RETAINED_MUTATION_RECEIPTS = 512
 const INSERT_BATCH_SIZE = 250
@@ -242,17 +243,21 @@ export async function writeTraining(
       return { kind: 'conflict', snapshot: current, changed: false }
     }
 
-    const changed = JSON.stringify(current.data) !== JSON.stringify(write.data)
+    // Hash/replay and revision checks use the client's original request. Only
+    // then protect unchanged records from older clients stripping evidence.
+    // Restored evidence also counts toward the shared snapshot size limit.
+    const data = parseCloudData(preserveTrainingEvidence(current.data, write.data))
+    const changed = JSON.stringify(current.data) !== JSON.stringify(data)
     const nextRevision = current.revision + (changed ? 1 : 0)
     if (nextRevision > MAX_CLOUD_REVISION) throw new Error('Training revision limit reached')
     if (changed) {
-      await updateCollections(tx, userId, current.data, write.data)
+      await updateCollections(tx, userId, current.data, data)
       await tx
         .update(trainingProfiles)
         .set({
           revision: nextRevision,
-          profile: write.data.profile,
-          preferences: write.data.preferences,
+          profile: data.profile,
+          preferences: data.preferences,
           updatedAt: new Date(),
         })
         .where(eq(trainingProfiles.userId, userId))
@@ -281,7 +286,7 @@ export async function writeTraining(
       )
     return {
       kind: 'saved',
-      snapshot: { revision: nextRevision, data: write.data },
+      snapshot: { revision: nextRevision, data },
       changed,
     }
   })

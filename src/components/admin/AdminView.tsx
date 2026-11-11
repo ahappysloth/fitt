@@ -58,7 +58,7 @@ function AdminPlayground({ studio: controlledStudio, onStudioChange }: AdminView
           <h1>
             A space to fine-tune Fitt<span className="greeting-dot">.</span>
           </h1>
-          <p>Explore the movement. Try the details. Make it feel right.</p>
+          <p>Explore the exercises. Try the details. Make it feel right.</p>
         </div>
         <Pill>
           <ShieldCheck size={14} aria-hidden="true" />

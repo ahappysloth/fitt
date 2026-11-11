@@ -42,8 +42,6 @@ export interface GoalParams {
   sets: Record<Profile['duration'], number>
   /** Multiplies each movement's base rest. */
   restMultiplier: number
-  /** Every increase waits for two successful sessions at the same target. */
-  steadyProgression: boolean
 }
 
 /*
@@ -59,7 +57,6 @@ export const goalParams: Record<Goal, GoalParams> = {
     exercises: { 20: 3, 30: 5, 45: 6 },
     sets: { 20: 3, 30: 3, 45: 3 },
     restMultiplier: 1.2,
-    steadyProgression: false,
   },
   strength: {
     repCeiling: 8,
@@ -67,7 +64,6 @@ export const goalParams: Record<Goal, GoalParams> = {
     exercises: { 20: 2, 30: 3, 45: 4 },
     sets: { 20: 3, 30: 3, 45: 3 },
     restMultiplier: 2,
-    steadyProgression: false,
   },
   fit: {
     repCeiling: 15,
@@ -75,7 +71,6 @@ export const goalParams: Record<Goal, GoalParams> = {
     exercises: { 20: 4, 30: 5, 45: 6 },
     sets: { 20: 3, 30: 3, 45: 4 },
     restMultiplier: 0.75,
-    steadyProgression: false,
   },
   health: {
     repCeiling: 15,
@@ -83,7 +78,6 @@ export const goalParams: Record<Goal, GoalParams> = {
     exercises: { 20: 4, 30: 5, 45: 6 },
     sets: { 20: 2, 30: 3, 45: 3 },
     restMultiplier: 1,
-    steadyProgression: true,
   },
 }
 

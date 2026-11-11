@@ -199,7 +199,7 @@ export default function SetupView({
                     <small>
                       {level === 'beginner'
                         ? 'Beginner · accessible variations'
-                        : 'Intermediate · more demanding movements'}
+                        : 'Intermediate · more demanding exercises'}
                     </small>
                     {profile.level === level && <Check size={16} />}
                   </button>

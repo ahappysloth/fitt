@@ -38,8 +38,8 @@ export default function WorkoutReview({
       <section className="panel workout-review__plan" aria-label="Workout review">
         <h2>{workout.title}</h2>
         <p className="workout-review__meta">
-          <Clock3 size={15} /> About {workout.duration} min · {workout.exercises.length} movements ·{' '}
-          {totalSets(workout)} sets
+          <Clock3 size={15} /> About {workout.duration} min · {workout.exercises.length}{' '}
+          {workout.exercises.length === 1 ? 'exercise' : 'exercises'} · {totalSets(workout)} sets
         </p>
         <ol>
           {workout.exercises.map((entry, index) => {
