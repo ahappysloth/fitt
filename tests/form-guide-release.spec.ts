@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test'
 // Released 3D motions replace the illustrated guide in exercise details;
 // unreleased exercises keep the illustration.
 test('exercise details use the 3D guide for released motions only', async ({ page }) => {
+  // Opens a dozen dialogs, each starting the software-WebGL viewer; CI needs more than 30 s.
+  test.setTimeout(120_000)
   await page.goto('/library')
   for (const [name, id] of [
     ['Bodyweight squat', 'squat'],
