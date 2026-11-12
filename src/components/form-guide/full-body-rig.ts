@@ -173,3 +173,103 @@ export function barGrip(frame: PoseFrame, side: Side) {
     }
   }
 }
+
+/**
+ * Two-bone arm IK whose upper arm takes the shortest rotation from its current
+ * (rest or girdle-pivoted) direction, so the humerus never flips its anterior
+ * axis; the forearm and hand inherit that twist rather than an absolute frame.
+ */
+export function reachArm(
+  frame: PoseFrame,
+  side: Side,
+  wrist: Vector3,
+  pole: Vector3,
+  /** Optional hand placement: the fingers' direction and the index-to-little-finger
+   * direction. The forearm pronates or supinates to meet it, as a real forearm does. */
+  palm?: { fingers: Vector3; pinky: Vector3 },
+) {
+  const shoulderRest = head(`upperarm01.${side}`),
+    elbowRest = head(`lowerarm01.${side}`),
+    wristRest = head(`wrist.${side}`)
+  const parent = frame.transforms.get(`upperarm01.${side}`)!
+  const shoulder = apply(parent, shoulderRest)
+  const elbow = solveJoint(
+    shoulder,
+    wrist,
+    pole,
+    shoulderRest.distanceTo(elbowRest),
+    elbowRest.distanceTo(wristRest),
+  )
+  const turn = (from: Vector3, to: Vector3, base: Quaternion) =>
+    new Quaternion()
+      .setFromUnitVectors(from.applyQuaternion(base).normalize(), to.normalize())
+      .multiply(base)
+  const upper = turn(
+    elbowRest.clone().sub(shoulderRest),
+    elbow.clone().sub(shoulder),
+    parent.rotation,
+  )
+  subtree(frame, `upperarm01.${side}`, {
+    original: shoulderRest,
+    anchor: shoulder,
+    rotation: upper,
+  })
+  const across = head(`finger5-1.${side}`).sub(head(`finger2-1.${side}`))
+  const lower = palm
+    ? frameRotation(wristRest.clone().sub(elbowRest), across, wrist.clone().sub(elbow), palm.pinky)
+    : turn(wristRest.clone().sub(elbowRest), wrist.clone().sub(elbow), upper)
+  subtree(frame, `lowerarm01.${side}`, { original: elbowRest, anchor: elbow, rotation: lower })
+  const hand = {
+    original: wristRest,
+    anchor: wrist,
+    rotation: palm
+      ? frameRotation(head(`finger3-1.${side}`).sub(wristRest), across, palm.fingers, palm.pinky)
+      : lower,
+  }
+  subtree(frame, `wrist.${side}`, hand)
+  frame.shoulders.push(shoulder)
+  frame.elbows.push(elbow)
+  frame.wrists.push(wrist)
+  return { shoulder, elbow, hand }
+}
+
+/** Raises the shoulder girdle about the body's anterior axis, as the pull-up does overhead. */
+export function liftGirdle(frame: PoseFrame, side: Side, body: Quaternion, elevation: number) {
+  const anterior = new Vector3(0, 0, 1).applyQuaternion(body)
+  const sign = side === 'L' ? 1 : -1
+  return pivot(
+    frame,
+    `shoulder01.${side}`,
+    new Quaternion().setFromAxisAngle(anterior, sign * elevation).multiply(body),
+  )
+}
+
+/**
+ * Curls the fingers toward the palm relative to the hand's own frame, for grips
+ * whose orientation follows the arm (rings held from below). `curl` is radians
+ * per joint for the fingers; the thumb closes by half as much.
+ */
+export function wrapGrip(frame: PoseFrame, side: Side, curl: number) {
+  const hand = frame.transforms.get(`wrist.${side}`)!
+  // Across the knuckles, index to little finger: the fingers' flexion axis at rest.
+  const across = head(`finger5-1.${side}`)
+    .sub(head(`finger2-1.${side}`))
+    .normalize()
+  const axis = side === 'L' ? across : across.negate()
+  for (let finger = 1; finger <= 5; finger++) {
+    let parent = hand
+    for (let joint = 1; joint <= 3; joint++) {
+      const name = `finger${finger}-${joint}.${side}`
+      if (!frame.transforms.has(name)) continue
+      const original = head(name)
+      const angle = (finger === 1 ? 0.5 : 1) * curl * joint
+      const transform = {
+        original,
+        anchor: apply(parent, original),
+        rotation: hand.rotation.clone().multiply(new Quaternion().setFromAxisAngle(axis, angle)),
+      }
+      subtree(frame, name, transform)
+      parent = transform
+    }
+  }
+}

@@ -250,6 +250,7 @@ export function createGuideScene(
     alignment.visible = false
     alignment.renderOrder = 3
     scene.add(alignment)
+    let bodyModel: BodyModel = 'male'
     let progress = 0,
       playing = false,
       speed = 1,
@@ -259,7 +260,7 @@ export function createGuideScene(
       if (!disposed) renderer.render(scene, camera)
     }
     function setPose() {
-      const pose = motion.sample(progress)
+      const pose = motion.sample(progress, bodyModel)
       athlete.applyPose(pose)
       placeRods(movingRods, unitRod, pose.rods ?? [])
       const points = [pose.alignment[0], pose.alignment.at(-1)!].map((p) =>
@@ -346,11 +347,13 @@ export function createGuideScene(
           ? stageTarget
               .clone()
               .add(
-                value === 'side'
-                  ? new THREE.Vector3(4, 0.12, 0)
-                  : value === 'front'
-                    ? new THREE.Vector3(0, 0.12, 4)
-                    : new THREE.Vector3(2.6, 0.85, 3.7),
+                stage?.views?.[value]
+                  ? new THREE.Vector3(...stage.views[value])
+                  : value === 'side'
+                    ? new THREE.Vector3(4, 0.12, 0)
+                    : value === 'front'
+                      ? new THREE.Vector3(0, 0.12, 4)
+                      : new THREE.Vector3(2.6, 0.85, 3.7),
               )
           : value === 'side'
             ? new THREE.Vector3(3, 0.83, 0.08)
@@ -459,6 +462,8 @@ export function createGuideScene(
       },
       model(value) {
         athlete.model(value)
+        bodyModel = value
+        setPose()
         render()
       },
       dispose,

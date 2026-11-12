@@ -1,5 +1,5 @@
 import type { Quaternion, Vector3 } from 'three'
-import type { Muscle } from '../../lib/types'
+import type { BodyModel, Muscle } from '../../lib/types'
 
 /** A rest-space anatomical segment mapped to a posed world-space frame. */
 export interface RigTransform {
@@ -43,7 +43,11 @@ export interface GuideMotion {
     bar?: { center: readonly [number, number, number]; width: number; radius?: number }
     /** Equipment and surfaces, built from props.ts helpers. Metres; y up, athlete faces +z. */
     props?: readonly StageProp[]
+    /** Camera offsets from `target` for views that need another angle, such as looking
+     * down on a floor drill from the front. Unlisted views keep the shared placement. */
+    views?: Partial<Record<'angle' | 'side' | 'front', readonly [number, number, number]>>
   }
-  sample(progress: number): PoseFrame
+  /** `model` lets floor contacts fit each body surface; omitted means the male surface. */
+  sample(progress: number, model?: BodyModel): PoseFrame
   describe(progress: number): { depth: number; phase: string; cue: string; breath: string }
 }

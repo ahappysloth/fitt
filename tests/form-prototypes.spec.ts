@@ -22,6 +22,8 @@ test('studio exercises share playback, body selection, muscle controls and clean
     ['Pull-up', 'pullup', 'Pause', 'Biceps'],
     ['Negative pull-up', 'negative-pullup', 'Lower slowly', 'Biceps'],
     ['Band-assisted pull-up', 'assisted-pullup', 'Pause', 'Biceps'],
+    ['Ring row', 'ring-row', 'Squeeze', 'Upper back'],
+    ['Prone pulldown', 'prone-pulldown', 'Squeeze', 'Upper back'],
     ['Wall push-up', 'wall-pushup', 'Pause', 'Chest'],
     ['Incline push-up', 'incline-pushup', 'Pause', 'Chest'],
     ['Push-up', 'pushup', 'Pause', 'Chest'],
