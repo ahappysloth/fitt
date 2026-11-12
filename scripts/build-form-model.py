@@ -11,6 +11,7 @@ import pathlib
 import struct
 import sys
 from collections import defaultdict
+import numpy as np
 from form_chest import refine_female_chest
 
 root = pathlib.Path(__file__).resolve().parents[1]
@@ -90,6 +91,21 @@ for old in used:
 
 def encode(fmt, values):
     return base64.b64encode(struct.pack('<' + fmt * len(values), *values)).decode()
+
+def encode_offsets(surface, parents=()):
+    # A body is stored as int16 offsets from the canonical surface (appended
+    # vertices from the midpoint of their two parents, as the runtime derives
+    # it). Half the bytes of float32 positions, a few micrometres of rounding,
+    # and every vertex a body shares with the canonical mesh is exactly zero.
+    points = np.asarray(surface, dtype='<f4').reshape(-1, 3)
+    base = np.zeros_like(points)
+    base[:len(positions)//3] = np.asarray(positions, dtype='<f4').reshape(-1, 3)
+    for index, (left, right) in enumerate(parents, len(positions)//3):
+        base[index] = (base[left].astype(float)+base[right].astype(float))/2
+    offsets = points.astype(float)-base.astype(float)
+    scale = float(np.abs(offsets).max())/32767
+    return {'offsetScale': scale,
+            'offsets': base64.b64encode(np.round(offsets/scale).astype('<i2').tobytes()).decode()}
 result = {
     'version': 1,
     'source': 'MakeHuman hm08, default rig110 / CC0',
@@ -431,7 +447,7 @@ for index in range(len(used)):
         male_positions[offset] += (positions[offset]-male_positions[offset])*foot_weight
 
 variant = {
-    'version': 1,
+    'version': 2,
     'source': 'MakeHuman hm08 adult male muscle/lean shape / CC0, with Fitt athletic surface sculpt',
     'surfaceSculpt': {'revision': 'athletic-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['male'], 6), 'eyeInsetMeters': .0012, 'polishIterations': 3},
     'lowerLegPreservation': {'blendSourceY': [-.35, -.23], 'maleMuscleTargetStrength': .40},
@@ -442,7 +458,7 @@ variant = {
     'sourcesSha256': {**result['sourcesSha256'], **{
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (target_path, muscle_target_path, lean_muscle_target_path)}},
-    'positions': encode('f', male_positions),
+    **encode_offsets(male_positions),
 }
 variant_output = root / 'src/components/form-guide/male-body-data.json'
 variant_output.write_text(json.dumps(variant, indent=2) + '\n')
@@ -545,7 +561,7 @@ female_positions, chest_refinement = refine_female_chest(
 female_total_offset = chest_refinement['maximumCanonicalDisplacementMeters']
 assert female_total_offset < .09, 'Final female silhouette exceeds its 90 mm envelope'
 female_variant = {
-    'version': 1,
+    'version': 2,
     'source': 'MakeHuman hm08 adult female muscle/lean and head shape / CC0, with Fitt athletic surface sculpt',
     'retargeting': variant['retargeting'],
     'surfaceSculpt': {**variant['surfaceSculpt'], 'revision': 'reference-silhouette-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6), 'maximumAllowedOffsetMeters': .09},
@@ -564,7 +580,8 @@ female_variant = {
                        'minimumJacobianBound': round(1-.055*math.pi/.25, 6)},
     'maximumCanonicalDisplacementMeters': round(female_total_offset, 6),
     **chest_refinement,
-    'positions': encode('f', female_positions),
+    **encode_offsets(female_positions, np.frombuffer(
+        base64.b64decode(chest_refinement['topology']['edgeParents']), dtype='<u2').reshape(-1, 2)),
 }
 female_output = root / 'src/components/form-guide/female-body-data.json'
 female_output.write_text(json.dumps(female_variant, indent=2) + '\n')

@@ -3,6 +3,8 @@ import { BufferAttribute, BufferGeometry, Vector3 } from 'three'
 import { createAthlete } from './athlete'
 import male from './male-body-data.json'
 import female from './female-body-data.json'
+import data from './body-data.json'
+import { surfaceBuffers } from './surface-buffers'
 import { finishSurfaceNormals } from './surface-normals'
 
 describe('the shared model finish', () => {
@@ -13,18 +15,11 @@ describe('the shared model finish', () => {
       try {
         const geometry = athlete.mesh.geometry
         const baseline = geometry.clone()
-        if (model === 'female') {
-          const bytes = Uint8Array.from(atob(female.normals), (character) =>
-            character.charCodeAt(0),
-          )
-          baseline.setAttribute('normal', new BufferAttribute(new Float32Array(bytes.buffer), 3))
-        } else baseline.computeVertexNormals()
+        const asset = surfaceBuffers(data, model === 'male' ? male : female)
+        if (asset.normals) baseline.setAttribute('normal', new BufferAttribute(asset.normals, 3))
+        else baseline.computeVertexNormals()
         try {
-          const asset = model === 'male' ? male : female
-          const bytes = Uint8Array.from(atob(asset.positions), (character) =>
-            character.charCodeAt(0),
-          )
-          expect(geometry.attributes.position.array).toEqual(new Float32Array(bytes.buffer))
+          expect(geometry.attributes.position.array).toEqual(asset.positions)
           const source = baseline.attributes.normal
           const polished = geometry.attributes.normal
           const before = new Vector3(),

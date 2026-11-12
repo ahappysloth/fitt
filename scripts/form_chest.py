@@ -238,10 +238,18 @@ def refine_female_chest(surface, source_chart, source_triangles, canonical):
     assert all(count == 2 for count in edge_counts.values()), 'Refined mesh must remain closed'
     maximum_offset = float(np.linalg.norm(points - np.asarray(canonical_points), axis=1).max())
     assert maximum_offset < .09, 'Refined female surface exceeds its 90 mm envelope'
+    # Most of the surface keeps the shared triangles: store only those the
+    # refinement replaced and the ones it added, and unit normals as int16.
+    shared = {tuple(face): index for index, face in enumerate(original_triangles.tolist())}
+    refined = {tuple(face) for face in triangles.tolist()}
+    removed = [index for face, index in shared.items() if face not in refined]
+    added = [face for face in triangles.tolist() if tuple(face) not in shared]
+    assert len(original_triangles) - len(removed) + len(added) == len(triangles)
     return points.ravel().tolist(), {
         'topology': {'baseVertexCount': base_count, 'edgeParents': _encode(parents, '<u2'),
-                     'indices': _encode(triangles, '<u2')},
-        'normals': _encode(normals, '<f4'),
+                     'removedTriangles': _encode(removed, '<u2'),
+                     'addedIndices': _encode(added, '<u2')},
+        'normals': _encode(np.round(normals * 32767), '<i2'),
         'chestRefinement': {'revision': 'round-lower-pole-1', 'subdivisionRounds': 2,
                             'vertices': len(points), 'triangles': len(triangles),
                             'changedOriginalVertices': len(patch - rim - set(range(base_count, len(points)))),
