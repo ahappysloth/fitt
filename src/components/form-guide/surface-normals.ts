@@ -12,16 +12,25 @@ export function finishSurfaceNormals(geometry: BufferGeometry) {
   let current = original.slice()
   // Work along existing edges only: disconnected eyes, lips and fingers must
   // never pick up the shading of a nearby surface on the other side of a gap.
-  const neighbors = Array.from({ length: normal.count }, () => new Set<number>())
-  for (let offset = 0; offset < triangles.count; offset += 3) {
-    const ids = [triangles.getX(offset), triangles.getX(offset + 1), triangles.getX(offset + 2)]
-    for (let edge = 0; edge < 3; edge++) {
-      const a = ids[edge],
-        b = ids[(edge + 1) % 3]
-      neighbors[a].add(b)
-      neighbors[b].add(a)
-    }
+  // Flat adjacency lists (start offsets into one array) keep this pass cheap on
+  // load: each vertex's distinct neighbours, in the order its triangles list them.
+  const index = triangles.array
+  const starts = new Uint32Array(normal.count + 1)
+  for (let offset = 0; offset < index.length; offset++) starts[index[offset] + 1] += 2
+  for (let vertex = 0; vertex < normal.count; vertex++) starts[vertex + 1] += starts[vertex]
+  const neighbors = new Uint32Array(starts[normal.count])
+  const ends = starts.slice(0, normal.count)
+  const connect = (a: number, b: number) => {
+    for (let slot = starts[a]; slot < ends[a]; slot++) if (neighbors[slot] === b) return
+    neighbors[ends[a]++] = b
   }
+  for (let offset = 0; offset < index.length; offset += 3)
+    for (let edge = 0; edge < 3; edge++) {
+      const a = index[offset + edge],
+        b = index[offset + ((edge + 1) % 3)]
+      connect(a, b)
+      connect(b, a)
+    }
 
   for (let pass = 0; pass < 2; pass++) {
     const next = current.slice()
@@ -34,8 +43,8 @@ export function finishSurfaceNormals(geometry: BufferGeometry) {
         sumY = 0,
         sumZ = 0,
         total = 0
-      for (const other of neighbors[vertex]) {
-        const neighbor = other * 3
+      for (let slot = starts[vertex]; slot < ends[vertex]; slot++) {
+        const neighbor = neighbors[slot] * 3
         const dot =
           original[offset] * original[neighbor] +
           original[offset + 1] * original[neighbor + 1] +

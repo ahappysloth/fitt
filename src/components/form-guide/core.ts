@@ -16,7 +16,7 @@ import {
   subtree,
   type Side,
 } from './full-body-rig'
-import { ball, heelUp, plantLeg } from './lunges'
+import { ball, heelUp, plantLeg, standing } from './lunges'
 
 /*
  * Core drills. Units are metres, y up. The supine drills lie head toward -z
@@ -192,7 +192,7 @@ const ballOf = (angle: number, side: Side) => {
 }
 /** Straight-body angle at which the balls of the feet reach the floor. */
 const plankAngle = (() => {
-  const floorBall = ball('L').y + 0.827
+  const floorBall = ball('L').y + standing
   let low = 0,
     high = Math.PI / 4
   for (let step = 0; step < 50; step++) {

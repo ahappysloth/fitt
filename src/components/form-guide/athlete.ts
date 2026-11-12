@@ -3,22 +3,23 @@ import data from './body-data.json'
 import maleData from './male-body-data.json'
 import femaleData from './female-body-data.json'
 import type { BodyModel, Muscle } from '../../lib/types'
-import { kneePushupMuscles, muscleRegionWeights, previewMuscles } from './muscle-regions'
-import { refineWeights, surfaceBuffers, type ModelSurface } from './surface-buffers'
+import {
+  kneePushupMuscles,
+  muscleFeather,
+  muscleLayer,
+  muscleRegionWeights,
+  previewMuscles,
+} from './muscle-regions'
+import { decodeBase64, refineWeights, surfaceBuffers, type ModelSurface } from './surface-buffers'
 import { finishSurfaceNormals } from './surface-normals'
 import type { PoseFrame, FocusRegion } from './contracts'
 export type { FocusRegion } from './contracts'
 
 const v = (values: number[]) => new THREE.Vector3(...(values as [number, number, number]))
-function decode(value: string) {
-  const raw = atob(value)
-  const bytes = new Uint8Array(raw.length)
-  for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index)
-  return bytes.buffer
-}
 let canonicalMasks: Record<Muscle, Float32Array> | undefined
-function muscleMasks(positions: Float32Array) {
+function muscleMasks() {
   if (canonicalMasks) return canonicalMasks
+  const positions = new Float32Array(decodeBase64(data.positions))
   const masks = Object.fromEntries(
     previewMuscles.map((muscle) => [muscle, new Float32Array(data.vertices)]),
   ) as Record<Muscle, Float32Array>
@@ -46,8 +47,7 @@ function transformKey(name: string) {
 }
 
 export function createAthlete(initialModel: BodyModel = 'male') {
-  const positions = new Float32Array(decode(data.positions))
-  const baseMasks = muscleMasks(positions)
+  const baseMasks = muscleMasks()
   function buildSurface(surface: ModelSurface) {
     const buffers = surfaceBuffers(data, surface)
     const geometry = new THREE.BufferGeometry()
@@ -60,11 +60,12 @@ export function createAthlete(initialModel: BodyModel = 'male') {
       new THREE.Uint16BufferAttribute(buffers.skinWeights, 4, true),
     )
     geometry.setIndex(new THREE.BufferAttribute(buffers.indices, 1))
-    const selectedWeights = new Float32Array(buffers.positions.length / 3)
+    // One weight per seam layer, so the shader can find where two layers meet.
+    const selectedWeights = new Float32Array((buffers.positions.length / 3) * 2)
     const masks = Object.fromEntries(
       previewMuscles.map((region) => [region, refineWeights(baseMasks[region], buffers.parents)]),
     ) as Record<Muscle, Float32Array>
-    geometry.setAttribute('muscleWeight', new THREE.BufferAttribute(selectedWeights, 1))
+    geometry.setAttribute('muscleWeight', new THREE.BufferAttribute(selectedWeights, 2))
     if (buffers.normals)
       geometry.setAttribute('normal', new THREE.BufferAttribute(buffers.normals, 3))
     else geometry.computeVertexNormals()
@@ -95,7 +96,7 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        '#include <common>\nattribute float muscleWeight;\nvarying float vFittMuscleWeight;',
+        '#include <common>\nattribute vec2 muscleWeight;\nvarying vec2 vFittMuscleWeight;',
       )
       .replace(
         '#include <begin_vertex>',
@@ -104,16 +105,21 @@ export function createAthlete(initialModel: BodyModel = 'male') {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        '#include <common>\nuniform vec3 fittMuscleColor;\nvarying float vFittMuscleWeight;',
+        '#include <common>\nuniform vec3 fittMuscleColor;\nvarying vec2 vFittMuscleWeight;',
       )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-         float muscleEdge = smoothstep(0.15, 0.85, vFittMuscleWeight);
+         float muscleTop = max(vFittMuscleWeight.x, vFittMuscleWeight.y);
+         float muscleUnder = min(vFittMuscleWeight.x, vFittMuscleWeight.y);
+         float muscleSeam = (1.0 - smoothstep(0.04, 0.11, muscleTop - muscleUnder))
+           * smoothstep(0.38, 0.5, muscleUnder);
+         float muscleEdge = smoothstep(${muscleFeather[0].toFixed(2)}, ${muscleFeather[1].toFixed(2)}, muscleTop)
+           * (1.0 - muscleSeam);
          diffuseColor.rgb = mix(diffuseColor.rgb, fittMuscleColor, muscleEdge);`,
       )
   }
-  material.customProgramCacheKey = () => 'fitt-muscle-edge-1'
+  material.customProgramCacheKey = () => 'fitt-muscle-seam-1'
   const mesh = new THREE.SkinnedMesh(activeSurface.geometry, material)
   mesh.name = 'Fitt training mannequin'
   mesh.castShadow = true
@@ -144,10 +150,12 @@ export function createAthlete(initialModel: BodyModel = 'male') {
   function highlight(regions: readonly Muscle[]) {
     highlightedRegions = [...regions]
     const { geometry, masks, selectedWeights } = activeSurface
-    for (let i = 0; i < selectedWeights.length; i++) {
-      let mask = 0
-      for (const region of regions) mask = Math.max(mask, masks[region][i])
-      selectedWeights[i] = mask
+    selectedWeights.fill(0)
+    for (const region of new Set(regions)) {
+      const mask = masks[region]
+      const layer = muscleLayer[region]
+      for (let i = 0; i < mask.length; i++)
+        if (mask[i] > selectedWeights[i * 2 + layer]) selectedWeights[i * 2 + layer] = mask[i]
     }
     material.color.copy(regions.length ? subtle : baseColor)
     geometry.attributes.muscleWeight.needsUpdate = true

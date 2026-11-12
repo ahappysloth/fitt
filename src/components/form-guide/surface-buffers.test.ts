@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { refineWeights, surfaceBuffers } from './surface-buffers'
 
-const encode = (values: Float32Array | Uint16Array | Uint8Array) =>
+const encode = (values: Float32Array | Uint16Array | Int16Array | Uint8Array) =>
   Buffer.from(values.buffer, values.byteOffset, values.byteLength).toString('base64')
 const shared = {
   vertices: 3,
@@ -12,12 +12,17 @@ const shared = {
     new Uint16Array([30000, 20000, 10000, 5535, 30000, 20000, 10000, 5535, 65535, 0, 0, 0]),
   ),
 }
+// Offsets count steps of `offsetScale` from the canonical vertex (appended
+// vertices: from the midpoint of their parents).
+const still = { offsetScale: 0.125, offsets: encode(new Int16Array(9)) }
 const refined = {
-  positions: encode(new Float32Array([0, 0, 0, 2, 0, 0, 0, 2, 0, 1, 0, 0.25, 0.5, 1, 0.25])),
+  offsetScale: 0.125,
+  offsets: encode(new Int16Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 2])),
   topology: {
     baseVertexCount: 3,
     edgeParents: encode(new Uint16Array([0, 1, 3, 2])),
-    indices: encode(new Uint16Array([0, 3, 4, 0, 4, 2, 3, 1, 4, 1, 2, 4])),
+    removedTriangles: encode(new Uint16Array([0])),
+    addedIndices: encode(new Uint16Array([0, 3, 4, 0, 4, 2, 3, 1, 4, 1, 2, 4])),
   },
 }
 
@@ -25,7 +30,8 @@ describe('local surface refinement', () => {
   it('preserves the base and derives recursive canonical coordinates and normalized skin weights', () => {
     const result = surfaceBuffers(shared, refined)
     expect([...result.canonical]).toEqual([0, 0, 0, 2, 0, 0, 0, 2, 0, 1, 0, 0, 0.5, 1, 0])
-    expect(result.positions[11]).toBe(0.25)
+    expect([...result.positions]).toEqual([0, 0, 0, 2, 0, 0, 0, 2, 0, 1, 0, 0.25, 0.5, 1, 0.25])
+    expect([...result.indices]).toEqual([0, 3, 4, 0, 4, 2, 3, 1, 4, 1, 2, 4])
     expect([...result.skinIndices.slice(12, 16)]).toEqual([0, 4, 1, 5])
     expect([...result.skinWeights.slice(0, 12)]).toEqual([
       30000, 20000, 10000, 5535, 30000, 20000, 10000, 5535, 65535, 0, 0, 0,
@@ -48,26 +54,23 @@ describe('local surface refinement', () => {
     expect([...base]).toEqual([0, 0.5, 1])
   })
 
-  it('keeps surfaces without refinement compatible with the original buffers', () => {
-    const result = surfaceBuffers(shared, { positions: shared.positions })
+  it('reproduces the canonical surface exactly where a body has no offset', () => {
+    const result = surfaceBuffers(shared, still)
     expect(result.positions).toEqual(result.canonical)
     expect([...result.indices]).toEqual([0, 1, 2])
     expect(result.parents).toHaveLength(0)
   })
 
   it('accepts normalized authored normals and rejects invalid lighting data', () => {
-    const normals = encode(new Float32Array(Array.from({ length: 5 }, () => [0, 0, 1]).flat()))
+    const normals = encode(new Int16Array(Array.from({ length: 5 }, () => [0, 0, 32767]).flat()))
     const result = surfaceBuffers(shared, { ...refined, normals })
     expect(result.normals).toHaveLength(result.positions.length)
     expect(result.normals![2]).toBe(1)
     expect(() =>
-      surfaceBuffers(shared, { ...refined, normals: encode(new Float32Array([0, 0, 1])) }),
+      surfaceBuffers(shared, { ...refined, normals: encode(new Int16Array([0, 0, 32767])) }),
     ).toThrow('match')
-    const invalid = new Float32Array(15)
-    invalid[0] = Number.NaN
-    expect(() => surfaceBuffers(shared, { ...refined, normals: encode(invalid) })).toThrow(
-      'finite unit',
-    )
+    const invalid = new Int16Array(15).fill(32767)
+    expect(() => surfaceBuffers(shared, { ...refined, normals: encode(invalid) })).toThrow('unit')
   })
 
   it('rejects mismatched ancestry and triangle indices before building a mesh', () => {
@@ -83,8 +86,17 @@ describe('local surface refinement', () => {
     expect(() =>
       surfaceBuffers(shared, {
         ...refined,
-        topology: { ...refined.topology, indices: encode(new Uint16Array([0, 1, 5])) },
+        topology: { ...refined.topology, addedIndices: encode(new Uint16Array([0, 1, 5])) },
       }),
     ).toThrow('triangle indices')
+    expect(() =>
+      surfaceBuffers(shared, {
+        ...refined,
+        topology: { ...refined.topology, removedTriangles: encode(new Uint16Array([1])) },
+      }),
+    ).toThrow('triangle indices')
+    expect(() => surfaceBuffers(shared, { ...still, offsets: encode(new Int16Array(6)) })).toThrow(
+      'canonical mesh',
+    )
   })
 })

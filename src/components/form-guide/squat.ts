@@ -19,11 +19,11 @@ import {
 
 export function squatPose(progress: number) {
   const { depth } = cycle(progress)
-  const frame = bodyFrame(new Vector3(0, 0.817 - 0.36 * depth, -0.22 * depth))
+  const frame = bodyFrame(new Vector3(0, 0.8075 - 0.36 * depth, -0.22 * depth))
   const torso = pivot(frame, 'spine05', pitch(0.48 * depth))
   for (const [side, sign] of sides) {
     const hip = apply(frame.transforms.get(`upperleg01.${side}`)!, head(`upperleg01.${side}`))
-    const ankle = head(`foot.${side}`).add(new Vector3(0, 0.827, 0))
+    const ankle = head(`foot.${side}`).add(new Vector3(0, 0.8175, 0))
     const knee = solveJoint(
       hip,
       ankle,

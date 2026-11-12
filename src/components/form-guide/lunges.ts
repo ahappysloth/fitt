@@ -24,7 +24,7 @@ import { bench } from './props'
  * on a bench (Bulgarian split squat).
  */
 /** Flat feet stand with their ankles here above their rest position (the squat's fit). */
-const standing = 0.827
+export const standing = 0.8175
 const smooth = (t: number) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2
 const toes = [1, 2, 3, 4, 5].map((toe) => `toe${toe}-1`)
 /** Rest-space ball of the foot: the toe joints' line, on the sole. */
@@ -91,7 +91,7 @@ const frontAnkle = head(`foot.${front}`).add(new Vector3(-0.09, standing, 0))
 export function reverseLungePose(progress: number) {
   const { depth } = cycle(progress)
   // Pelvis descends and moves back as the rear foot travels; the step lands by 85%.
-  const frame = bodyFrame(new Vector3(0, 0.817 - 0.37 * depth, -0.36 * depth))
+  const frame = bodyFrame(new Vector3(0, 0.8075 - 0.37 * depth, -0.36 * depth))
   const torso = pivot(frame, 'spine05', pitch(0.12 * depth))
   plantLeg(
     frame,

@@ -11,6 +11,7 @@ import pathlib
 import struct
 import sys
 from collections import defaultdict
+import numpy as np
 from form_chest import refine_female_chest
 
 root = pathlib.Path(__file__).resolve().parents[1]
@@ -90,6 +91,21 @@ for old in used:
 
 def encode(fmt, values):
     return base64.b64encode(struct.pack('<' + fmt * len(values), *values)).decode()
+
+def encode_offsets(surface, parents=()):
+    # A body is stored as int16 offsets from the canonical surface (appended
+    # vertices from the midpoint of their two parents, as the runtime derives
+    # it). Half the bytes of float32 positions, a few micrometres of rounding,
+    # and every vertex a body shares with the canonical mesh is exactly zero.
+    points = np.asarray(surface, dtype='<f4').reshape(-1, 3)
+    base = np.zeros_like(points)
+    base[:len(positions)//3] = np.asarray(positions, dtype='<f4').reshape(-1, 3)
+    for index, (left, right) in enumerate(parents, len(positions)//3):
+        base[index] = (base[left].astype(float)+base[right].astype(float))/2
+    offsets = points.astype(float)-base.astype(float)
+    scale = float(np.abs(offsets).max())/32767
+    return {'offsetScale': scale,
+            'offsets': base64.b64encode(np.round(offsets/scale).astype('<i2').tobytes()).decode()}
 result = {
     'version': 1,
     'source': 'MakeHuman hm08, default rig110 / CC0',
@@ -274,13 +290,18 @@ def sculpt_surface(surface, model):
         # The trunk field excludes arms, and fades before the pelvis and neck.
         trunk = 1-smoothstep(.16, .23, ax)
         waist = gaussian(oy, .225, .105)*trunk
-        dx -= x*(.105 if male else .18)*waist
+        dx -= x*(.02 if male else .18)*waist
         dz -= (z-.005)*(.10 if male else .14)*waist
         # Lats widen the upper trunk while the waist narrows below them.
-        lat = gaussian(oy, .40, .095)*smoothstep(.07, .135, ax)*trunk
+        # The male taper is longer: it starts at the armpit and runs to the waist.
+        lat = (gaussian(oy, .44 if male else .40, .12 if male else .095)
+               *smoothstep(.07, .135, ax)*trunk)
         dx += side*(.014*(1-.45*smoothstep(.025, .075, oz)) if male else -.003)*lat
         front = smoothstep(.025, .075, oz)
         if male:
+            # The shared pelvis is wide for a male frame: bring the hips and the
+            # outer upper thighs in under the lats, keeping each hip joint fixed.
+            dx -= side*.018*gaussian(oy, .0, .14)*smoothstep(.08, .16, ax)
             # A broad pectoral plate with a higher, flatter lower edge. The
             # source's rounded lower lobes otherwise read as breasts as volume
             # rises; blend their forward depth toward an anatomical chest plane.
@@ -289,6 +310,8 @@ def sculpt_surface(surface, model):
             chest_plane = (.115+.025*gaussian(oy, .455, .080)
                            -.012*smoothstep(.12, .18, ax))
             dz += .78*pec*(chest_plane-z)
+            # Lower the outer pectoral edge into the ribs instead of a hanging lobe.
+            dz -= .012*gaussian(oy, .35, .04)*gaussian(ax, .105, .05)*front
             # Shallow paired abdominal planes and tendinous valleys. Broad
             # quartic fields keep them planar rather than isolated round bumps.
             abdominal = math.exp(-((ax-.039)/.032)**4)*front
@@ -380,9 +403,15 @@ def polish_surface(surface, model):
         skull = .52*smoothstep(.765, .81, y)
         cheek = .32*gaussian(ax, .065, .028)*gaussian(y, .695, .027)*smoothstep(.02, .06, z)
         shoulder = .50*gaussian(ax, .185, .07)*gaussian(y, .53, .055)
-        chest = (.28 if model == 'male' else .25)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
+        chest = (.6 if model == 'male' else .25)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
         hip = .35*gaussian(ax, .145, .06)*gaussian(y, .08, .11) if model == 'female' else 0.
-        strengths.append(max(skull, cheek, shoulder, chest, hip))
+        # The front chart meets the side wall at an angle, leaving a ridge from
+        # the outer lower chest down the flank to the hip. Relax that corner.
+        flank = (.8*smoothstep(.055, .085, ax)*(1-smoothstep(.15, .175, ax))
+                 *smoothstep(.12, .17, y)*(1-smoothstep(.26, .31, y))
+                 *smoothstep(-.01, .02, z)*(1-smoothstep(.075, .105, z))
+                 if model == 'female' else 0.)
+        strengths.append(max(skull, cheek, shoulder, chest, hip, flank))
     for _ in range(3):
         relaxed = surface[:]
         for index, strength in enumerate(strengths):
@@ -406,11 +435,21 @@ def preserve_lower_legs(surface, original):
 male_positions = polish_surface(sculpt_surface(fit_surface(male_vertices), 'male'), 'male')
 male_previous = fit_surface(apply_target(muscle_target_path, .40, male_base_vertices))
 male_positions = preserve_lower_legs(male_positions, male_previous)
+# The male target's toe frames point below the heel, which left the toes 10 mm
+# under it: with a flat foot either the heel floated or, on the shared placement,
+# the female soles did. Both bodies stand on the canonical foot instead, blended
+# in by foot and toe skin weight so the male ankle keeps its shape.
+for index in range(len(used)):
+    foot_weight = sum(skin_weights[index*4+k]/65535 for k in range(4)
+                      if names[skin_indices[index*4+k]].startswith(('foot', 'toe')))
+    for axis in range(3):
+        offset = index*3+axis
+        male_positions[offset] += (positions[offset]-male_positions[offset])*foot_weight
 
 variant = {
-    'version': 1,
+    'version': 2,
     'source': 'MakeHuman hm08 adult male muscle/lean shape / CC0, with Fitt athletic surface sculpt',
-    'surfaceSculpt': {'revision': 'athletic-1', 'maximumOffsetMeters': round(sculpt_maximum_offsets['male'], 6), 'eyeInsetMeters': .0012, 'polishIterations': 3},
+    'surfaceSculpt': {'revision': 'athletic-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['male'], 6), 'eyeInsetMeters': .0012, 'polishIterations': 3},
     'lowerLegPreservation': {'blendSourceY': [-.35, -.23], 'maleMuscleTargetStrength': .40},
     'retargeting': 'Coherent pelvis-to-shoulder trunk frame and head frame, smoothly blended neck; weighted limb frames',
     'maleHeadTargetStrength': male_head_strength,
@@ -419,7 +458,7 @@ variant = {
     'sourcesSha256': {**result['sourcesSha256'], **{
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (target_path, muscle_target_path, lean_muscle_target_path)}},
-    'positions': encode('f', male_positions),
+    **encode_offsets(male_positions),
 }
 variant_output = root / 'src/components/form-guide/male-body-data.json'
 variant_output.write_text(json.dumps(variant, indent=2) + '\n')
@@ -522,7 +561,7 @@ female_positions, chest_refinement = refine_female_chest(
 female_total_offset = chest_refinement['maximumCanonicalDisplacementMeters']
 assert female_total_offset < .09, 'Final female silhouette exceeds its 90 mm envelope'
 female_variant = {
-    'version': 1,
+    'version': 2,
     'source': 'MakeHuman hm08 adult female muscle/lean and head shape / CC0, with Fitt athletic surface sculpt',
     'retargeting': variant['retargeting'],
     'surfaceSculpt': {**variant['surfaceSculpt'], 'revision': 'reference-silhouette-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6), 'maximumAllowedOffsetMeters': .09},
@@ -541,7 +580,8 @@ female_variant = {
                        'minimumJacobianBound': round(1-.055*math.pi/.25, 6)},
     'maximumCanonicalDisplacementMeters': round(female_total_offset, 6),
     **chest_refinement,
-    'positions': encode('f', female_positions),
+    **encode_offsets(female_positions, np.frombuffer(
+        base64.b64decode(chest_refinement['topology']['edgeParents']), dtype='<u2').reshape(-1, 2)),
 }
 female_output = root / 'src/components/form-guide/female-body-data.json'
 female_output.write_text(json.dumps(female_variant, indent=2) + '\n')

@@ -115,9 +115,13 @@ const seat: Record<BodyModel, Vector3> = {
   male: new Vector3(0, 0.023, -0.02),
   female: new Vector3(0, 0.053, -0.02),
 }
-const legsForward = pitch(-Math.PI / 2)
+/** Legs straight out on the floor; the female surface's calves need them slightly lower. */
+const legsForward: Record<BodyModel, ReturnType<typeof pitch>> = {
+  male: pitch(-Math.PI / 2),
+  female: pitch(-Math.PI / 2 + 0.045),
+}
 /** Rest-space outer edge of each sole at the arch, where the band wraps. */
-const soleEdge = (sign: number) => new Vector3(sign * 0.285, -0.83, 0.05)
+const soleEdge = (sign: number) => new Vector3(sign * 0.285, -0.821, 0.05)
 
 function bandRow(progress: number, model: BodyModel = 'male'): PoseFrame {
   const { depth } = cycle(progress)
@@ -125,7 +129,7 @@ function bandRow(progress: number, model: BodyModel = 'male'): PoseFrame {
   const body = frame.transforms.get('body')!
   const feet: Vector3[] = []
   for (const [side, sign] of sides) {
-    const leg = pivot(frame, `upperleg01.${side}`, legsForward)
+    const leg = pivot(frame, `upperleg01.${side}`, legsForward[model])
     frame.knees.push(apply(leg, head(`lowerleg01.${side}`)))
     feet.push(apply(leg, soleEdge(sign)))
   }

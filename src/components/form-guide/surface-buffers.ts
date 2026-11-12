@@ -6,39 +6,60 @@ interface SharedSurface {
   skinWeights: string
 }
 
+/**
+ * A body surface, stored relative to the shared canonical mesh:
+ * `offsets` are int16 XYZ steps of `offsetScale` metres from each canonical
+ * vertex, `normals` are int16 unit vectors (÷ 32767), and `topology` lists only
+ * the shared triangles a local refinement removed and the ones it added.
+ */
 export interface ModelSurface {
-  positions: string
+  offsets: string
+  offsetScale: number
   normals?: string
   topology?: {
     baseVertexCount: number
     edgeParents: string
-    indices: string
+    removedTriangles: string
+    addedIndices: string
   }
 }
 
-function decode(value: string) {
-  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0)).buffer
+/** Base64 to bytes. A plain loop: mapping each character through a callback is several times slower. */
+export function decodeBase64(value: string) {
+  const raw = atob(value)
+  const bytes = new Uint8Array(raw.length)
+  for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index)
+  return bytes.buffer
 }
+const decode = decodeBase64
 
 /** Refined vertices keep their canonical ancestry for skinning and muscle masks. */
 export function surfaceBuffers(shared: SharedSurface, surface: ModelSurface) {
-  const positions = new Float32Array(decode(surface.positions))
-  const normals = surface.normals ? new Float32Array(decode(surface.normals)) : undefined
+  const offsets = new Int16Array(decode(surface.offsets))
+  const packedNormals = surface.normals ? new Int16Array(decode(surface.normals)) : undefined
   const parents = new Uint16Array(decode(surface.topology?.edgeParents ?? ''))
   const count = shared.vertices + parents.length / 2
   if (
     parents.length % 2 ||
-    positions.length !== count * 3 ||
+    offsets.length !== count * 3 ||
+    !Number.isFinite(surface.offsetScale) ||
     (surface.topology && surface.topology.baseVertexCount !== shared.vertices)
   )
     throw new Error('The model surface does not match its canonical mesh.')
-  if (normals) {
-    if (normals.length !== positions.length)
+  let normals: Float32Array | undefined
+  if (packedNormals) {
+    if (packedNormals.length !== offsets.length)
       throw new Error('Model normals do not match its surface.')
+    normals = new Float32Array(packedNormals.length)
     for (let offset = 0; offset < normals.length; offset += 3) {
-      const length = Math.hypot(normals[offset], normals[offset + 1], normals[offset + 2])
-      if (!Number.isFinite(length) || Math.abs(length - 1) > 0.01)
-        throw new Error('Model normals must be finite unit vectors.')
+      const x = packedNormals[offset] / 32767,
+        y = packedNormals[offset + 1] / 32767,
+        z = packedNormals[offset + 2] / 32767
+      const length = Math.hypot(x, y, z)
+      if (Math.abs(length - 1) > 0.01) throw new Error('Model normals must be unit vectors.')
+      normals[offset] = x / length
+      normals[offset + 1] = y / length
+      normals[offset + 2] = z / length
     }
   }
   const canonical = new Float32Array(count * 3)
@@ -73,10 +94,37 @@ export function surfaceBuffers(shared: SharedSurface, surface: ModelSurface) {
     })
     skinWeights[index * 4] += 65535 - normalized
   }
-  const indices = new Uint16Array(decode(surface.topology?.indices ?? shared.indices))
+  // A zero offset reproduces the canonical coordinate exactly, so contact
+  // surfaces a body shares with the canonical mesh stay bit-identical.
+  const positions = new Float32Array(count * 3)
+  for (let offset = 0; offset < positions.length; offset++)
+    positions[offset] = canonical[offset] + offsets[offset] * surface.offsetScale
+  const indices = triangleIndices(shared, surface.topology)
   if (indices.length % 3 || indices.some((index) => index >= count))
     throw new Error('The model triangle indices do not match its surface.')
   return { positions, normals, canonical, parents, indices, skinIndices, skinWeights }
+}
+
+function triangleIndices(shared: SharedSurface, topology: ModelSurface['topology']) {
+  const base = new Uint16Array(decode(shared.indices))
+  if (!topology) return base
+  const removed = new Uint16Array(decode(topology.removedTriangles))
+  const added = new Uint16Array(decode(topology.addedIndices))
+  const indices = new Uint16Array(base.length - removed.length * 3 + added.length)
+  const dropped = new Uint8Array(base.length / 3)
+  for (const triangle of removed) {
+    if (triangle >= dropped.length || dropped[triangle])
+      throw new Error('The model triangle indices do not match its surface.')
+    dropped[triangle] = 1
+  }
+  let offset = 0
+  for (let triangle = 0; triangle < dropped.length; triangle++)
+    if (!dropped[triangle]) {
+      indices.set(base.subarray(triangle * 3, triangle * 3 + 3), offset)
+      offset += 3
+    }
+  indices.set(added, offset)
+  return indices
 }
 
 export function refineWeights(base: Float32Array, parents: Uint16Array) {
