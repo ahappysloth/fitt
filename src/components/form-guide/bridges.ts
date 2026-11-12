@@ -24,11 +24,11 @@ import {
  */
 const supine = pitch(-Math.PI / 2)
 /**
- * Per surface fit. The bridge pivots on the upper back (`depth` is the
- * rest-space z of that contact at shoulder-blade height); `settle` tilts the
- * resting body so the upper back and the buttocks both touch the floor.
+ * Per surface fit. The body pivots on the upper back (`depth` and `height` place
+ * that contact in rest space); `settle` tilts the resting body so the upper back
+ * and the buttocks both touch the floor; `neck` extends the head onto the floor;
+ * `lift` is the bridge angle at the top, so shoulders, hips and knees line up.
  */
-/** `lift` is the bridge angle at the top, in radians: shoulders, hips and knees in one line. */
 const fit: Record<
   BodyModel,
   { depth: number; settle: number; height: number; neck: number; lift: number }
@@ -60,20 +60,38 @@ function armRest(model: BodyModel, side: Side, sign: number) {
   return new Vector3(x, y, shoulder.z + along)
 }
 
-function bridge(progress: number, model: BodyModel = 'male', single = false): PoseFrame {
-  const { depth } = cycle(progress)
-  const rotation = pitch(-(fit[model].settle + fit[model].lift * depth)).multiply(supine)
+/**
+ * Lies the body on its back, head toward -z, fitted so each surface's upper back
+ * and buttocks rest on the floor. `lift` raises the hips about the upper back and
+ * `tuck` flexes the neck; `curl` lifts the chest; all in radians. Shared with
+ * the supine core drills.
+ */
+export function lieOnBack(model: BodyModel = 'male', lift = 0, tuck = 0, curl = 0) {
+  const rotation = pitch(-(fit[model].settle + lift)).multiply(supine)
   const frame = bodyFrame(new Vector3())
   const body = { original: upperBack(model), anchor: new Vector3(), rotation }
   subtree(frame, 'root', body)
   frame.transforms.set('body', body)
-  // The head stays flat on the floor while the hips rise.
-  // A slight chin tuck at the top keeps the back of the head on the floor.
+  // `curl` lifts the chest and shoulders off the floor about the mid back.
+  const chest = pitch(curl)
+  if (curl) pivot(frame, 'spine02', chest.clone().multiply(rotation))
+  // The head stays flat on the floor whatever the hips do, and rides with a curl.
   pivot(
     frame,
     'neck01',
-    supine.clone().multiply(pitch(-fit[model].neck + 0.7 * fit[model].lift * depth)),
+    chest
+      .clone()
+      .multiply(supine)
+      .multiply(pitch(-fit[model].neck + tuck)),
   )
+  return { frame, body, rotation, chest }
+}
+
+function bridge(progress: number, model: BodyModel = 'male', single = false): PoseFrame {
+  const { depth } = cycle(progress)
+  const lift = fit[model].lift * depth
+  // A slight chin tuck at the top keeps the back of the head on the floor.
+  const { frame, body, rotation } = lieOnBack(model, lift, 0.7 * lift)
   const hips: Vector3[] = []
   let thigh = new Vector3()
   for (const [side, sign] of sides) {
