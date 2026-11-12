@@ -20,4 +20,8 @@ export const releasedFormGuides: ReadonlySet<string> = new Set([
   'band-row',
   'ring-row',
   'low-ring-row',
+  'reverse-lunge',
+  'split-squat',
+  'glute-bridge',
+  'single-leg-bridge',
 ])
