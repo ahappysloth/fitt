@@ -15,6 +15,8 @@ test('exercise details use the 3D guide for released motions only', async ({ pag
     ['Ring row', 'ring-row'],
     ['Glute bridge', 'glute-bridge'],
     ['Bulgarian split squat', 'split-squat'],
+    ['Dead bug', 'deadbug'],
+    ['Wall slide', 'wall-slide'],
   ]) {
     await page.getByRole('button', { name: `View ${name} instructions`, exact: true }).click()
     const guide = page.locator('.form-3d[data-ready=true]')
@@ -22,7 +24,9 @@ test('exercise details use the 3D guide for released motions only', async ({ pag
     await expect(guide).toHaveAttribute('data-exercise', id)
     await page.getByRole('button', { name: 'Close dialog' }).click()
   }
-  await page.getByRole('button', { name: 'View Dead bug instructions', exact: true }).click()
-  await expect(page.getByRole('img', { name: /Dead bug:/ })).toBeVisible()
+  await page
+    .getByRole('button', { name: 'View Scapular pull-up instructions', exact: true })
+    .click()
+  await expect(page.getByRole('img', { name: /Scapular pull-up:/ })).toBeVisible()
   await expect(page.locator('.form-3d')).toHaveCount(0)
 })

@@ -4,8 +4,9 @@ import { readFile } from 'node:fs/promises'
 test('studio exercises share playback, body selection, muscle controls and clean switching', async ({
   page,
 }) => {
-  // Switches through every studio motion with software WebGL; CI needs more than 30 s.
-  test.setTimeout(120_000)
+  // Switches through 18 studio motions with software WebGL (about 35 s locally;
+  // CI runners take two to three times as long).
+  test.setTimeout(240_000)
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   const html = await readFile('preview/fitt-form-studio.html', 'utf8')
@@ -26,6 +27,8 @@ test('studio exercises share playback, body selection, muscle controls and clean
     ['Prone pulldown', 'prone-pulldown', 'Squeeze', 'Upper back'],
     ['Reverse lunge', 'reverse-lunge', 'Pause', 'Quads'],
     ['Glute bridge', 'glute-bridge', 'Squeeze', 'Glutes'],
+    ['Forearm plank', 'plank', 'Hold', 'Core'],
+    ['Pike push-up', 'pike-pushup', 'Pause', 'Shoulders'],
     ['Wall push-up', 'wall-pushup', 'Pause', 'Chest'],
     ['Incline push-up', 'incline-pushup', 'Pause', 'Chest'],
     ['Push-up', 'pushup', 'Pause', 'Chest'],

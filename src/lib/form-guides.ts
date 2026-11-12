@@ -24,4 +24,10 @@ export const releasedFormGuides: ReadonlySet<string> = new Set([
   'split-squat',
   'glute-bridge',
   'single-leg-bridge',
+  'deadbug',
+  'plank',
+  'hollow-hold',
+  'tuck-support',
+  'wall-slide',
+  'pike-pushup',
 ])
