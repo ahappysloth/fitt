@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import type { FocusRegion } from './athlete'
 import type { Muscle } from '../../lib/types'
-import { kneePushupMotion } from './knee-pushup'
 import type { GuideMotion } from './contracts'
 import { createGuideScene, type CameraView, type GuideScene } from './scene'
 import './form-guide.css'
@@ -29,22 +28,6 @@ interface FormGuideOptions {
   previewMuscles?: readonly Muscle[]
   /** Enables free panning and wheel/pinch zoom in the studio. */
   inspectionControls?: boolean
-}
-
-export default function KneePushupGuide({
-  fallback,
-  previewMuscles,
-  inspectionControls,
-}: FormGuideOptions) {
-  return (
-    <FormGuide
-      key={kneePushupMotion.id}
-      motion={kneePushupMotion}
-      fallback={fallback}
-      previewMuscles={previewMuscles}
-      inspectionControls={inspectionControls}
-    />
-  )
 }
 
 export function FormGuide({

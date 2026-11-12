@@ -1,3 +1,4 @@
+import { releasedFormGuides } from '../lib/form-guides'
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import type { Exercise } from '../lib/types'
@@ -665,10 +666,10 @@ export function ExerciseThumbnail({
   )
 }
 
-const KneePushupGuide = lazy(() => import('./form-guide/KneePushupGuide'))
+const ExerciseFormGuide = lazy(() => import('./form-guide/ExerciseFormGuide'))
 
 export default function ExerciseGuide({ exercise }: { exercise: Exercise }) {
-  if (exercise.id === 'knee-pushup') {
+  if (releasedFormGuides.has(exercise.id)) {
     return (
       <Suspense
         fallback={
@@ -677,7 +678,10 @@ export default function ExerciseGuide({ exercise }: { exercise: Exercise }) {
           </p>
         }
       >
-        <KneePushupGuide fallback={<LegacyExerciseGuide exercise={exercise} />} />
+        <ExerciseFormGuide
+          exerciseId={exercise.id}
+          fallback={<LegacyExerciseGuide exercise={exercise} />}
+        />
       </Suspense>
     )
   }

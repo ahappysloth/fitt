@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { ArrowUpRight, Check, CirclePlay, Move3D, ShieldCheck } from 'lucide-react'
-import { FormGuide } from './KneePushupGuide'
-import { kneePushupMotion } from './knee-pushup'
-import { squatMotion } from './squat'
-import { pullupMotion } from './pull-up'
+import { FormGuide } from './FormGuide'
+import { guideMotions } from './motions'
 import { byId, equipmentList } from '../../lib/catalog'
 import { Select } from '../ui'
 import ModelInspector from './ModelInspector'
@@ -14,7 +12,7 @@ import '../../form-preview/preview.css'
 
 /** Shared studio content. The local provider keeps model experiments out of account preferences. */
 export default function FormStudioContent({ embedded = false }: { embedded?: boolean }) {
-  const motions = [kneePushupMotion, squatMotion, pullupMotion]
+  const motions = Object.values(guideMotions)
   const [exerciseId, setExerciseId] = useState('knee-pushup')
   const motion = motions.find((item) => item.id === exerciseId)!
   const exercise = byId[exerciseId]
