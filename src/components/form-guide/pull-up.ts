@@ -16,13 +16,22 @@ import {
 
 export function pullupPose(progress: number) {
   const { depth } = cycle(progress)
+  return overheadPose(depth)
+}
+
+/** Shared overhead solver; defaults preserve the approved pull-up exactly. */
+export function overheadPose(
+  depth: number,
+  elevation = 0.85 - 0.5 * depth,
+  straight: boolean | number = false,
+) {
   const frame = bodyFrame(new Vector3(0, 0.995 + 0.445 * depth, 0))
   for (const [side, sign] of sides) {
     // Share overhead elevation with the shoulder girdle rather than hinging only at the humerus.
     pivot(
       frame,
       `shoulder01.${side}`,
-      new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), sign * (0.85 - 0.5 * depth)),
+      new Quaternion().setFromAxisAngle(new Vector3(0, 0, 1), sign * elevation),
     )
     const wrist = new Vector3(sign * 0.29, 1.99, 0.1)
     const handRotation = frameRotation(
@@ -32,6 +41,22 @@ export function pullupPose(progress: number) {
       new Vector3(-sign, 0, 0),
     )
     const shoulder = apply(frame.transforms.get(`upperarm01.${side}`)!, head(`upperarm01.${side}`))
+    if (straight) {
+      const length =
+        head(`upperarm01.${side}`).distanceTo(head(`lowerarm01.${side}`)) +
+        head(`lowerarm01.${side}`).distanceTo(head(`wrist.${side}`))
+      const dy =
+        wrist.y -
+        Math.sqrt(
+          (length - 0.00001) ** 2 - (wrist.x - shoulder.x) ** 2 - (wrist.z - shoulder.z) ** 2,
+        ) -
+        shoulder.y
+      if (side === 'L') {
+        for (const transform of new Set(frame.transforms.values()))
+          transform.anchor.y += dy * Number(straight)
+      }
+      shoulder.copy(apply(frame.transforms.get(`upperarm01.${side}`)!, head(`upperarm01.${side}`)))
+    }
     arm(
       frame,
       side,
