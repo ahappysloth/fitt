@@ -13,4 +13,6 @@ export const releasedFormGuides: ReadonlySet<string> = new Set([
   'pushup',
   'diamond-pushup',
   'ring-pushup',
+  'negative-pullup',
+  'assisted-pullup',
 ])

@@ -141,7 +141,10 @@ export const barPullMotions: GuideMotion[] = Object.entries(scripts).map(([id, s
     keyframes: script.keyframes,
     regions: [
       { id: 'all', label: 'All' },
-      ...exercise.muscles.map((id) => ({ id, label: id.replace('-', ' ') })),
+      ...exercise.muscles.map((id) => {
+        const label = id.replace('-', ' ')
+        return { id, label: label[0].toUpperCase() + label.slice(1) }
+      }),
     ],
     sample: script.sample,
     stage: {
