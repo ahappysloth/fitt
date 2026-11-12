@@ -4,8 +4,7 @@ import { createAthlete } from './athlete'
 import { apply, head } from './full-body-rig'
 import { proneMotions } from './prone'
 import { ringRowLayout, rowMotions } from './rows'
-import data from './body-data.json'
-import { bodyRegions, lowestByRegion, shoulderArea } from './surface-checks'
+import { bodyRegions, expectRigIntact, lowestByRegion, shoulderArea } from './surface-checks'
 import type { GuideMotion } from './contracts'
 
 const motions = [...proneMotions, ...rowMotions]
@@ -28,36 +27,9 @@ function lowest(athlete: ReturnType<typeof createAthlete>, regions: string[]) {
 
 describe('floor pulls and rows', () => {
   for (const motion of motions) {
-    it(`${motion.id}: preserves joint connections, lengths and the loop seam`, () => {
-      for (const model of models) {
-        const start = motion.sample(0, model)
-        let previous = start
-        for (const progress of steps(100)) {
-          const frame = motion.sample(progress, model)
-          expect(frame.transforms.size).toBe(data.bones.length + 1)
-          for (const bone of data.bones) {
-            const transform = frame.transforms.get(bone.name)!
-            expect(Math.abs(transform.rotation.length() - 1)).toBeLessThan(1e-10)
-            const position = apply(transform, head(bone.name))
-            expect(
-              position.distanceTo(apply(previous.transforms.get(bone.name)!, head(bone.name))),
-              // Fingertips sweep fastest in the snow angel; a flip would jump far more.
-            ).toBeLessThan(0.07)
-            if (bone.parent >= 0) {
-              const parent = data.bones[bone.parent]
-              expect(
-                position.distanceTo(apply(frame.transforms.get(parent.name)!, head(parent.name))),
-              ).toBeCloseTo(head(bone.name).distanceTo(head(parent.name)), 9)
-            }
-            if (progress === 1)
-              expect(
-                position.distanceTo(apply(start.transforms.get(bone.name)!, head(bone.name))),
-              ).toBeLessThan(1e-10)
-          }
-          previous = frame
-        }
-      }
-    })
+    it(`${motion.id}: preserves joint connections, lengths and the loop seam`, () =>
+      // Fast sweeps (fingertips, a stepping foot) move most per 1%; a flip would jump far more.
+      expectRigIntact(motion, 0.07))
   }
 
   it.each(models)('rests the prone drills on the %s chest, hips and thighs', (model) => {

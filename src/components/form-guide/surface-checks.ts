@@ -1,9 +1,12 @@
 import { Vector3 } from 'three'
+import { expect } from 'vitest'
+import type { GuideMotion } from './contracts'
+import { apply, head } from './full-body-rig'
 import type { createAthlete } from './athlete'
 import data from './body-data.json'
 
 /*
- * Surface measurements shared by the motion tests. Not imported by the app.
+ * Surface and rig checks shared by the motion tests. Not imported by the app.
  */
 type Athlete = ReturnType<typeof createAthlete>
 const patterns: [string, RegExp][] = [
@@ -91,5 +94,41 @@ export function shoulderArea(athlete: Athlete) {
         .sort((a, b) => a - b)
       return ratios[Math.floor(ratios.length * 0.05)]
     },
+  }
+}
+
+/**
+ * Every bone keeps its rest length to its parent, rotations stay unit length,
+ * no bone jumps more than `maxStep` metres between 1% steps (a flipped limb
+ * would), and the loop closes exactly. Uses vitest's expect: tests only.
+ */
+export function expectRigIntact(motion: GuideMotion, maxStep: number) {
+  for (const model of ['male', 'female'] as const) {
+    const start = motion.sample(0, model)
+    let previous = start
+    for (let step = 0; step <= 100; step++) {
+      const progress = step / 100
+      const frame = motion.sample(progress, model)
+      expect(frame.transforms.size).toBe(data.bones.length + 1)
+      for (const bone of data.bones) {
+        const transform = frame.transforms.get(bone.name)!
+        expect(Math.abs(transform.rotation.length() - 1)).toBeLessThan(1e-10)
+        const position = apply(transform, head(bone.name))
+        expect(
+          position.distanceTo(apply(previous.transforms.get(bone.name)!, head(bone.name))),
+        ).toBeLessThan(maxStep)
+        if (bone.parent >= 0) {
+          const parent = data.bones[bone.parent]
+          expect(
+            position.distanceTo(apply(frame.transforms.get(parent.name)!, head(parent.name))),
+          ).toBeCloseTo(head(bone.name).distanceTo(head(parent.name)), 9)
+        }
+        if (step === 100)
+          expect(
+            position.distanceTo(apply(start.transforms.get(bone.name)!, head(bone.name))),
+          ).toBeLessThan(1e-10)
+      }
+      previous = frame
+    }
   }
 }
