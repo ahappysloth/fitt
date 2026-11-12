@@ -28,10 +28,10 @@ const standing = 0.827
 const smooth = (t: number) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2
 const toes = [1, 2, 3, 4, 5].map((toe) => `toe${toe}-1`)
 /** Rest-space ball of the foot: the toe joints' line, on the sole. */
-const ball = (side: Side) => head(`toe3-1.${side}`).setX(head(`foot.${side}`).x)
+export const ball = (side: Side) => head(`toe3-1.${side}`).setX(head(`foot.${side}`).x)
 
 /** Two-bone leg IK to a placed ankle, with the foot (and flat toes, if given) set in world space. */
-function plantLeg(
+export function plantLeg(
   frame: PoseFrame,
   side: Side,
   ankle: Vector3,
@@ -79,7 +79,7 @@ function relaxedArms(frame: PoseFrame, torso: RigTransform) {
 }
 
 /** Ankle of a foot whose ball stays at `ballAt` while the heel lifts by `lift` radians. */
-function heelUp(side: Side, ballAt: Vector3, lift: number) {
+export function heelUp(side: Side, ballAt: Vector3, lift: number) {
   const rotation = pitch(lift)
   const offset = head(`foot.${side}`).sub(ball(side)).applyQuaternion(rotation)
   return { ankle: ballAt.clone().add(offset), rotation }
