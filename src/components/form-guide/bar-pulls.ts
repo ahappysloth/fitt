@@ -6,6 +6,11 @@ import { overheadPose, pullupMotion } from './pull-up'
 import { band, bench } from './props'
 
 const smooth = (t: number) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2
+/**
+ * Relaxed hang to an active hang. The torso lifts only about 2 cm: the rig's shoulder
+ * skin pinches below the approved active-hang elevation (0.85), and shrugging past
+ * 1.3 adds no lift, so this motion is held from release until the shoulder rig improves.
+ */
 export function scapularPose(progress: number) {
   return overheadPose(0, 1.3 - 0.45 * cycle(progress).depth, true)
 }
@@ -24,9 +29,11 @@ export function assistedPose(progress: number) {
   ]
   return frame
 }
+const negativeDepth = (t: number) =>
+  t < 0.72 ? 1 - smooth((t - 0.12) / 0.6) : smooth((t - 0.78) / 0.22)
 export function negativePose(progress: number) {
   const t = Math.max(0, Math.min(1, progress))
-  const depth = t < 0.72 ? 1 - smooth((t - 0.12) / 0.6) : smooth((t - 0.78) / 0.22)
+  const depth = negativeDepth(t)
   const frame = overheadPose(depth, undefined, 1 - smooth(depth / 0.2))
   // Bring each foot back onto the rear step before extending the legs to reset.
   const contact = t < 0.12 ? 1 - smooth(t / 0.12) : t > 0.72 ? smooth((t - 0.72) / 0.1) : 0
@@ -53,43 +60,102 @@ export function negativePose(progress: number) {
   }
   return frame
 }
-export const barPullMotions: GuideMotion[] = [
-  ['scapular-pullup', scapularPose],
-  ['negative-pullup', negativePose],
-  ['assisted-pullup', assistedPose],
-].map(([id, sample]) => {
-  const exercise = byId[id as string]
+interface Script {
+  phases: readonly string[]
+  keyframes: GuideMotion['keyframes']
+  cues: readonly string[]
+  breaths: readonly string[]
+  seconds: number
+  sample: GuideMotion['sample']
+  /** Depth and phase index at a progress; defaults to the shared pull cycle. */
+  timeline?: (progress: number) => { depth: number; phase: number }
+}
+const scripts: Record<string, Script> = {
+  'scapular-pullup': {
+    phases: ['Relaxed hang', 'Shoulders down', 'Pause', 'Relax'],
+    keyframes: [
+      { label: 'Relaxed hang', progress: 0 },
+      { label: 'Shoulders down', progress: 0.53 },
+      { label: 'Relax slowly', progress: 0.79 },
+    ],
+    cues: [
+      'Hang with straight arms and an overhand grip.',
+      'Draw your shoulders down away from your ears. Elbows stay straight.',
+      'Hold the lift for a moment.',
+      'Relax slowly back into the hang.',
+    ],
+    breaths: ['Get ready', 'Breathe out', 'Stay braced', 'Breathe in'],
+    seconds: 6.4,
+    sample: scapularPose,
+  },
+  'negative-pullup': {
+    phases: ['Top', 'Lower slowly', 'Hang', 'Step back up'],
+    keyframes: [
+      { label: 'Chin over bar', progress: 0 },
+      { label: 'Lowering', progress: 0.42 },
+      { label: 'Straight arms', progress: 0.74 },
+    ],
+    cues: [
+      'Start with your chin above the bar. Lift your feet off the bench.',
+      'Lower for 3 to 5 seconds. Stay in control the whole way.',
+      'Reach straight arms, then find the bench with your feet.',
+      'Step back up onto the bench to reset.',
+    ],
+    breaths: ['Get ready', 'Breathe steadily', 'Breathe out', 'Breathe in'],
+    seconds: 8,
+    sample: negativePose,
+    timeline(progress) {
+      const t = Math.max(0, Math.min(1, progress))
+      return { depth: negativeDepth(t), phase: t < 0.12 ? 0 : t < 0.72 ? 1 : t < 0.8 ? 2 : 3 }
+    },
+  },
+  'assisted-pullup': {
+    phases: ['Set up', 'Pull', 'Pause', 'Lower'],
+    keyframes: [
+      { label: 'Hang in the band', progress: 0 },
+      { label: 'Top & pause', progress: 0.53 },
+      { label: 'Lower slowly', progress: 0.79 },
+    ],
+    cues: [
+      'Hang with one foot in the band. Brace and keep still.',
+      'Drive your elbows down until your chin reaches the bar.',
+      'Keep your neck neutral at the top.',
+      'Lower with control. No swinging.',
+    ],
+    breaths: ['Get ready', 'Breathe out', 'Stay braced', 'Breathe in'],
+    seconds: 6.4,
+    sample: assistedPose,
+  },
+}
+
+export const barPullMotions: GuideMotion[] = Object.entries(scripts).map(([id, script]) => {
+  const exercise = byId[id]
+  const timeline = script.timeline ?? cycle
   return {
     ...pullupMotion,
     id: exercise.id,
     name: exercise.name,
     steps: exercise.steps,
-    seconds: exercise.id === 'negative-pullup' ? 8 : 6.4,
+    seconds: script.seconds,
+    phases: script.phases,
+    keyframes: script.keyframes,
     regions: [
       { id: 'all', label: 'All' },
       ...exercise.muscles.map((id) => ({ id, label: id.replace('-', ' ') })),
     ],
-    sample: sample as GuideMotion['sample'],
+    sample: script.sample,
     stage: {
       ...pullupMotion.stage,
       height: 2.7,
-      props:
-        exercise.id === 'negative-pullup'
-          ? bench([0, 0.745, -0.4], { width: 0.65, depth: 0.4 })
-          : [],
+      props: id === 'negative-pullup' ? bench([0, 0.745, -0.4], { width: 0.65, depth: 0.4 }) : [],
     },
-    keyframes: [
-      { label: 'Setup', progress: 0 },
-      { label: 'Movement', progress: 0.54 },
-      { label: 'Return', progress: 0.79 },
-    ],
     describe(progress: number) {
-      const index = progress < 0.08 ? 0 : progress < 0.72 ? 1 : 2
+      const { depth, phase } = timeline(progress)
       return {
-        depth: cycle(progress).depth,
-        phase: ['Setup', 'Movement', 'Return'][index],
-        cue: exercise.steps[index],
-        breath: 'Breathe steadily',
+        depth,
+        phase: script.phases[phase],
+        cue: script.cues[phase],
+        breath: script.breaths[phase],
       }
     },
   }
