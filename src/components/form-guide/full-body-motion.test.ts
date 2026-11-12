@@ -5,8 +5,42 @@ import { squatMotion } from './squat'
 import { pullupMotion } from './pull-up'
 import { apply, head, solveJoint } from './full-body-rig'
 import data from './body-data.json'
+import { guideMotions } from './motions'
+import { bodyRegions, lowestByRegion } from './surface-checks'
 
 const motions = [squatMotion, pullupMotion]
+
+describe('planted soles', () => {
+  // Both bodies stand on the same canonical foot, so one placement fits both.
+  const planted = [
+    'squat',
+    'reverse-lunge',
+    'glute-bridge',
+    'pushup',
+    'incline-pushup',
+    'wall-pushup',
+  ]
+  it.each(['male', 'female'] as const)('rest the %s feet on the floor, not above it', (model) => {
+    const athlete = createAthlete(model)
+    try {
+      const regions = bodyRegions(athlete)
+      for (const id of planted) {
+        const motion = guideMotions[id]
+        expect(motion, id).toBeDefined()
+        for (const progress of [0, 0.3, 0.54, 0.8]) {
+          athlete.applyPose(motion.sample(progress, model))
+          const floor = lowestByRegion(athlete, regions)
+          for (const foot of id === 'reverse-lunge' ? ['foot.L'] : ['foot.L', 'foot.R']) {
+            expect(floor[foot], `${id} ${foot} at ${progress}`).toBeGreaterThanOrEqual(0)
+            expect(floor[foot], `${id} ${foot} at ${progress}`).toBeLessThan(0.002)
+          }
+        }
+      }
+    } finally {
+      athlete.dispose()
+    }
+  })
+})
 describe('full-body pose foundation', () => {
   it('rejects unreachable IK instead of stretching a limb', () => {
     expect(() =>

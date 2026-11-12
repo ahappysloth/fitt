@@ -23,7 +23,7 @@ function motion(
   width = 0.247,
 ): GuideMotion {
   const vertical = id === 'wall-pushup'
-  const support = new Vector3(0, 0.15, -1.05)
+  const support = new Vector3(0, 0.1425, -1.05)
   const original = head('foot.L').add(head('foot.R')).multiplyScalar(0.5)
   return {
     id,

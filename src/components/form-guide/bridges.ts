@@ -37,7 +37,7 @@ const fit: Record<
   female: { depth: -0.061, settle: 0.097, height: 0.55, neck: 0.06, lift: 0.37 },
 }
 const upperBack = (model: BodyModel) => new Vector3(0, fit[model].height, fit[model].depth)
-const ankleHeight = 0.082
+const ankleHeight = 0.0727
 const feetZ = 0.82
 
 const legLength = (side: Side) =>

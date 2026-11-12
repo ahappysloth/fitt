@@ -413,6 +413,16 @@ def preserve_lower_legs(surface, original):
 male_positions = polish_surface(sculpt_surface(fit_surface(male_vertices), 'male'), 'male')
 male_previous = fit_surface(apply_target(muscle_target_path, .40, male_base_vertices))
 male_positions = preserve_lower_legs(male_positions, male_previous)
+# The male target's toe frames point below the heel, which left the toes 10 mm
+# under it: with a flat foot either the heel floated or, on the shared placement,
+# the female soles did. Both bodies stand on the canonical foot instead, blended
+# in by foot and toe skin weight so the male ankle keeps its shape.
+for index in range(len(used)):
+    foot_weight = sum(skin_weights[index*4+k]/65535 for k in range(4)
+                      if names[skin_indices[index*4+k]].startswith(('foot', 'toe')))
+    for axis in range(3):
+        offset = index*3+axis
+        male_positions[offset] += (positions[offset]-male_positions[offset])*foot_weight
 
 variant = {
     'version': 1,

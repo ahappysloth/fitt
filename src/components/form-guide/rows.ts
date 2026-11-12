@@ -117,7 +117,7 @@ const seat: Record<BodyModel, Vector3> = {
 }
 const legsForward = pitch(-Math.PI / 2)
 /** Rest-space outer edge of each sole at the arch, where the band wraps. */
-const soleEdge = (sign: number) => new Vector3(sign * 0.285, -0.83, 0.05)
+const soleEdge = (sign: number) => new Vector3(sign * 0.285, -0.821, 0.05)
 
 function bandRow(progress: number, model: BodyModel = 'male'): PoseFrame {
   const { depth } = cycle(progress)
