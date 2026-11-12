@@ -465,7 +465,7 @@ export function createGuideScene(
 }
 
 const equipmentColor = '#667064'
-const surfaceColor = '#3a3f37'
+const surfaceColor = '#6b7364'
 /** Builds one stage prop. The scene's traverse-based dispose releases it with the rest. */
 function propMesh(prop: StageProp): THREE.Mesh {
   if (prop.kind === 'box') {
@@ -474,7 +474,8 @@ function propMesh(prop: StageProp): THREE.Mesh {
       new THREE.MeshStandardMaterial({
         color: prop.surface ? surfaceColor : equipmentColor,
         transparent: !!prop.surface,
-        opacity: prop.surface ? 0.12 : 1,
+        // See-through enough for front views, where the wall sits between camera and athlete.
+        opacity: prop.surface ? 0.4 : 1,
         depthWrite: !prop.surface,
         roughness: prop.surface ? 0.9 : 0.5,
         metalness: prop.surface ? 0 : 0.2,

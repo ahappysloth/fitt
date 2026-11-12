@@ -4,4 +4,13 @@
  * motions themselves live in components/form-guide/motions.ts and load lazily.
  * Exercises not listed keep their illustrated guide.
  */
-export const releasedFormGuides: ReadonlySet<string> = new Set(['knee-pushup', 'squat', 'pullup'])
+export const releasedFormGuides: ReadonlySet<string> = new Set([
+  'knee-pushup',
+  'squat',
+  'pullup',
+  'wall-pushup',
+  'incline-pushup',
+  'pushup',
+  'diamond-pushup',
+  'ring-pushup',
+])

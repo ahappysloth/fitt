@@ -132,7 +132,7 @@ function motion(
   }
 }
 export const pushupMotions = [
-  motion('wall-pushup', 1.25, 61, 55),
+  motion('wall-pushup', 1.25, 61, 53),
   motion('incline-pushup', 0.5, 37, 24),
   motion('pushup', 0, 16, 6),
   motion('diamond-pushup', 0, 14, 6, 0.095),
