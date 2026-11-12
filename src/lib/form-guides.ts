@@ -15,4 +15,9 @@ export const releasedFormGuides: ReadonlySet<string> = new Set([
   'ring-pushup',
   'negative-pullup',
   'assisted-pullup',
+  'prone-pulldown',
+  'reverse-snow-angel',
+  'band-row',
+  'ring-row',
+  'low-ring-row',
 ])
