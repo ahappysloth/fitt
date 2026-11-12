@@ -7,6 +7,8 @@ test('exercise details use the 3D guide for released motions only', async ({ pag
   for (const [name, id] of [
     ['Bodyweight squat', 'squat'],
     ['Pull-up', 'pullup'],
+    ['Push-up', 'pushup'],
+    ['Wall push-up', 'wall-pushup'],
   ]) {
     await page.getByRole('button', { name: `View ${name} instructions`, exact: true }).click()
     const guide = page.locator('.form-3d[data-ready=true]')

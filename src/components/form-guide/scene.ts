@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { createAthlete, type FocusRegion } from './athlete'
-import type { GuideMotion } from './contracts'
+import type { GuideMotion, StageProp } from './contracts'
 import type { BodyModel, Muscle } from '../../lib/types'
 
 export type CameraView = 'angle' | 'side' | 'front'
@@ -214,6 +214,7 @@ export function createGuideScene(
         scene.add(bracket)
       }
     }
+    for (const prop of stage?.props ?? []) scene.add(propMesh(prop))
     for (const end of [-0.91, 0.91]) {
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints([
@@ -461,4 +462,50 @@ export function createGuideScene(
     dispose()
     throw error
   }
+}
+
+const equipmentColor = '#667064'
+const surfaceColor = '#6b7364'
+/** Builds one stage prop. The scene's traverse-based dispose releases it with the rest. */
+function propMesh(prop: StageProp): THREE.Mesh {
+  if (prop.kind === 'box') {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(...prop.size),
+      new THREE.MeshStandardMaterial({
+        color: prop.surface ? surfaceColor : equipmentColor,
+        transparent: !!prop.surface,
+        // See-through enough for front views, where the wall sits between camera and athlete.
+        opacity: prop.surface ? 0.4 : 1,
+        depthWrite: !prop.surface,
+        roughness: prop.surface ? 0.9 : 0.5,
+        metalness: prop.surface ? 0 : 0.2,
+      }),
+    )
+    mesh.position.set(...prop.center)
+    mesh.castShadow = !prop.surface
+    mesh.receiveShadow = true
+    return mesh
+  }
+  if (prop.kind === 'rod') {
+    const from = new THREE.Vector3(...prop.from)
+    const to = new THREE.Vector3(...prop.to)
+    const radius = prop.radius ?? 0.018
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, from.distanceTo(to), 20),
+      new THREE.MeshStandardMaterial({ color: equipmentColor, roughness: 0.4, metalness: 0.3 }),
+    )
+    mesh.position.copy(from).add(to).multiplyScalar(0.5)
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize())
+    mesh.castShadow = true
+    return mesh
+  }
+  // Gymnastic ring: a torus standing upright in the athlete's side plane.
+  const mesh = new THREE.Mesh(
+    new THREE.TorusGeometry(prop.radius ?? 0.09, prop.tube ?? 0.014, 12, 40),
+    new THREE.MeshStandardMaterial({ color: '#8a7a5c', roughness: 0.6, metalness: 0.1 }),
+  )
+  mesh.position.set(...prop.center)
+  mesh.rotation.y = Math.PI / 2
+  mesh.castShadow = true
+  return mesh
 }

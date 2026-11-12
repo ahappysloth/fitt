@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises'
 test('studio exercises share playback, body selection, muscle controls and clean switching', async ({
   page,
 }) => {
+  // Switches through every studio motion with software WebGL; CI needs more than 30 s.
+  test.setTimeout(120_000)
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   const html = await readFile('preview/fitt-form-studio.html', 'utf8')
@@ -18,6 +20,11 @@ test('studio exercises share playback, body selection, muscle controls and clean
   for (const [name, id, phase, region] of [
     ['Bodyweight squat', 'squat', 'Pause', 'Quads'],
     ['Pull-up', 'pullup', 'Pause', 'Biceps'],
+    ['Wall push-up', 'wall-pushup', 'Pause', 'Chest'],
+    ['Incline push-up', 'incline-pushup', 'Pause', 'Chest'],
+    ['Push-up', 'pushup', 'Pause', 'Chest'],
+    ['Close-grip push-up', 'diamond-pushup', 'Pause', 'Triceps'],
+    ['Ring push-up', 'ring-pushup', 'Pause', 'Forearms'],
     ['Knee push-up', 'knee-pushup', 'Pause', 'Chest'],
   ]) {
     await page.getByRole('combobox', { name: 'Preview exercise', exact: true }).click()
