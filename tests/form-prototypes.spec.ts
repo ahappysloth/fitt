@@ -20,6 +20,8 @@ test('studio exercises share playback, body selection, muscle controls and clean
   for (const [name, id, phase, region] of [
     ['Bodyweight squat', 'squat', 'Pause', 'Quads'],
     ['Pull-up', 'pullup', 'Pause', 'Biceps'],
+    ['Negative pull-up', 'negative-pullup', 'Lower slowly', 'Biceps'],
+    ['Band-assisted pull-up', 'assisted-pullup', 'Pause', 'Biceps'],
     ['Wall push-up', 'wall-pushup', 'Pause', 'Chest'],
     ['Incline push-up', 'incline-pushup', 'Pause', 'Chest'],
     ['Push-up', 'pushup', 'Pause', 'Chest'],

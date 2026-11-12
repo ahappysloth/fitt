@@ -1,3 +1,4 @@
+import { barPullMotions } from './bar-pulls'
 import type { GuideMotion } from './contracts'
 import { kneePushupMotion } from './knee-pushup'
 import { pullupMotion } from './pull-up'
@@ -12,5 +13,6 @@ export const guideMotions: Readonly<Record<string, GuideMotion>> = {
   [kneePushupMotion.id]: kneePushupMotion,
   [squatMotion.id]: squatMotion,
   [pullupMotion.id]: pullupMotion,
+  ...Object.fromEntries(barPullMotions.map((motion) => [motion.id, motion])),
   ...Object.fromEntries(pushupMotions.map((motion) => [motion.id, motion])),
 }
