@@ -18,7 +18,7 @@ import {
   wrapGrip,
   type Side,
 } from './full-body-rig'
-import { ball, heelUp, plantLeg } from './lunges'
+import { ball, heelUp, plantLeg, standing } from './lunges'
 import { parallettes } from './props'
 
 /*
@@ -83,7 +83,7 @@ const wallSlab: StageProp[] = [
 
 export function wallSlidePose(progress: number, model: BodyModel = 'male') {
   const { depth } = cycle(progress)
-  const frame = bodyFrame(new Vector3(0, 0.827, wallFace + standBack[model]))
+  const frame = bodyFrame(new Vector3(0, 0.817, wallFace + standBack[model]))
   for (const [side, sign] of sides) {
     liftGirdle(frame, side, new Quaternion(), 0.2 + 0.55 * depth)
     const shoulder = joint(frame, `upperarm01.${side}`)
@@ -122,7 +122,8 @@ const hipRest = head('upperleg01.L').add(head('upperleg01.R')).multiplyScalar(0.
 /** Hips high and back: an inverted V with the feet on their balls. */
 const hipsAt = new Vector3(0, 0.78, -0.32)
 const feetLift = 0.7
-const ballsAt = (side: Side, sign: number) => new Vector3(sign * 0.12, ball(side).y + 0.827, -0.7)
+const ballsAt = (side: Side, sign: number) =>
+  new Vector3(sign * 0.12, ball(side).y + standing, -0.7)
 const torsoAt = (angle: number) => ({ original: hipRest, anchor: hipsAt, rotation: pitch(angle) })
 /** The torso at `angle` with the girdle raised as the motion raises it. */
 function pikeTorso(angle: number) {

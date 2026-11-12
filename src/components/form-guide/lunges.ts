@@ -24,7 +24,7 @@ import { bench } from './props'
  * on a bench (Bulgarian split squat).
  */
 /** Flat feet stand with their ankles here above their rest position (the squat's fit). */
-const standing = 0.8175
+export const standing = 0.8175
 const smooth = (t: number) => (1 - Math.cos(Math.PI * Math.max(0, Math.min(1, t)))) / 2
 const toes = [1, 2, 3, 4, 5].map((toe) => `toe${toe}-1`)
 /** Rest-space ball of the foot: the toe joints' line, on the sole. */
