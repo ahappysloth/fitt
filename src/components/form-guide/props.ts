@@ -1,4 +1,4 @@
-import type { StageProp } from './contracts'
+import type { RodProp, StageProp } from './contracts'
 
 /*
  * Equipment for 3D guides, composed from the scene's box/rod/ring primitives.
@@ -95,4 +95,14 @@ export function rings(z: number, ringHeight: number, halfWidth = 0.25, anchor = 
     props.push({ kind: 'rod', from: [x, ringHeight + 0.09, z], to: [x, anchor, z], radius: 0.008 })
   }
   return props
+}
+
+/**
+ * A resistance band between two points, such as a foot and a hand. Bands
+ * stretch as the athlete moves, so motions usually return them per frame in
+ * `PoseFrame.rods` rather than in the static stage props.
+ */
+export function band(from: Vec3 | { x: number; y: number; z: number }, to: typeof from): RodProp {
+  const point = (p: typeof from): Vec3 => ('x' in p ? [p.x, p.y, p.z] : p)
+  return { kind: 'rod', from: point(from), to: point(to), radius: 0.007, band: true }
 }

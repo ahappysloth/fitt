@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { createAthlete, type FocusRegion } from './athlete'
-import type { GuideMotion, StageProp } from './contracts'
+import type { GuideMotion, RodProp, StageProp } from './contracts'
 import type { BodyModel, Muscle } from '../../lib/types'
 
 export type CameraView = 'angle' | 'side' | 'front'
@@ -225,6 +225,10 @@ export function createGuideScene(
       )
       scene.add(line)
     }
+    // Per-frame rods (bands): unit cylinders reused across frames and scaled into place.
+    const movingRods = new THREE.Group()
+    scene.add(movingRods)
+    const unitRod = new THREE.CylinderGeometry(1, 1, 1, 16)
     const athlete = createAthlete()
     cleanups.push(() => athlete.dispose())
     scene.add(athlete.mesh)
@@ -257,6 +261,7 @@ export function createGuideScene(
     function setPose() {
       const pose = motion.sample(progress)
       athlete.applyPose(pose)
+      placeRods(movingRods, unitRod, pose.rods ?? [])
       const points = [pose.alignment[0], pose.alignment.at(-1)!].map((p) =>
         p.clone().add(new THREE.Vector3(0.24, 0.035, 0)),
       )
@@ -465,6 +470,41 @@ export function createGuideScene(
 }
 
 const equipmentColor = '#667064'
+const bandColor = '#d0643c'
+const up = new THREE.Vector3(0, 1, 0)
+function rodMaterial(band?: boolean) {
+  return band
+    ? new THREE.MeshStandardMaterial({ color: bandColor, roughness: 0.75, metalness: 0 })
+    : new THREE.MeshStandardMaterial({ color: equipmentColor, roughness: 0.4, metalness: 0.3 })
+}
+/** Fits a unit cylinder (radius 1, height 1) between a rod's end points. */
+function fitRod(mesh: THREE.Mesh, rod: RodProp) {
+  const from = new THREE.Vector3(...rod.from)
+  const span = new THREE.Vector3(...rod.to).sub(from)
+  const radius = rod.radius ?? 0.018
+  mesh.position.copy(from).addScaledVector(span, 0.5)
+  mesh.quaternion.setFromUnitVectors(up, span.clone().normalize())
+  mesh.scale.set(radius, Math.max(span.length(), 1e-6), radius)
+}
+/** Shows this frame's moving rods, reusing meshes by index and hiding any left over. */
+function placeRods(group: THREE.Group, geometry: THREE.BufferGeometry, rods: readonly RodProp[]) {
+  rods.forEach((rod, index) => {
+    let mesh = group.children[index] as THREE.Mesh | undefined
+    if (!mesh) {
+      mesh = new THREE.Mesh(geometry, rodMaterial(rod.band))
+      mesh.userData.band = !!rod.band
+      mesh.castShadow = true
+      group.add(mesh)
+    } else if (mesh.userData.band !== !!rod.band) {
+      ;(mesh.material as THREE.Material).dispose()
+      mesh.material = rodMaterial(rod.band)
+      mesh.userData.band = !!rod.band
+    }
+    mesh.visible = true
+    fitRod(mesh, rod)
+  })
+  for (const mesh of group.children.slice(rods.length)) mesh.visible = false
+}
 const surfaceColor = '#6b7364'
 /** Builds one stage prop. The scene's traverse-based dispose releases it with the rest. */
 function propMesh(prop: StageProp): THREE.Mesh {
@@ -487,15 +527,8 @@ function propMesh(prop: StageProp): THREE.Mesh {
     return mesh
   }
   if (prop.kind === 'rod') {
-    const from = new THREE.Vector3(...prop.from)
-    const to = new THREE.Vector3(...prop.to)
-    const radius = prop.radius ?? 0.018
-    const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(radius, radius, from.distanceTo(to), 20),
-      new THREE.MeshStandardMaterial({ color: equipmentColor, roughness: 0.4, metalness: 0.3 }),
-    )
-    mesh.position.copy(from).add(to).multiplyScalar(0.5)
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize())
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 20), rodMaterial(prop.band))
+    fitRod(mesh, prop)
     mesh.castShadow = true
     return mesh
   }

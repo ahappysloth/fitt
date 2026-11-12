@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bench, doorframe, parallettes, rings, table, wall } from './props'
+import { band, bench, doorframe, parallettes, rings, table, wall } from './props'
 import type { StageProp } from './contracts'
 
 const boxes = (props: StageProp[]) =>
@@ -36,5 +36,15 @@ describe('equipment props', () => {
       [-0.25, 1.2, 0],
       [0.25, 1.2, 0],
     ])
+  })
+  it('draws a band between two points given as tuples or vectors', () => {
+    const strand = band([0, 0.1, 0.9], { x: 0.1, y: 0.8, z: 0.3 })
+    expect(strand).toMatchObject({
+      kind: 'rod',
+      from: [0, 0.1, 0.9],
+      to: [0.1, 0.8, 0.3],
+      band: true,
+    })
+    expect(strand.radius).toBeLessThan(0.018)
   })
 })
