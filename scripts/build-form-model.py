@@ -274,13 +274,18 @@ def sculpt_surface(surface, model):
         # The trunk field excludes arms, and fades before the pelvis and neck.
         trunk = 1-smoothstep(.16, .23, ax)
         waist = gaussian(oy, .225, .105)*trunk
-        dx -= x*(.105 if male else .18)*waist
+        dx -= x*(.02 if male else .18)*waist
         dz -= (z-.005)*(.10 if male else .14)*waist
         # Lats widen the upper trunk while the waist narrows below them.
-        lat = gaussian(oy, .40, .095)*smoothstep(.07, .135, ax)*trunk
+        # The male taper is longer: it starts at the armpit and runs to the waist.
+        lat = (gaussian(oy, .44 if male else .40, .12 if male else .095)
+               *smoothstep(.07, .135, ax)*trunk)
         dx += side*(.014*(1-.45*smoothstep(.025, .075, oz)) if male else -.003)*lat
         front = smoothstep(.025, .075, oz)
         if male:
+            # The shared pelvis is wide for a male frame: bring the hips and the
+            # outer upper thighs in under the lats, keeping each hip joint fixed.
+            dx -= side*.018*gaussian(oy, .0, .14)*smoothstep(.08, .16, ax)
             # A broad pectoral plate with a higher, flatter lower edge. The
             # source's rounded lower lobes otherwise read as breasts as volume
             # rises; blend their forward depth toward an anatomical chest plane.
@@ -289,6 +294,8 @@ def sculpt_surface(surface, model):
             chest_plane = (.115+.025*gaussian(oy, .455, .080)
                            -.012*smoothstep(.12, .18, ax))
             dz += .78*pec*(chest_plane-z)
+            # Lower the outer pectoral edge into the ribs instead of a hanging lobe.
+            dz -= .012*gaussian(oy, .35, .04)*gaussian(ax, .105, .05)*front
             # Shallow paired abdominal planes and tendinous valleys. Broad
             # quartic fields keep them planar rather than isolated round bumps.
             abdominal = math.exp(-((ax-.039)/.032)**4)*front
@@ -380,7 +387,7 @@ def polish_surface(surface, model):
         skull = .52*smoothstep(.765, .81, y)
         cheek = .32*gaussian(ax, .065, .028)*gaussian(y, .695, .027)*smoothstep(.02, .06, z)
         shoulder = .50*gaussian(ax, .185, .07)*gaussian(y, .53, .055)
-        chest = (.28 if model == 'male' else .25)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
+        chest = (.6 if model == 'male' else .25)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
         hip = .35*gaussian(ax, .145, .06)*gaussian(y, .08, .11) if model == 'female' else 0.
         strengths.append(max(skull, cheek, shoulder, chest, hip))
     for _ in range(3):
@@ -410,7 +417,7 @@ male_positions = preserve_lower_legs(male_positions, male_previous)
 variant = {
     'version': 1,
     'source': 'MakeHuman hm08 adult male muscle/lean shape / CC0, with Fitt athletic surface sculpt',
-    'surfaceSculpt': {'revision': 'athletic-1', 'maximumOffsetMeters': round(sculpt_maximum_offsets['male'], 6), 'eyeInsetMeters': .0012, 'polishIterations': 3},
+    'surfaceSculpt': {'revision': 'athletic-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['male'], 6), 'eyeInsetMeters': .0012, 'polishIterations': 3},
     'lowerLegPreservation': {'blendSourceY': [-.35, -.23], 'maleMuscleTargetStrength': .40},
     'retargeting': 'Coherent pelvis-to-shoulder trunk frame and head frame, smoothly blended neck; weighted limb frames',
     'maleHeadTargetStrength': male_head_strength,
