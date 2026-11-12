@@ -389,7 +389,13 @@ def polish_surface(surface, model):
         shoulder = .50*gaussian(ax, .185, .07)*gaussian(y, .53, .055)
         chest = (.6 if model == 'male' else .25)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
         hip = .35*gaussian(ax, .145, .06)*gaussian(y, .08, .11) if model == 'female' else 0.
-        strengths.append(max(skull, cheek, shoulder, chest, hip))
+        # The front chart meets the side wall at an angle, leaving a ridge from
+        # the outer lower chest down the flank to the hip. Relax that corner.
+        flank = (.8*smoothstep(.055, .085, ax)*(1-smoothstep(.15, .175, ax))
+                 *smoothstep(.12, .17, y)*(1-smoothstep(.26, .31, y))
+                 *smoothstep(-.01, .02, z)*(1-smoothstep(.075, .105, z))
+                 if model == 'female' else 0.)
+        strengths.append(max(skull, cheek, shoulder, chest, hip, flank))
     for _ in range(3):
         relaxed = surface[:]
         for index, strength in enumerate(strengths):
