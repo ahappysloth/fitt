@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises'
 test('studio exercises share playback, body selection, muscle controls and clean switching', async ({
   page,
 }) => {
+  // Switches through every studio motion with software WebGL; CI needs more than 30 s.
+  test.setTimeout(120_000)
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   const html = await readFile('preview/fitt-form-studio.html', 'utf8')
