@@ -10,21 +10,16 @@ import {
   muscleRegionWeights,
   previewMuscles,
 } from './muscle-regions'
-import { refineWeights, surfaceBuffers, type ModelSurface } from './surface-buffers'
+import { decodeBase64, refineWeights, surfaceBuffers, type ModelSurface } from './surface-buffers'
 import { finishSurfaceNormals } from './surface-normals'
 import type { PoseFrame, FocusRegion } from './contracts'
 export type { FocusRegion } from './contracts'
 
 const v = (values: number[]) => new THREE.Vector3(...(values as [number, number, number]))
-function decode(value: string) {
-  const raw = atob(value)
-  const bytes = new Uint8Array(raw.length)
-  for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index)
-  return bytes.buffer
-}
 let canonicalMasks: Record<Muscle, Float32Array> | undefined
-function muscleMasks(positions: Float32Array) {
+function muscleMasks() {
   if (canonicalMasks) return canonicalMasks
+  const positions = new Float32Array(decodeBase64(data.positions))
   const masks = Object.fromEntries(
     previewMuscles.map((muscle) => [muscle, new Float32Array(data.vertices)]),
   ) as Record<Muscle, Float32Array>
@@ -52,8 +47,7 @@ function transformKey(name: string) {
 }
 
 export function createAthlete(initialModel: BodyModel = 'male') {
-  const positions = new Float32Array(decode(data.positions))
-  const baseMasks = muscleMasks(positions)
+  const baseMasks = muscleMasks()
   function buildSurface(surface: ModelSurface) {
     const buffers = surfaceBuffers(data, surface)
     const geometry = new THREE.BufferGeometry()

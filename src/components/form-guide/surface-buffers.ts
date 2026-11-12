@@ -24,9 +24,14 @@ export interface ModelSurface {
   }
 }
 
-function decode(value: string) {
-  return Uint8Array.from(atob(value), (character) => character.charCodeAt(0)).buffer
+/** Base64 to bytes. A plain loop: mapping each character through a callback is several times slower. */
+export function decodeBase64(value: string) {
+  const raw = atob(value)
+  const bytes = new Uint8Array(raw.length)
+  for (let index = 0; index < raw.length; index++) bytes[index] = raw.charCodeAt(index)
+  return bytes.buffer
 }
+const decode = decodeBase64
 
 /** Refined vertices keep their canonical ancestry for skinning and muscle masks. */
 export function surfaceBuffers(shared: SharedSurface, surface: ModelSurface) {
