@@ -473,6 +473,9 @@ function propMesh(prop: StageProp): THREE.Mesh {
       new THREE.BoxGeometry(...prop.size),
       new THREE.MeshStandardMaterial({
         color: prop.surface ? surfaceColor : equipmentColor,
+        transparent: !!prop.surface,
+        opacity: prop.surface ? 0.12 : 1,
+        depthWrite: !prop.surface,
         roughness: prop.surface ? 0.9 : 0.5,
         metalness: prop.surface ? 0 : 0.2,
       }),
