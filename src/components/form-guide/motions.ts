@@ -6,6 +6,8 @@ import { squatMotion } from './squat'
 import { pushupMotions } from './pushups'
 import { proneMotions } from './prone'
 import { rowMotions } from './rows'
+import { lungeMotions } from './lunges'
+import { bridgeMotions } from './bridges'
 
 /**
  * Every authored 3D motion, keyed by exercise id. The studio lists all of them;
@@ -16,7 +18,9 @@ export const guideMotions: Readonly<Record<string, GuideMotion>> = {
   [squatMotion.id]: squatMotion,
   [pullupMotion.id]: pullupMotion,
   ...Object.fromEntries(
-    [...proneMotions, ...rowMotions, ...barPullMotions].map((motion) => [motion.id, motion]),
+    [...proneMotions, ...rowMotions, ...barPullMotions, ...lungeMotions, ...bridgeMotions].map(
+      (motion) => [motion.id, motion],
+    ),
   ),
   ...Object.fromEntries(pushupMotions.map((motion) => [motion.id, motion])),
 }

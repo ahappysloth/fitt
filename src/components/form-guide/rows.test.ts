@@ -5,6 +5,7 @@ import { apply, head } from './full-body-rig'
 import { proneMotions } from './prone'
 import { ringRowLayout, rowMotions } from './rows'
 import data from './body-data.json'
+import { bodyRegions, lowestByRegion, shoulderArea } from './surface-checks'
 import type { GuideMotion } from './contracts'
 
 const motions = [...proneMotions, ...rowMotions]
@@ -14,39 +15,15 @@ const steps = (count: number) => Array.from({ length: count + 1 }, (_, step) => 
 const angleAt = (a: Vector3, joint: Vector3, b: Vector3) =>
   (a.clone().sub(joint).angleTo(b.clone().sub(joint)) * 180) / Math.PI
 
-/** Dominant bone of every vertex, grouped into the regions the floor checks use. */
-function regions(athlete: ReturnType<typeof createAthlete>) {
-  const { skinIndex, skinWeight, position } = athlete.mesh.geometry.attributes
-  return Array.from({ length: position.count }, (_, vertex) => {
-    let weight = 0,
-      bone = 0
-    for (let slot = 0; slot < 4; slot++)
-      if (skinWeight.getComponent(vertex, slot) > weight) {
-        weight = skinWeight.getComponent(vertex, slot)
-        bone = skinIndex.getComponent(vertex, slot)
-      }
-    const name = data.bones[bone].name
-    return /^(spine|root|pelvis|breast)/.test(name)
-      ? 'torso'
-      : /^upperleg/.test(name)
-        ? 'thigh'
-        : /^(foot|toe)/.test(name)
-          ? 'foot'
-          : 'other'
-  })
-}
-/** Lowest surface point overall and per region, checking every vertex is finite. */
-function lowest(athlete: ReturnType<typeof createAthlete>, groups: string[]) {
-  const result: Record<string, number> = { all: Infinity }
-  const point = new Vector3()
-  for (let vertex = 0; vertex < groups.length; vertex++) {
-    athlete.mesh.getVertexPosition(vertex, point)
-    if (![point.x, point.y, point.z].every(Number.isFinite))
-      throw new Error(`Nonfinite vertex ${vertex}`)
-    result.all = Math.min(result.all, point.y)
-    result[groups[vertex]] = Math.min(result[groups[vertex]] ?? Infinity, point.y)
+/** Lowest point per region, with left and right merged into torso, thigh and foot. */
+function lowest(athlete: ReturnType<typeof createAthlete>, regions: string[]) {
+  const floor = lowestByRegion(athlete, regions)
+  return {
+    all: floor.all,
+    torso: Math.min(floor.upperBack, floor.pelvis),
+    thigh: Math.min(floor['thigh.L'], floor['thigh.R']),
+    foot: Math.min(floor['foot.L'], floor['foot.R']),
   }
-  return result
 }
 
 describe('floor pulls and rows', () => {
@@ -86,7 +63,7 @@ describe('floor pulls and rows', () => {
   it.each(models)('rests the prone drills on the %s chest, hips and thighs', (model) => {
     const athlete = createAthlete(model)
     try {
-      const groups = regions(athlete)
+      const groups = bodyRegions(athlete)
       for (const motion of proneMotions)
         for (const progress of steps(12)) {
           athlete.applyPose(motion.sample(progress, model))
@@ -105,7 +82,7 @@ describe('floor pulls and rows', () => {
   it.each(models)('plants the %s heels for the ring rows and seats the band row', (model) => {
     const athlete = createAthlete(model)
     try {
-      const groups = regions(athlete)
+      const groups = bodyRegions(athlete)
       for (const progress of steps(12)) {
         for (const id of ['ring-row', 'low-ring-row']) {
           athlete.applyPose(byId[id].sample(progress, model))
@@ -198,42 +175,11 @@ for (const motion of motions) {
   it.each(models)(`${motion.id} retains %s shoulder area`, (model) => {
     const athlete = createAthlete(model)
     try {
-      const geometry = athlete.mesh.geometry
-      const canonical = geometry.attributes.canonicalPosition
-      const position = geometry.attributes.position
-      const triangles: { ids: number[]; area: number }[] = []
-      const area = (points: Vector3[]) =>
-        points[1].clone().sub(points[0]).cross(points[2].clone().sub(points[0])).length()
-      for (let index = 0; index < geometry.index!.count; index += 3) {
-        const ids = [0, 1, 2].map((offset) => geometry.index!.getX(index + offset))
-        const center = ids
-          .map((id) => new Vector3().fromBufferAttribute(canonical, id))
-          .reduce((sum, point) => sum.add(point), new Vector3())
-          .divideScalar(3)
-        if (
-          Math.abs(center.x) < 0.12 ||
-          Math.abs(center.x) > 0.22 ||
-          center.y < 0.45 ||
-          center.y > 0.56
-        )
-          continue
-        triangles.push({
-          ids,
-          area: area(ids.map((id) => new Vector3().fromBufferAttribute(position, id))),
-        })
-      }
-      expect(triangles.length).toBeGreaterThan(400)
+      const shoulder = shoulderArea(athlete)
+      expect(shoulder.count).toBeGreaterThan(400)
       for (const progress of [0, 0.16, 0.24, 0.4, 0.53, 0.75, 1]) {
         athlete.applyPose(motion.sample(progress, model))
-        const ratios = triangles
-          .map(
-            (triangle) =>
-              area(triangle.ids.map((id) => athlete.mesh.getVertexPosition(id, new Vector3()))) /
-              triangle.area,
-          )
-          .sort((a, b) => a - b)
-        // The lower tail detects pinched attachment triangles that an average hides.
-        expect(ratios[Math.floor(ratios.length * 0.05)]).toBeGreaterThan(0.35)
+        expect(shoulder.lowTail()).toBeGreaterThan(0.35)
       }
     } finally {
       athlete.dispose()
