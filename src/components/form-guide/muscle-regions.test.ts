@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createAthlete } from './athlete'
 import data from './body-data.json'
-import { muscleRegionWeights, previewMuscles } from './muscle-regions'
+import { muscleFeather, muscleLayer, muscleRegionWeights, previewMuscles } from './muscle-regions'
 import { kneePushupPose } from './knee-pushup'
 import { muscleNames } from '../../lib/catalog'
 
@@ -36,10 +36,12 @@ describe('shared muscle regions', () => {
     let backOnFront = 0,
       chestOnBack = 0,
       opposingArms = 0
+    // A weight is a ramp through the outline; only weights above the feather are drawn.
+    const drawn = (weight: number) => weight > muscleFeather[0]
     masks.forEach((mask, index) => {
       const z = positions[index * 3 + 2]
-      if (z > 0.05 && (mask['upper-back'] > 0 || mask['lower-back'] > 0)) backOnFront++
-      if (z < -0.02 && mask.chest > 0) chestOnBack++
+      if (z > 0.05 && (drawn(mask['upper-back']) || drawn(mask['lower-back']))) backOnFront++
+      if (z < -0.02 && drawn(mask.chest)) chestOnBack++
       if (mask.biceps > 0.6 && mask.triceps > 0.6) opposingArms++
     })
     expect({ backOnFront, chestOnBack, opposingArms }).toEqual({
@@ -47,6 +49,19 @@ describe('shared muscle regions', () => {
       chestOnBack: 0,
       opposingArms: 0,
     })
+  })
+
+  it('keeps the groups of one seam layer apart, so every shared border is drawn as a seam', () => {
+    const touching = new Set<string>()
+    masks.forEach((mask) => {
+      for (const layer of [0, 1]) {
+        const drawn = previewMuscles.filter(
+          (muscle) => muscleLayer[muscle] === layer && mask[muscle] > muscleFeather[0],
+        )
+        if (drawn.length > 1) touching.add(drawn.join('+'))
+      }
+    })
+    expect([...touching]).toEqual([])
   })
 
   it('covers the central abdomen and upper glute surface instead of only their edges', () => {
@@ -88,7 +103,7 @@ describe('shared muscle regions', () => {
       const highlights = combined.slice()
       athlete.model('female')
       const femaleGeometry = athlete.mesh.geometry
-      expect(femaleGeometry.attributes.muscleWeight.array.slice(0, data.vertices)).toEqual(
+      expect(femaleGeometry.attributes.muscleWeight.array.slice(0, highlights.length)).toEqual(
         highlights,
       )
       expect(athlete.mesh.skeleton.boneMatrices).toEqual(pose)
