@@ -1,0 +1,14 @@
+{
+  "server": "https://api.envault.turnal.io",
+  "repo": "fitt",
+  "environments": {
+    "local": {
+      "file": ".env.local"
+    },
+    "prod": {
+      "file": ".env.prod",
+      "branch": "main",
+      "production": true
+    }
+  }
+}
