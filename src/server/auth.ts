@@ -61,8 +61,14 @@ export function fittAuthConfig(
     ...(env.RATE_LIMIT_DO
       ? { rateLimiter: createDurableObjectRateLimiter(env.RATE_LIMIT_DO) }
       : {}),
-    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-      ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+    // Trimmed: a secret stored with a trailing newline would otherwise fail construction.
+    ...(env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim()
+      ? {
+          google: {
+            clientId: env.GOOGLE_CLIENT_ID.trim(),
+            clientSecret: env.GOOGLE_CLIENT_SECRET.trim(),
+          },
+        }
       : {}),
     // Anyone with an inbox can create a Fitt account by email, as before.
     magicLink: { enabled: true, allowSignUp: true },
