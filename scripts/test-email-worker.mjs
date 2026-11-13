@@ -59,6 +59,11 @@ test('Worker SMTP adapter loads and renders in real workerd', { timeout: 30_000 
               runtime: navigator.userAgent,
               missingConfiguration: createWorkerMailSender({}) === undefined,
               implicitTls: connection.port === 465 && connection.secure && !connection.startTls,
+              // worker-mailer's own logger (4 = NONE) would print refused recipients.
+              silentMailerLog: connection.logLevel === 4,
+              // A display-name From must reach the SMTP envelope as a parsed address.
+              from: message.from,
+              to: message.to,
               rendered: message.html.includes('Worker rendering works'),
               plainText: message.text.includes('Worker rendering works'),
               closed,
@@ -108,6 +113,9 @@ test('Worker SMTP adapter loads and renders in real workerd', { timeout: 30_000 
     runtime: 'Cloudflare-Workers',
     missingConfiguration: true,
     implicitTls: true,
+    silentMailerLog: true,
+    from: { email: 'fitt@example.test', name: 'Fitt' },
+    to: [{ email: 'athlete@example.test' }],
     rendered: true,
     plainText: true,
     closed: true,

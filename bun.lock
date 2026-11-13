@@ -12,8 +12,8 @@
         "@radix-ui/react-tooltip": "1.4.1",
         "@react-email/render": "2.2.0",
         "@turnal-io/auth": "3.0.1",
-        "@turnal-io/db": "1.0.1",
-        "@turnal-io/email": "2.1.0",
+        "@turnal-io/db": "1.1.1",
+        "@turnal-io/email": "2.2.3",
         "@turnal-io/ratelimit": "1.1.1",
         "better-auth": "1.6.34",
         "drizzle-orm": "0.45.4",
@@ -46,6 +46,7 @@
         "drizzle-kit": "0.31.11",
         "esbuild": "0.28.2",
         "miniflare": "5.20261023.3-beta",
+        "pg": "8.23.1",
         "prettier": "3.9.10",
         "tailwindcss": "4.3.3",
         "tsx": "4.23.15",
@@ -393,9 +394,9 @@
 
     "@turnal-io/auth": ["@turnal-io/auth@3.0.1", "https://npm.pkg.github.com/download/@turnal-io/auth/3.0.1/fbb663890d28b24baa86a54a84632f832cd4c2c2", { "peerDependencies": { "better-auth": ">=1.6.30 <1.7.0", "drizzle-orm": ">=0.30.0 <1" } }, "sha512-0/zggcDa8iAgZEtMyg/i61R255M/hDf83tWITdEAvx6fFKc7lIIkJLxuu8spk4gAVW4gYC2l43zcRpb8+xFptA=="],
 
-    "@turnal-io/db": ["@turnal-io/db@1.0.1", "https://npm.pkg.github.com/download/@turnal-io/db/1.0.1/4900caef622590818a625eb049224fbb0d14492d", { "peerDependencies": { "@neondatabase/serverless": ">=1.0.0", "drizzle-orm": ">=0.30.0 <1", "pg": "^8" } }, "sha512-wIh/K8HPocVFYZtQHzsh79caNTRHRebfRQ15r8qGVgypBJficYcijTr+zdkL747EtFTBiVUsLQ2zx1ih6hJmog=="],
+    "@turnal-io/db": ["@turnal-io/db@1.1.1", "https://npm.pkg.github.com/download/@turnal-io/db/1.1.1/20c33c1a54abec6f36339038784550bac1751bff", { "peerDependencies": { "@neondatabase/serverless": ">=1.0.0", "drizzle-orm": ">=0.30.0 <1", "pg": "^8" } }, "sha512-DJgD+owCfpjnB23/IPRawfxIJfny6csMAsJGPb3pOizBHMdcSpAMp/Muq6ZW5AAPjvl6ilUCJ8AMocSUDCf3VQ=="],
 
-    "@turnal-io/email": ["@turnal-io/email@2.1.0", "https://npm.pkg.github.com/download/@turnal-io/email/2.1.0/a9f54856d0712dc81bad1848a675246c5619e8ba", { "peerDependencies": { "@react-email/render": "^2", "nodemailer": "^8.0.0", "react": ">=18", "worker-mailer": "1.2.1" } }, "sha512-ZKrJL/WY+WsDzaLPD8WSjpF3ZgcOIcNuAyrOS8VnErZYtSSFFivgIMbBHFCYeqZo22nsX9XjCvSM1VXN9fWppA=="],
+    "@turnal-io/email": ["@turnal-io/email@2.2.3", "https://npm.pkg.github.com/download/@turnal-io/email/2.2.3/1ccec81e93e093ec52c3bdb1e009d966208d0244", { "peerDependencies": { "@react-email/render": "^2", "nodemailer": "^8.0.0", "react": ">=18" } }, "sha512-fHzYBR8u1Jr/adfH4As68ltHJlS7YsMyvGDnoMNUl+Cnx7BAwFG2yqzgvvyDCLKN76d1FWZU/Hz2tXnMjP73ig=="],
 
     "@turnal-io/ratelimit": ["@turnal-io/ratelimit@1.1.1", "https://npm.pkg.github.com/download/@turnal-io/ratelimit/1.1.1/3af7bcf2408c5f72954519e443fd5eb3b17a1ff4", {}, "sha512-N82v0FgQnnCvNW8415GVsNYGLTeyPwxNHdFTdp51uVyFGjBY362gD9We9Ve+3Idz1nqyp5cWClCdYRaEgeraGw=="],
 
