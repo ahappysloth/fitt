@@ -182,10 +182,16 @@ test(
           'https://fitt.example/?account=return&error=rate_limited',
         )
         assert.ok(allowed >= 100 && allowed < 400, `allowed ${allowed}`)
-        const fetched = await auth('callback/google', '198.51.100.3')
-        assert.equal(fetched.status, 429)
+        // A burst, not one request: the bucket refills a token every 100 ms,
+        // so on a slow runner a single follow-up request can find a fresh one.
+        const burst = await Promise.all(
+          Array.from({ length: 20 }, () => auth('callback/google', '198.51.100.3')),
+        )
+        await Promise.all(burst.map((response) => response.arrayBuffer()))
+        const fetched = burst.find((response) => response.status === 429)
+        assert.ok(fetched, `no 429 in burst: ${burst.map((response) => response.status)}`)
         assert.ok(fetched.headers.get('x-retry-after'))
-        await fetched.arrayBuffer()
+        assert.ok(burst.every((response) => response.status === 429 || response.status === 302))
         const other = await auth('callback/google', '198.51.100.4', navigate)
         assert.equal(other.status, 302)
         assert.doesNotMatch(other.headers.get('location'), /rate_limited/)
