@@ -102,6 +102,9 @@ describe('passwordless authentication', () => {
   it('limits signed-in routes per isolate even though auth is built per request', async () => {
     const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
     takes.length = 0
+    // Frozen clock: the bucket refills a token every 100 ms, so a slow run
+    // would otherwise let request 101 through.
+    vi.useFakeTimers({ toFake: ['Date'] })
     try {
       // A fresh auth instance per request, as in production; the per-isolate
       // buckets live at module scope, so they still accumulate.
@@ -123,6 +126,7 @@ describe('passwordless authentication', () => {
       expect(statuses[100]).toBe(429)
       expect(takes).toHaveLength(0)
     } finally {
+      vi.useRealTimers()
       await pool.end()
     }
   })
