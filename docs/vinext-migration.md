@@ -31,18 +31,18 @@ Run formatting and both application and Worker type checks from a clean checkout
 The ordinary suite remains:
 
 ```sh
-npm run format:check
-npm run typecheck
-npm run typecheck:worker
-npm test
-npm run test:realtime
-npm run test:email-worker
-npm run test:worker-context
-npm run check:deploy
-npm run test:worker-account
-npm run build:preview
-npm run build:form-preview
-npm run test:e2e
+bun run format:check
+bun run typecheck
+bun run typecheck:worker
+bun run test
+bun run test:realtime
+bun run test:email-worker
+bun run test:worker-context
+bun run check:deploy
+bun run test:worker-account
+bun run build:preview
+bun run build:form-preview
+bun run test:e2e
 ```
 
 The native Worker context check bundles the production environment bridge and request lifecycle with synthetic database/auth resources. The built Worker browser server must use the generated Cloudflare deployment output; a Node-only server does not verify Cloudflare bindings or WebSocket routing. Ordinary browser checks use `http://127.0.0.1:4173`; only the opt-in account fixture suite accepts an explicit hosted origin.
@@ -61,8 +61,8 @@ The built Worker smoke test checks these boundaries with synthetic configuration
 The existing opt-in database and account browser suites create uniquely named synthetic users and remove their own data. They cover magic-link verification and replay/expiry with an in-memory delivery sink, account isolation, concurrent-save protection, two-device restoration, offline synchronization, and sign-out.
 
 ```sh
-npm run test:db
-npm run test:account
+bun run test:db
+bun run test:account
 ```
 
 Use an explicitly selected migrated test database. Do not put credentials, session cookies, or magic-link tokens in logs, screenshots, or committed files. These checks do not prove a real Google OAuth exchange or delivery to a person's mailbox; verify those separately with an authorized user flow.
@@ -72,7 +72,7 @@ Local workerd cannot resolve the external Neon WebSocket destination in this man
 Run the isolated account fixture checks against the existing Worker with the matching database and signing-secret environment:
 
 ```sh
-FITT_LIVE_TEST_ORIGIN=https://fitt.turnal.workers.dev npm run test:account
+FITT_LIVE_TEST_ORIGIN=https://fitt.turnal.workers.dev bun run test:account
 ```
 
 The script already enables `FITT_RUN_LIVE_DB_TESTS=1`. An external origin requires that opt-in and an exact HTTPS origin; it selects only `account-live.spec.ts` and does not start a local server. HTTPS sessions use the `__Secure-` cookie prefix. Live-account traces are disabled, inherited proxy settings remain in use, and fixture cleanup still runs if a browser context fails to close. The suite checks explicit import, two-device restoration, signed-in Durable Object revision messages, offline replay without duplication, account isolation, and sign-out. Both hosted projects passed against release `5aceaaf` in 30.8 seconds, and their temporary database fixtures were removed.

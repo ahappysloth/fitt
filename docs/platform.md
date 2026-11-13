@@ -12,17 +12,17 @@ Fitt uses vinext, React 19, and Tailwind CSS v4. The Cloudflare Vite plugin buil
 
 | Command                       | Purpose                                                        |
 | ----------------------------- | -------------------------------------------------------------- |
-| `npm run dev`                 | Vite/vinext development server on port 5173                    |
-| `npm run typecheck`           | Strict TypeScript check                                        |
-| `npm test`                    | Domain, storage, and offline-cache tests                       |
-| `npm run build`               | Production Worker, static assets, and versioned service worker |
-| `npm run preview`             | Run the built Worker in local workerd on port 4173             |
-| `npm run build:preview`       | Self-contained HTML review artifact                            |
-| `npm run build:worker`        | Alias for the production build                                 |
-| `npm run dev:worker`          | Alias for the local Worker preview                             |
-| `npm run check:deploy`        | Build and validate a Worker deployment without publishing      |
-| `npm run check:compatibility` | Scan App Router compatibility with the pinned vinext version   |
-| `npm run deploy`              | Build and publish the production `fitt` Worker                 |
+| `bun run dev`                 | Vite/vinext development server on port 5173                    |
+| `bun run typecheck`           | Strict TypeScript check                                        |
+| `bun run test`                | Domain, storage, and offline-cache tests                       |
+| `bun run build`               | Production Worker, static assets, and versioned service worker |
+| `bun run preview`             | Run the built Worker in local workerd on port 4173             |
+| `bun run build:preview`       | Self-contained HTML review artifact                            |
+| `bun run build:worker`        | Alias for the production build                                 |
+| `bun run dev:worker`          | Alias for the local Worker preview                             |
+| `bun run check:deploy`        | Build and validate a Worker deployment without publishing      |
+| `bun run check:compatibility` | Scan App Router compatibility with the pinned vinext version   |
+| `bun run deploy`              | Build and publish the production `fitt` Worker                 |
 
 The production Worker entry is `worker.ts`, which delegates ordinary HTTP requests to `vinext/server/app-router-entry`. Vite emits its server module graph in `dist/server/`, hashed client assets under `dist/client/_next/static/`, and copied public assets in `dist/client/`. Wrangler preview, dry run, and deployment use the generated `dist/server/wrangler.json`; the source `wrangler.jsonc` declares assets, authentication origins, and the SQLite-backed `WORKSPACE_DO` and `RATE_LIMIT_DO` bindings (migration tags `v1` and `v2`). The custom entry authenticates `/api/realtime` upgrades and exports `WorkspaceDO` and `RateLimitDO`. There is no OpenNext bundle or Worker self-reference service.
 

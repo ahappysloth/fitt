@@ -1,6 +1,6 @@
 /**
  * Starts the actual Wrangler dry-run bundle in workerd with synthetic bindings.
- * Run npm run check:deploy first, then node --test scripts/test-worker-account.mjs.
+ * Run bun run check:deploy first, then node --test scripts/test-worker-account.mjs.
  * These guest/origin checks never connect to a database or send email.
  */
 import assert from 'node:assert/strict'
