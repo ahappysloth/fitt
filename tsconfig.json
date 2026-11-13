@@ -13,7 +13,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["node", "vite/client"],
+    "types": ["node", "vite/client", "vinext/types"],
     "incremental": true,
     "paths": {
       "@/*": ["./src/*"]

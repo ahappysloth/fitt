@@ -1,16 +1,11 @@
 Fitt runs on vinext with the Cloudflare Vite plugin. `npm run dev` starts Vite;
 `npm run build` creates `dist/server` and `dist/client`; `npm run preview` runs
-the built Worker in workerd. Next is retained only for the auth package's peer
-dependency and compatible API types. Do not restore the Next CLI or OpenNext.
-Check vinext's installed documentation/source for runtime behavior; the Next
-documentation below remains useful for the compatible App Router API surface.
+the built Worker in workerd. The `next` package is not installed: vinext
+implements the supported `next/*` imports, and its fallback declarations
+(`vinext/types` in `tsconfig.json`) type them. Do not restore the Next CLI,
+the `next` package, or OpenNext.
 
-<!-- BEGIN:nextjs-agent-rules -->
-
-## This is NOT the Next.js you know
-
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
-
-This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
-
-<!-- END:nextjs-agent-rules -->
+Check vinext's installed documentation and source (`node_modules/vinext/`,
+`node_modules/@vinext/types/`) for runtime behavior and the supported App
+Router API surface; it may differ from the Next.js you know. Auth is built with
+the framework-free root entry of `@turnal-io/auth` (see `docs/platform.md`).

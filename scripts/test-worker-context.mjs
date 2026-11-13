@@ -39,7 +39,6 @@ test(
         return { db: { id }, dispose: async () => { state.disposed.push(id); } };
       }`,
       auth: `export function buildRequestAuth() { return {}; }`,
-      'auth-context': `export const authContextReady = Promise.resolve();`,
     }
     const bundled = await build({
       stdin: {
@@ -81,7 +80,7 @@ test(
               path: 'fixture-state',
               namespace: 'request-fixture',
             }))
-            builder.onResolve({ filter: /^\.\/(?:db|auth|realtime\/auth-context)$/ }, (args) => {
+            builder.onResolve({ filter: /^\.\/(?:db|auth)$/ }, (args) => {
               if (args.importer !== resolve(root, 'src/server/request.ts')) return
               return { path: args.path.split('/').at(-1), namespace: 'request-fixture' }
             })

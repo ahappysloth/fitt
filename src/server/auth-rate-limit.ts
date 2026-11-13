@@ -3,7 +3,8 @@ import type { ServerDb } from './db'
 import type { FittEnv } from './env'
 import { isWorkerRuntime } from './runtime'
 
-async function privateKey(secret: string, value: string) {
+/** HMAC-SHA256 (hex) so limiter keys never store a raw IP address or email. */
+export async function privateRateLimitKey(secret: string, value: string) {
   const bytes = new TextEncoder()
   const key = await crypto.subtle.importKey(
     'raw',
@@ -38,7 +39,7 @@ async function consume(db: ServerDb, key: string, maximum: number) {
 }
 
 export async function allowTrainingWrite(db: ServerDb, userId: string, env: FittEnv) {
-  return consume(db, await privateKey(env.BETTER_AUTH_SECRET, `training:${userId}`), 120)
+  return consume(db, await privateRateLimitKey(env.BETTER_AUTH_SECRET, `training:${userId}`), 120)
 }
 
 export async function allowAuthAttempt(db: ServerDb, request: Request, env: FittEnv) {
@@ -46,7 +47,9 @@ export async function allowAuthAttempt(db: ServerDb, request: Request, env: Fitt
   const source = isWorkerRuntime()
     ? request.headers.get('cf-connecting-ip') || 'unknown'
     : 'node-development'
-  if (!(await consume(db, await privateKey(env.BETTER_AUTH_SECRET, `source:${source}`), 20)))
+  if (
+    !(await consume(db, await privateRateLimitKey(env.BETTER_AUTH_SECRET, `source:${source}`), 20))
+  )
     return false
   if (new URL(request.url).pathname.endsWith('/sign-in/magic-link')) {
     const body: unknown = await request.clone().json()
@@ -54,7 +57,7 @@ export async function allowAuthAttempt(db: ServerDb, request: Request, env: Fitt
     if (typeof email === 'string' && email.length <= 254) {
       return consume(
         db,
-        await privateKey(env.BETTER_AUTH_SECRET, `email:${email.trim().toLowerCase()}`),
+        await privateRateLimitKey(env.BETTER_AUTH_SECRET, `email:${email.trim().toLowerCase()}`),
         5,
       )
     }

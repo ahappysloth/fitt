@@ -7,7 +7,6 @@ import {
   isTrustedRequestOrigin,
   privateResponse,
 } from './request-policy'
-import { authContextReady } from './realtime/auth-context'
 
 export interface AccountUser {
   id: string
@@ -55,12 +54,18 @@ export async function withRequestServices(
     void task.catch(() => {})
   }
   try {
-    await authContextReady
     resource = await createRequestDb(execution.env.DATABASE_URL)
     const auth = buildRequestAuth(resource.db, execution.env, waitUntil)
     return privateResponse(await handler({ db: resource.db, env: execution.env, waitUntil, auth }))
-  } catch {
-    console.error('[Fitt] Account request could not be completed')
+  } catch (error) {
+    // @turnal-io/auth construction errors name the misconfiguration and carry
+    // no secret values; every other error stays a constant line.
+    const message = error instanceof Error ? error.message : ''
+    console.error(
+      message.startsWith('@turnal-io/auth:')
+        ? `[Fitt] Account services are misconfigured: ${message}`
+        : '[Fitt] Account request could not be completed',
+    )
     return errorResponse(
       'Account services are temporarily unavailable. Your device data is safe.',
       503,

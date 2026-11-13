@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDb } from '@turnal-io/db/serverless'
-import { buildRequestAuth, discardProviderTokens } from './auth'
+import { buildRequestAuth, discardProviderTokens, logAuthLine } from './auth'
 import {
   boundedDelivery,
   createMailSender,
@@ -10,6 +10,20 @@ import {
 import type { FittEnv } from './env'
 import * as schema from '../db/schema'
 import { createElement } from 'react'
+
+// Stand-in for the RATE_LIMIT_DO binding: records the instance and bucket key
+// of every take and answers with `allowed`.
+const takes: Array<{ instance: string; key: string; limit: number; windowMs: number }> = []
+let allowed = true
+const rateLimitNamespace = {
+  idFromName: (name: string) => name,
+  get: (instance: string) => ({
+    fetch: async (_url: string, init: { body: string }) => {
+      takes.push({ instance, ...JSON.parse(init.body) })
+      return Response.json({ allowed, remaining: allowed ? 1 : 0, resetMs: allowed ? 0 : 1_000 })
+    },
+  }),
+} as unknown as NonNullable<FittEnv['RATE_LIMIT_DO']>
 
 const env = {
   DATABASE_URL: 'postgresql://fixture:fixture@invalid.example/test',
@@ -22,6 +36,7 @@ const env = {
   SMTP_USER: '',
   SMTP_PASS: '',
   EMAIL_FROM: '',
+  RATE_LIMIT_DO: rateLimitNamespace,
 } satisfies FittEnv
 
 describe('passwordless authentication', () => {
@@ -39,6 +54,109 @@ describe('passwordless authentication', () => {
       expect(destination.searchParams.get('account')).toBe('return')
       expect(destination.searchParams.has('error')).toBe(true)
     } finally {
+      await pool.end()
+    }
+  })
+
+  it('limits pre-auth routes through the sharded Durable Object without storing client IPs', async () => {
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    takes.length = 0
+    try {
+      const built = buildRequestAuth(
+        db,
+        env,
+        () => {},
+        async () => {},
+      )
+      const request = (path: string, ip: string) =>
+        built.auth.handler(
+          new Request(`${env.BETTER_AUTH_URL}/api/auth/${path}`, {
+            headers: { 'cf-connecting-ip': ip },
+          }),
+        )
+      // Signed-in and health routes use a per-isolate bucket: no DO round trip.
+      expect((await request('ok', '203.0.113.7')).status).toBe(200)
+      expect((await request('get-session', '203.0.113.7')).status).toBe(200)
+      expect(takes).toHaveLength(0)
+      // The OAuth callback is pre-auth: it reaches the shared limiter.
+      await request('callback/google', '203.0.113.7')
+      await request('callback/google', '203.0.113.7')
+      await request('callback/google', '203.0.113.8')
+      expect(takes).toHaveLength(3)
+      for (const take of takes) {
+        expect(take.key).toMatch(/^[0-9a-f]{64}$/)
+        expect(take.instance).toMatch(/^(global|shard-([1-9]|1[0-5]))$/)
+      }
+      // One HMAC'd key per client and path, never the address itself.
+      expect(takes[1].key).toBe(takes[0].key)
+      expect(takes[2].key).not.toBe(takes[0].key)
+      expect(JSON.stringify(takes)).not.toMatch(/203\.0\.113/)
+      // The refusal of pre-auth requests without cf-connecting-ip cannot be
+      // exercised here: Better Auth substitutes 127.0.0.1 when NODE_ENV=test.
+      // scripts/test-worker-account.mjs checks it in the built Worker.
+    } finally {
+      await pool.end()
+    }
+  })
+
+  it('limits signed-in routes per isolate even though auth is built per request', async () => {
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    takes.length = 0
+    // Frozen clock: the bucket refills a token every 100 ms, so a slow run
+    // would otherwise let request 101 through.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      // A fresh auth instance per request, as in production; the per-isolate
+      // buckets live at module scope, so they still accumulate.
+      const session = () =>
+        buildRequestAuth(
+          db,
+          env,
+          () => {},
+          async () => {},
+        ).auth.handler(
+          new Request(`${env.BETTER_AUTH_URL}/api/auth/get-session`, {
+            headers: { 'cf-connecting-ip': '203.0.113.20' },
+          }),
+        )
+      const statuses: number[] = []
+      for (let index = 0; index < 101; index += 1) statuses.push((await session()).status)
+      // Better Auth's default rule: 100 per 10 seconds per client IP.
+      expect(statuses.slice(0, 100).every((status) => status === 200)).toBe(true)
+      expect(statuses[100]).toBe(429)
+      expect(takes).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+      await pool.end()
+    }
+  })
+
+  it('returns a rate-limited browser navigation to the account controls', async () => {
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    allowed = false
+    try {
+      const built = buildRequestAuth(
+        db,
+        env,
+        () => {},
+        async () => {},
+      )
+      const callback = (headers: Record<string, string>) =>
+        built.auth.handler(
+          new Request(`${env.BETTER_AUTH_URL}/api/auth/callback/google?state=fixture`, {
+            headers: { 'cf-connecting-ip': '203.0.113.9', ...headers },
+          }),
+        )
+      const navigation = await callback({ 'Sec-Fetch-Mode': 'navigate' })
+      expect(navigation.status).toBe(302)
+      const destination = new URL(navigation.headers.get('location')!)
+      expect(destination.origin + destination.pathname).toBe(`${env.BETTER_AUTH_URL}/`)
+      expect(destination.searchParams.get('account')).toBe('return')
+      expect(destination.searchParams.get('error')).toBe('rate_limited')
+      // A fetch keeps Better Auth's JSON 429.
+      expect((await callback({})).status).toBe(429)
+    } finally {
+      allowed = true
       await pool.end()
     }
   })
@@ -64,36 +182,52 @@ describe('passwordless authentication', () => {
     expect(input.accessToken).toBe('access')
   })
 
-  it('does not hide a failed mail send behind Turnal’s successful dispatch response', async () => {
+  it('answers 503 EMAIL_DELIVERY_FAILED when the sign-in email cannot be sent', async () => {
     const output = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
-    const background: Promise<unknown>[] = []
     const sender = vi.fn(async () => {
-      throw new Error('delivery failed')
+      throw new Error('delivery failed for athlete@example.test')
     })
     try {
-      const built = buildRequestAuth(
-        db,
-        env,
-        (task) => {
-          background.push(task)
-        },
-        sender,
-      )
+      const built = buildRequestAuth(db, env, () => {}, sender)
       const plugin = built.auth.options.plugins?.find((value) => value.id === 'magic-link')
       const options = plugin?.options as {
         sendMagicLink: (options: { email: string; url: string }) => Promise<void>
       }
-      await options.sendMagicLink({
-        email: 'athlete@example.test',
-        url: 'https://fitt.example/api/auth/magic-link/verify?token=fixture',
-      })
-      await expect(built.finishEmailDeliveries()).rejects.toThrow('delivery failed')
-      await Promise.allSettled(background)
+      // Better Auth awaits this callback inside /sign-in/magic-link.
+      await expect(
+        options.sendMagicLink({
+          email: 'athlete@example.test',
+          url: 'https://fitt.example/api/auth/magic-link/verify?token=fixture',
+        }),
+      ).rejects.toMatchObject({ statusCode: 503, body: { code: 'EMAIL_DELIVERY_FAILED' } })
       expect(sender).toHaveBeenCalledOnce()
+      // The failure is logged, redacted, through Fitt's sink.
+      const logged = output.mock.calls.flat().map(String).join('\n')
+      expect(logged).toContain('email send failed (magic-link)')
+      expect(logged).not.toContain('athlete@example.test')
     } finally {
       await pool.end()
       output.mockRestore()
+    }
+  })
+
+  it("prints the package's own log lines and drops Better Auth's", () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      logAuthLine('error', '[turnalbase/auth] rate limiter failed — REFUSING /sign-in/social', 'x')
+      logAuthLine('warn', '[turnalbase/auth] RATE LIMITING HAS NO CLIENT IP: …')
+      logAuthLine('error', '[turnalbase/auth] Better Auth endpoint threw:', 'driver detail')
+      logAuthLine('error', 'Failed to create user')
+      logAuthLine('warn', 'Social sign-in failed')
+      expect(error.mock.calls).toEqual([
+        ['[turnalbase/auth] rate limiter failed — REFUSING /sign-in/social', 'x'],
+      ])
+      expect(warn.mock.calls).toEqual([['[turnalbase/auth] RATE LIMITING HAS NO CLIENT IP: …']])
+    } finally {
+      error.mockRestore()
+      warn.mockRestore()
     }
   })
 

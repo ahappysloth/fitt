@@ -25,6 +25,14 @@ async function builtWorker() {
     (binding) => binding.name === 'WORKSPACE_DO',
   )
   assert.equal(workspace?.class_name, 'WorkspaceDO', 'The realtime binding must remain configured')
+  const rateLimit = config.durable_objects?.bindings?.find(
+    (binding) => binding.name === 'RATE_LIMIT_DO',
+  )
+  assert.equal(
+    rateLimit?.class_name,
+    'RateLimitDO',
+    'The auth rate-limit binding must be configured',
+  )
   const bundle = resolve(root, '.wrangler/dry-run', basename(config.main))
   const assetsDirectory = resolve(dirname(configPath), config.assets.directory)
   await Promise.all([access(bundle), access(assetsDirectory)])
@@ -85,7 +93,10 @@ test(
           EMAIL_FROM: 'Fitt <fitt@example.test>',
           FITT_ADMIN_EMAILS: 'owner@example.test',
         },
-        durableObjects: { WORKSPACE_DO: { className: 'WorkspaceDO', useSQLite: true } },
+        durableObjects: {
+          WORKSPACE_DO: { className: 'WorkspaceDO', useSQLite: true },
+          RATE_LIMIT_DO: { className: 'RateLimitDO', useSQLite: true },
+        },
         assets: {
           directory: assetsDirectory,
           binding: config.assets.binding,
@@ -126,6 +137,58 @@ test(
           assert.equal(denied.status, 403, path)
           assert.match(denied.headers.get('cache-control'), /no-store/)
         }
+      },
+    )
+
+    await t.test(
+      'builds production-shaped auth and limits it through the shared Durable Object',
+      async () => {
+        // No database or email: /ok and a callback without OAuth state answer
+        // before any query. (Miniflare adds CF-Connecting-IP to every request,
+        // so the refusal of requests without one is pinned by the package's
+        // own workerd test, not here.)
+        const auth = (path, ip, headers = {}) =>
+          runtime.dispatchFetch(`https://fitt.example/api/auth/${path}`, {
+            headers: { ...(ip ? { 'cf-connecting-ip': ip } : {}), ...headers },
+            redirect: 'manual',
+          })
+        const ok = await auth('ok', '198.51.100.1')
+        assert.equal(ok.status, 200)
+        assert.deepEqual(await ok.json(), { ok: true })
+        const callback = await auth('callback/google', '198.51.100.2')
+        assert.equal(callback.status, 302)
+        assert.match(callback.headers.get('location'), /^https:\/\/fitt\.example\/\?account=return/)
+        // The OAuth callback is a pre-auth route, so Better Auth's default
+        // rule (100 per 10 s per client, a token bucket refilling 10 per
+        // second) is enforced through the sharded RATE_LIMIT_DO. A refused
+        // browser navigation returns to the account controls with
+        // error=rate_limited; a fetch keeps the JSON 429. Another client keeps
+        // its own bucket.
+        // A browser navigation's Accept header. (Node's fetch overwrites
+        // Sec-Fetch-Mode, so dispatchFetch cannot send the other signal.)
+        const navigate = { Accept: 'text/html,application/xhtml+xml,*/*;q=0.8' }
+        let allowed = 0
+        let limited
+        for (let index = 0; index < 400 && !limited; index += 1) {
+          const response = await auth('callback/google', '198.51.100.3', navigate)
+          await response.arrayBuffer()
+          const location = new URL(response.headers.get('location') ?? '', 'https://fitt.example')
+          if (location.searchParams.get('error') === 'rate_limited') limited = response
+          else allowed += 1
+        }
+        assert.equal(limited?.status, 302)
+        assert.equal(
+          limited.headers.get('location'),
+          'https://fitt.example/?account=return&error=rate_limited',
+        )
+        assert.ok(allowed >= 100 && allowed < 400, `allowed ${allowed}`)
+        const fetched = await auth('callback/google', '198.51.100.3')
+        assert.equal(fetched.status, 429)
+        assert.ok(fetched.headers.get('x-retry-after'))
+        await fetched.arrayBuffer()
+        const other = await auth('callback/google', '198.51.100.4', navigate)
+        assert.equal(other.status, 302)
+        assert.doesNotMatch(other.headers.get('location'), /rate_limited/)
       },
     )
 

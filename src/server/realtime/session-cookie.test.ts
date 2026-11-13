@@ -47,6 +47,16 @@ describe('realtime session cookies', () => {
     ).toBeNull()
   })
 
+  it('accepts a cookie signed with the same secret, whatever the session state', async () => {
+    // Signature only: the session lookup in resolveRealtimeSession decides.
+    const cookie = await signed()
+    expect(await verifiedSessionToken(request(cookie), secret, 'http://localhost:5173')).toBe(token)
+    const shortToken = await signed('better-auth.session_token', 'short')
+    expect(
+      await verifiedSessionToken(request(shortToken), secret, 'http://localhost:5173'),
+    ).toBeNull()
+  })
+
   it('fails closed for missing configuration and unbounded cookie input', async () => {
     expect(
       await verifiedSessionToken(request(await signed()), '', 'https://fitt.example'),

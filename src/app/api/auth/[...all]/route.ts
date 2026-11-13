@@ -67,13 +67,8 @@ async function handle(request: Request) {
         { status: 429, headers: { 'Retry-After': '600' } },
       )
     }
-    const response = await auth.auth.handler(bounded)
-    try {
-      await auth.finishEmailDeliveries()
-    } catch {
-      return errorResponse('Your sign-in email could not be sent. Please try again later.', 503)
-    }
-    return response
+    // A failed magic-link send answers 503 EMAIL_DELIVERY_FAILED (emailDelivery: 'await').
+    return auth.auth.handler(bounded)
   })
 }
 

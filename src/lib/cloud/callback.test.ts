@@ -41,6 +41,14 @@ describe('account callback navigation', () => {
     ).toBe('This Google sign-in attempt expired or could not be verified. Please try again.')
   })
 
+  it('explains a rate-limited Google return or email-link click', () => {
+    const result = parseAuthCallback('https://fitt.example.test/?account=return&error=rate_limited')
+    expect(result?.error).toBe(
+      'Too many sign-in attempts from this connection. Wait a moment, then try again.',
+    )
+    expect(result?.cleanedUrl).toBe('https://fitt.example.test/')
+  })
+
   it('returns to account controls on every Better Auth outcome with no external redirect input', () => {
     expect(authCallbackURLs('https://fitt.example.test')).toEqual({
       callbackURL: 'https://fitt.example.test/settings?account=return',
