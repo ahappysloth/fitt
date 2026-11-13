@@ -254,6 +254,66 @@ test(
       },
     )
 
+    await t.test(
+      'sets security headers on every Worker response, with a report-only CSP',
+      async () => {
+        const enforced = {
+          'strict-transport-security': 'max-age=63072000; includeSubDomains',
+          'x-content-type-options': 'nosniff',
+          'x-frame-options': 'DENY',
+          'referrer-policy': 'strict-origin-when-cross-origin',
+          'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+        }
+        const requests = [
+          ['/', {}],
+          ['/workout', {}],
+          ['/workout', { RSC: '1', Accept: 'text/x-component' }],
+          ['/not-a-fitt-page', {}],
+          ['/sw.js', {}],
+          ['/manifest.webmanifest', {}],
+          ['/api/account', {}],
+          ['/api/training', {}],
+          ['/api/auth/ok', {}],
+          // Answered by worker.ts itself, never by vinext.
+          ['/admin', {}],
+          ['/api/realtime', { Origin: 'https://fitt.example' }],
+          ['/api/csp-report', {}],
+        ]
+        for (const [path, headers] of requests) {
+          const response = await runtime.dispatchFetch(`https://fitt.example${path}`, {
+            headers,
+            redirect: 'manual',
+          })
+          await response.arrayBuffer()
+          for (const [name, value] of Object.entries(enforced))
+            assert.equal(response.headers.get(name), value, `${path} ${name}`)
+          assert.equal(response.headers.get('content-security-policy'), null, path)
+          const policy = response.headers.get('content-security-policy-report-only') ?? ''
+          assert.match(policy, /frame-ancestors 'none'/, path)
+          assert.match(policy, /connect-src 'self' wss:\/\/fitt\.example;/, path)
+          assert.match(policy, /report-uri \/api\/csp-report$/, path)
+        }
+        const report = await runtime.dispatchFetch('https://fitt.example/api/csp-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/csp-report' },
+          body: JSON.stringify({
+            'csp-report': {
+              'document-uri': 'https://fitt.example/workout',
+              'effective-directive': 'script-src-elem',
+              'blocked-uri': 'inline',
+            },
+          }),
+        })
+        assert.equal(report.status, 204)
+        const oversized = await runtime.dispatchFetch('https://fitt.example/api/csp-report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/csp-report' },
+          body: 'x'.repeat(16 * 1024 + 1),
+        })
+        assert.equal(oversized.status, 413)
+      },
+    )
+
     await t.test('serves the shell, client chunks, and noncacheable service worker', async () => {
       for (const path of ['/', '/workout', '/journey', '/library', '/settings', '/builder']) {
         const shell = await runtime.dispatchFetch(`https://fitt.example${path}`)
