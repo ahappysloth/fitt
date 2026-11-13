@@ -30,7 +30,7 @@ const lying = pitch(Math.PI / 2)
  */
 const fit: Record<BodyModel, { floor: number; tilt: number; hip: number; neck: number }> = {
   male: { floor: 0.142, tilt: 0, hip: 0.095, neck: 0.22 },
-  female: { floor: 0.137, tilt: 0.075, hip: 0.075, neck: 0.08 },
+  female: { floor: 0.13, tilt: 0.06, hip: 0.075, neck: 0.08 },
 }
 /** Rest-space thigh contact the tilt pivots about. */
 const thighContact = new Vector3(0, -0.3, 0.1)

@@ -1,31 +1,53 @@
 """Create Fitt's compact, offline skinned body from the CC0 MakeHuman sources.
 
-Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw male.target female-size.target female-firmness.target female-size-firmness.target female-upper-volume.target male-muscle.target male-lean-muscle.target female-muscle.target female-lean-muscle.target female-shape.target
+Usage: python scripts/build-form-model.py base.obj default.mhskel default_weights.mhw targets/
+`targets/` mirrors MakeHuman's makehuman/data/targets directory.
 Source URLs, licensing, and the asset contract are in assets/form-guide/README.md.
 """
 import base64
 import hashlib
 import json
 import math
+import os
 import pathlib
 import struct
 import sys
 from collections import defaultdict
 import numpy as np
-from form_chest import refine_female_chest
+from form_chest import refine_chest
 
 root = pathlib.Path(__file__).resolve().parents[1]
-obj_path, rig_path, weights_path = map(pathlib.Path, sys.argv[1:4])
-target_path = pathlib.Path(sys.argv[4])
-chest_target_path = pathlib.Path(sys.argv[5])
-firmness_target_path = pathlib.Path(sys.argv[6])
-full_firmness_target_path = pathlib.Path(sys.argv[7])
-upper_volume_target_path = pathlib.Path(sys.argv[8])
-muscle_target_path = pathlib.Path(sys.argv[9])
-lean_muscle_target_path = pathlib.Path(sys.argv[10])
-female_muscle_target_path = pathlib.Path(sys.argv[11])
-female_lean_muscle_target_path = pathlib.Path(sys.argv[12])
-female_shape_target_path = pathlib.Path(sys.argv[13])
+obj_path, rig_path, weights_path, targets_root = map(pathlib.Path, sys.argv[1:5])
+# Shape choices. FITT_FORM_CONFIG (JSON, {"male": {...}, "female": {...}}) overrides
+# single values so alternative option sheets can be rendered without editing this file.
+config = {
+    'male': {
+        # Authored macro grid: muscle 0 = average, 1 = maximum; lean 0 = average
+        # weight, 1 = minimum weight. `extras` are further targets by strength.
+        'muscle': 1., 'lean': .15, 'extras': {},
+        # Vertex rings around the authored nipple that are faired into the chest.
+        'apex_rings': 3,
+        'chest_polish': .6, 'axilla_polish': 0., 'subdivision_rounds': 1,
+    },
+    'female': {
+        'shape': 1., 'muscle': .23, 'lean': 0.,
+        # Authored breast grid: -1 = minimum, 0 = average, 1 = maximum.
+        'cup': .75, 'firmness': 1.,
+        'extras': {'breast/breast-dist-incr.target': .6,
+                   'breast/breast-point-decr.target': 1.5,
+                   'breast/breast-trans-up.target': .5},
+        'apex_rings': 3,
+        'waist': .08, # The authored female already has slender arms and sloping shoulders.
+        'chest_polish': .5, 'axilla_polish': 1., 'subdivision_rounds': 1,
+    },
+}
+for model, overrides in json.loads(os.environ.get('FITT_FORM_CONFIG', '{}')).items():
+    config[model].update(overrides)
+used_targets = {'male': {}, 'female': {}}
+def target(model, name):
+    path = targets_root / name
+    used_targets[model][name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return path
 rig = json.loads(rig_path.read_text())
 weights = json.loads(weights_path.read_text())
 assert rig['license'] == weights['license'] == 'CC0'
@@ -146,16 +168,78 @@ def smoothstep(start, end, value):
 # to the entire source head (including eyes and joint helpers) before retargeting.
 # This preserves local features and the single coherent anatomical head frame.
 male_head_strength = .55
-male_muscle_strength = .85
-male_lean_muscle_strength = .15
-male_vertices = apply_target(target_path)
+def macro_blend(model, gender, muscle, lean, source, strength=1., pattern='macrodetails/universal-{gender}-young-{muscle}-{weight}.target'):
+    # Bilinear blend of the authored muscle/weight grid, as MakeHuman's own
+    # macro modifiers combine it. The four weights sum to `strength`.
+    for muscle_name, muscle_weight in (('averagemuscle', 1-muscle), ('maxmuscle', muscle)):
+        for weight_name, weight in (('averageweight', 1-lean), ('minweight', lean)):
+            if muscle_weight*weight*strength:
+                source = apply_target(target(model, pattern.format(gender=gender, muscle=muscle_name, weight=weight_name)),
+                                      muscle_weight*weight*strength, source)
+    return source
+source_neighbors = defaultdict(set)
+for face in faces:
+    for offset, old in enumerate(face):
+        source_neighbors[old].update((face[(offset+1)%3], face[(offset+2)%3]))
+def fair_apex(model, source, rings):
+    # The source's nipple and areola loops form a small cone that reads as a
+    # point on an untextured mannequin. Each patch (one side of the authored
+    # areola target's support, grown by `rings`) is moved along its own normal
+    # onto the quadric fitted to the three vertex rings around it, so the apex
+    # continues the curvature of the surrounding chest. Vertices keep their
+    # tangential placement; topology and weights are unchanged.
+    if rings < 0:
+        return source
+    support = set()
+    for line in target(model, 'breast/nipple-point-incr.target').read_text().splitlines():
+        if line.strip() and not line.lstrip().startswith('#'):
+            support.add(int(line.split()[0]))
+    support &= set(source_neighbors)
+    source = [point[:] for point in source]
+    for side in (-1, 1):
+        patch = {old for old in support if side*vertices[old][0] > 0}
+        for _ in range(rings):
+            patch |= {other for old in patch for other in source_neighbors[old]}
+        surround = set(patch)
+        for _ in range(3):
+            surround |= {other for old in surround for other in source_neighbors[old]}
+        ring = np.array([source[old] for old in sorted(surround - patch)])
+        center = ring.mean(axis=0)
+        _, _, axes = np.linalg.svd(ring - center)
+        def chart(points):
+            u, v, h = ((points - center) @ axes.T).T
+            return np.stack([np.ones_like(u), u, v, u*u, u*v, v*v], axis=1), h
+        basis, height = chart(ring)
+        coefficients = np.linalg.lstsq(basis, height, rcond=None)[0]
+        inside = sorted(patch)
+        points = np.array([source[old] for old in inside])
+        basis, height = chart(points)
+        points += np.outer(basis @ coefficients - height, axes[2])
+        for old, point in zip(inside, points):
+            source[old] = [float(value) for value in point]
+        # Two neighbor-relaxation passes across the patch border remove the
+        # faint step where the fitted cap meets the authored surface.
+        border = sorted({other for old in patch for other in source_neighbors[old]
+                         if other not in patch}
+                        | {old for old in patch if source_neighbors[old] - patch})
+        for _ in range(2):
+            relaxed = {old: [sum(source[other][axis] for other in source_neighbors[old])
+                             / len(source_neighbors[old]) for axis in range(3)] for old in border}
+            for old, average in relaxed.items():
+                source[old] = [.5*value+.5*mean for value, mean in zip(source[old], average)]
+    return source
+
+male = config['male']
+male_vertices = apply_target(target('male', 'macrodetails/caucasian-male-young.target'))
 for index, point in enumerate(male_vertices):
     strength = 1-(1-male_head_strength)*smoothstep(.54, .66, vertices[index][1])
     male_vertices[index] = [base+(value-base)*strength
                             for base, value in zip(vertices[index], point)]
 male_base_vertices = [point[:] for point in male_vertices]
-male_vertices = apply_target(muscle_target_path, male_muscle_strength, male_vertices)
-male_vertices = apply_target(lean_muscle_target_path, male_lean_muscle_strength, male_vertices)
+male_vertices = macro_blend('male', 'male', male['muscle'], male['lean'], male_vertices)
+for name, strength in male['extras'].items():
+    male_vertices = apply_target(target('male', name), strength, male_vertices)
+male_vertices = fair_apex('male', male_vertices, male['apex_rings'])
 
 def sub(a, b):
     return [x-y for x, y in zip(a, b)]
@@ -290,7 +374,7 @@ def sculpt_surface(surface, model):
         # The trunk field excludes arms, and fades before the pelvis and neck.
         trunk = 1-smoothstep(.16, .23, ax)
         waist = gaussian(oy, .225, .105)*trunk
-        dx -= x*(.02 if male else .18)*waist
+        dx -= x*(.02 if male else config['female']['waist'])*waist
         dz -= (z-.005)*(.10 if male else .14)*waist
         # Lats widen the upper trunk while the waist narrows below them.
         # The male taper is longer: it starts at the armpit and runs to the waist.
@@ -302,16 +386,6 @@ def sculpt_surface(surface, model):
             # The shared pelvis is wide for a male frame: bring the hips and the
             # outer upper thighs in under the lats, keeping each hip joint fixed.
             dx -= side*.018*gaussian(oy, .0, .14)*smoothstep(.08, .16, ax)
-            # A broad pectoral plate with a higher, flatter lower edge. The
-            # source's rounded lower lobes otherwise read as breasts as volume
-            # rises; blend their forward depth toward an anatomical chest plane.
-            pec = (smoothstep(.015, .045, ax)*(1-smoothstep(.105, .155, ax))
-                   *gaussian(oy, .425, .085)*front)
-            chest_plane = (.115+.025*gaussian(oy, .455, .080)
-                           -.012*smoothstep(.12, .18, ax))
-            dz += .78*pec*(chest_plane-z)
-            # Lower the outer pectoral edge into the ribs instead of a hanging lobe.
-            dz -= .012*gaussian(oy, .35, .04)*gaussian(ax, .105, .05)*front
             # Shallow paired abdominal planes and tendinous valleys. Broad
             # quartic fields keep them planar rather than isolated round bumps.
             abdominal = math.exp(-((ax-.039)/.032)**4)*front
@@ -321,23 +395,11 @@ def sculpt_surface(surface, model):
                 dz -= .0015*abdominal*gaussian(oy, level, .011)
 
         else:
-            # A smooth adult mannequin silhouette: high, rounded chest volumes,
-            # softly tapered ribcage and waist, and a continuous hip/glute curve.
-            # A smooth front chart carries paired rounded volumes and a shallow
-            # abdomen, while the lateral support fades into the original ribs.
-            chest = ((1-smoothstep(.10, .165, ax))*smoothstep(.025, .065, oz)
-                     *smoothstep(.12, .20, oy)*(1-smoothstep(.49, .55, oy)))
-            vertical_radius = .065+.008*smoothstep(.412, .438, oy)
-            radius = ((ax-.078)/.060)**2+((oy-.425)/vertical_radius)**2
-            dome = math.exp(-.5*radius-.28*radius*radius)
-            chest_curve = .120-2.5*ax*ax+.100*dome
-            dz += chest*(chest_curve-z)
+            # The chest is the authored source shape; the sculpt only adds a
+            # softly tapered waist and a continuous hip/glute curve.
             glute = gaussian(oy, -.005, .15)*gaussian(ax, .105, .085)
             dz -= .024*glute*(1-smoothstep(-.035, .015, oz))
             dx += side*.012*glute*smoothstep(.07, .15, ax)
-            # Reduce shoulder caps while keeping each joint fixed.
-            shoulder = gaussian(ax, .19, .065)*gaussian(oy, .525, .07)
-            dy -= .012*shoulder
         # Upper arm volumes follow the fixed shoulder/elbow line rather than
         # axis-aligned lobes, so the deltoid and triceps remain coherent in motion.
         arm_side = 'L' if ox >= 0 else 'R'
@@ -348,10 +410,10 @@ def sculpt_surface(surface, model):
         t = dot(offset, axis)/dot(axis, axis)
         arm_weight = sum(skin_weights[index*4+k]/65535 for k in range(4)
                          if names[skin_indices[index*4+k]].startswith('upperarm'))
-        if arm_weight:
+        # The authored female already has slender arms, so only the male gains volume.
+        if arm_weight and male:
             center = [shoulder[a]+t*axis[a] for a in range(3)]
-            volume = ((.25 if male else -.12)*gaussian(t, .15, .35)
-                      +(.20 if male else -.13)*gaussian(t, .62, .28))*arm_weight
+            volume = (.25*gaussian(t, .15, .35)+.20*gaussian(t, .62, .28))*arm_weight
             dx += (x-center[0])*volume
             dy += (y-center[1])*volume
             dz += (z-center[2])*volume
@@ -388,10 +450,6 @@ def sculpt_surface(surface, model):
 
 # Remove coarse triangulation ripples only on broad anatomical surfaces. Fine
 # eyelid, nose, lip and ear borders retain their authored topology and shape.
-source_neighbors = defaultdict(set)
-for face in faces:
-    for offset, old in enumerate(face):
-        source_neighbors[old].update((face[(offset+1)%3], face[(offset+2)%3]))
 neighbors = {lookup[old]: sorted(lookup[other] for other in adjacent)
              for old, adjacent in source_neighbors.items()}
 
@@ -403,15 +461,12 @@ def polish_surface(surface, model):
         skull = .52*smoothstep(.765, .81, y)
         cheek = .32*gaussian(ax, .065, .028)*gaussian(y, .695, .027)*smoothstep(.02, .06, z)
         shoulder = .50*gaussian(ax, .185, .07)*gaussian(y, .53, .055)
-        chest = (.6 if model == 'male' else .25)*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
+        chest = config[model]['chest_polish']*gaussian(ax, .085, .075)*gaussian(y, .40, .075)*smoothstep(.03, .08, z)
         hip = .35*gaussian(ax, .145, .06)*gaussian(y, .08, .11) if model == 'female' else 0.
-        # The front chart meets the side wall at an angle, leaving a ridge from
-        # the outer lower chest down the flank to the hip. Relax that corner.
-        flank = (.8*smoothstep(.055, .085, ax)*(1-smoothstep(.15, .175, ax))
-                 *smoothstep(.12, .17, y)*(1-smoothstep(.26, .31, y))
-                 *smoothstep(-.01, .02, z)*(1-smoothstep(.075, .105, z))
-                 if model == 'female' else 0.)
-        strengths.append(max(skull, cheek, shoulder, chest, hip, flank))
+        # The authored breast's upper outer volume reaches toward the armpit; relax
+        # that fold so it compresses evenly when the arms turn in under the chest.
+        axilla = config[model]['axilla_polish']*gaussian(ax, .16, .03)*gaussian(y, .495, .035)
+        strengths.append(max(skull, cheek, shoulder, chest, hip, axilla))
     for _ in range(3):
         relaxed = surface[:]
         for index, strength in enumerate(strengths):
@@ -433,7 +488,7 @@ def preserve_lower_legs(surface, original):
     return surface
 
 male_positions = polish_surface(sculpt_surface(fit_surface(male_vertices), 'male'), 'male')
-male_previous = fit_surface(apply_target(muscle_target_path, .40, male_base_vertices))
+male_previous = fit_surface(apply_target(target('male', 'macrodetails/universal-male-young-maxmuscle-averageweight.target'), .40, male_base_vertices))
 male_positions = preserve_lower_legs(male_positions, male_previous)
 # The male target's toe frames point below the heel, which left the toes 10 mm
 # under it: with a flat foot either the heel floated or, on the shared placement,
@@ -446,143 +501,69 @@ for index in range(len(used)):
         offset = index*3+axis
         male_positions[offset] += (positions[offset]-male_positions[offset])*foot_weight
 
+all_triangles = [[lookup[old] for old in face] for face in faces]
+def finish(surface, model):
+    surface, refinement = refine_chest(surface, all_triangles, config[model]['subdivision_rounds'])
+    front = [surface[i+2] for i in range(0, len(surface), 3)
+             if abs(surface[i]) < .17 and .30 < surface[i+1] < .50]
+    print(f'{model} chest depth {max(front)*100:.2f} cm')
+    return surface, refinement
+
+male_positions, male_refinement = finish(male_positions, 'male')
+checksums = lambda model: {**result['sourcesSha256'], **used_targets[model]}
 variant = {
     'version': 2,
     'source': 'MakeHuman hm08 adult male muscle/lean shape / CC0, with Fitt athletic surface sculpt',
-    'surfaceSculpt': {'revision': 'athletic-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['male'], 6), 'eyeInsetMeters': .0012, 'polishIterations': 3},
+    'surfaceSculpt': {'revision': 'authored-chest-1', 'maximumOffsetMeters': round(sculpt_maximum_offsets['male'], 6), 'eyeInsetMeters': .0012, 'polishIterations': 3},
     'lowerLegPreservation': {'blendSourceY': [-.35, -.23], 'maleMuscleTargetStrength': .40},
     'retargeting': 'Coherent pelvis-to-shoulder trunk frame and head frame, smoothly blended neck; weighted limb frames',
     'maleHeadTargetStrength': male_head_strength,
-    'maleMuscleTargetStrength': male_muscle_strength,
-    'maleLeanMuscleTargetStrength': male_lean_muscle_strength,
-    'sourcesSha256': {**result['sourcesSha256'], **{
-        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in (target_path, muscle_target_path, lean_muscle_target_path)}},
-    **encode_offsets(male_positions),
+    'shape': male,
+    'sourcesSha256': checksums('male'),
+    **male_refinement,
+    **encode_offsets(male_positions, np.frombuffer(
+        base64.b64decode(male_refinement['topology']['edgeParents']), dtype='<u2').reshape(-1, 2)),
 }
 variant_output = root / 'src/components/form-guide/male-body-data.json'
 variant_output.write_text(json.dumps(variant, indent=2) + '\n')
-print(f'Male surface: {variant_output.stat().st_size // 1024} KiB; shares canonical rig and topology')
+print(f'Male surface: {variant_output.stat().st_size // 1024} KiB; shares canonical rig')
 
-# Blend the authored adult size/firmness target grid bilinearly. Firmness rounds
-# and lifts the added volume; increasing size alone would produce a longer,
-# lower silhouette. The missing average-size/average-firmness corner is the base.
-# A restrained upper-volume target fills out the upper curve of the chest.
-# This separate surface keeps the canonical rig, contact envelope and masks intact.
-chest_strength = .12
-firmness_strength = .95
-upper_volume_strength = .30
-chest_targets = [
-    (chest_target_path, chest_strength * (1-firmness_strength)),
-    (firmness_target_path, (1-chest_strength) * firmness_strength),
-    (full_firmness_target_path, chest_strength * firmness_strength),
-    (upper_volume_target_path, upper_volume_strength),
-]
-female_vertices = vertices
-for path, strength in chest_targets:
-    female_vertices = apply_target(path, strength, female_vertices)
-
-# The low-resolution chest's lower contour can read as a hard, scalloped shelf.
-# Relax only the authored morph's support, fading to zero at its boundary. This
-# follows the existing surface topology and keeps the chest's anatomical shape;
-# this preparation precedes the full-body athletic and adult head targets.
-chest_support = {old for old in used if length(sub(female_vertices[old], vertices[old])) > 1e-10}
-chest_neighbors = {old: sorted(adjacent) for old, adjacent in source_neighbors.items()}
-relaxation = {old: .32*min(1., length(sub(female_vertices[old], vertices[old]))/.008)
-              for old in chest_support}
-for _ in range(3):
-    relaxed = [point[:] for point in female_vertices]
-    for old, strength in relaxation.items():
-        adjacent = chest_neighbors[old]
-        for axis in range(3):
-            average = sum(female_vertices[other][axis] for other in adjacent)/len(adjacent)
-            relaxed[old][axis] += strength*(average-female_vertices[old][axis])
-    female_vertices = relaxed
-female_muscle_strength = .18
-female_lean_muscle_strength = .05
+# The female starts from the authored adult female macro shape at full strength,
+# then MakeHuman's own cup/firmness grid for that muscle/weight blend. Both are
+# sculpted surfaces by the MakeHuman artists; no procedural chest is added.
+female = config['female']
+female_vertices = macro_blend('female', 'female', female['muscle'], female['lean'], vertices, female['shape'])
+cup, firmness = female['cup'], female['firmness']
+for cup_name, cup_weight in (('mincup', max(0., -cup)), ('averagecup', 1-abs(cup)), ('maxcup', max(0., cup))):
+    for firm_name, firm_weight in (('minfirmness', max(0., -firmness)), ('averagefirmness', 1-abs(firmness)), ('maxfirmness', max(0., firmness))):
+        if cup_weight*firm_weight and (cup_name, firm_name) != ('averagecup', 'averagefirmness'):
+            female_vertices = macro_blend('female', 'female', female['muscle'], female['lean'], female_vertices, cup_weight*firm_weight,
+                                          'breast/{gender}-young-{muscle}-{weight}-'+cup_name+'-'+firm_name+'.target')
+for name, strength in female['extras'].items():
+    female_vertices = apply_target(target('female', name), strength, female_vertices)
+female_vertices = fair_apex('female', female_vertices, female['apex_rings'])
 female_shape_strength = .30
-female_vertices = apply_target(female_muscle_target_path, female_muscle_strength, female_vertices)
-female_vertices = apply_target(female_lean_muscle_target_path, female_lean_muscle_strength, female_vertices)
-female_shape = apply_target(female_shape_target_path, female_shape_strength)
+female_shape = apply_target(target('female', 'macrodetails/caucasian-female-young.target'), female_shape_strength)
 for index, point in enumerate(female_vertices):
     blend = smoothstep(.54, .66, vertices[index][1])
     female_vertices[index] = [value+(female_shape[index][axis]-vertices[index][axis])*blend
                               for axis, value in enumerate(point)]
-def female_chest_chart(surface):
-    # The source breast has a folded under-pole and dense nipple loops. A
-    # harmonic front chart untangles those local x/y coordinates before the
-    # rounded depth is sampled; z and all boundary vertices remain fixed here.
-    # This moves existing vertices only, retaining topology and skin weights.
-    strengths = []
-    for index in range(len(used)):
-        x, y, z = surface[index*3:index*3+3]
-        strength = (smoothstep(.005, .030, abs(x))*(1-smoothstep(.12, .17, abs(x)))
-                    *smoothstep(.27, .32, y)*(1-smoothstep(.47, .52, y))
-                    *smoothstep(.045, .085, z))
-        strengths.append(strength)
-    for _ in range(100):
-        relaxed = surface[:]
-        for index, strength in enumerate(strengths):
-            if strength < 1e-6:
-                continue
-            adjacent = neighbors[index]
-            for axis in (0, 1):
-                average = sum(surface[other*3+axis] for other in adjacent)/len(adjacent)
-                relaxed[index*3+axis] += .7*strength*(average-surface[index*3+axis])
-        surface = relaxed
-    return surface
-
-def round_female_lower_chest(surface):
-    # Lift the rib attachment while keeping the projecting lobe fixed. This
-    # vertical shear is evaluated in final sculpt coordinates, not source Y.
-    # x/z are unchanged and its Jacobian determinant is bounded below by
-    # 1 - .055*pi/.25 > .30, so the continuous warp is one-to-one.
-    amplitude, start, span = .055, .18, .25
-    minimum_jacobian = 1.
-    warped = surface[:]
-    for index in range(len(used)):
-        x, y, z = surface[index*3:index*3+3]
-        t = max(0., min(1., (y-start)/span))
-        support = ((1-smoothstep(.12, .20, abs(x)))*smoothstep(.015, .060, z)
-                   *(1-smoothstep(.105, .190, z)))
-        warped[index*3+1] += amplitude*math.sin(math.pi*t)**2*support
-        jacobian = 1+amplitude*math.pi/span*math.sin(2*math.pi*t)*support
-        minimum_jacobian = min(minimum_jacobian, jacobian)
-    assert minimum_jacobian > .30, 'Lower chest warp must remain invertible'
-    return warped
-
-female_chart = female_chest_chart(fit_surface(female_vertices))
-female_positions = sculpt_surface(female_chart, 'female')
-female_positions = polish_surface(round_female_lower_chest(female_positions), 'female')
+female_positions = polish_surface(sculpt_surface(fit_surface(female_vertices), 'female'), 'female')
 female_positions = preserve_lower_legs(female_positions, positions)
-female_positions, chest_refinement = refine_female_chest(
-    female_positions, female_chart,
-    [[lookup[old] for old in face] for face in faces], positions)
-female_total_offset = chest_refinement['maximumCanonicalDisplacementMeters']
-assert female_total_offset < .09, 'Final female silhouette exceeds its 90 mm envelope'
+female_positions, female_refinement = finish(female_positions, 'female')
 female_variant = {
     'version': 2,
-    'source': 'MakeHuman hm08 adult female muscle/lean and head shape / CC0, with Fitt athletic surface sculpt',
+    'source': 'MakeHuman hm08 adult female shape and breast targets / CC0, with Fitt athletic surface sculpt',
     'retargeting': variant['retargeting'],
-    'surfaceSculpt': {**variant['surfaceSculpt'], 'revision': 'reference-silhouette-2', 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6), 'maximumAllowedOffsetMeters': .09},
+    'surfaceSculpt': {**variant['surfaceSculpt'], 'maximumOffsetMeters': round(sculpt_maximum_offsets['female'], 6), 'maximumAllowedOffsetMeters': .09},
     'lowerLegPreservation': {'blendSourceY': [-.35, -.23], 'surface': 'canonical'},
-    'sourcesSha256': {**result['sourcesSha256'], **{
-        path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in [p for p, _ in chest_targets] + [female_muscle_target_path, female_lean_muscle_target_path, female_shape_target_path]}},
-    'femaleMuscleTargetStrength': female_muscle_strength,
-    'femaleLeanMuscleTargetStrength': female_lean_muscle_strength,
     'femaleHeadTargetStrength': female_shape_strength,
-    'chestTargetStrength': chest_strength,
-    'chestFirmnessStrength': firmness_strength,
-    'chestUpperVolumeStrength': upper_volume_strength,
-    'chestSurfaceRelaxation': {'iterations': 3, 'strength': .32, 'boundaryFadeMeters': .008},
-    'chestFrontChart': {'iterations': 100, 'strength': .70, 'axes': ['x', 'y']},
-    'lowerChestWarp': {'maximumLiftMeters': .055, 'inputYRange': [.18, .43],
-                       'minimumJacobianBound': round(1-.055*math.pi/.25, 6)},
-    'maximumCanonicalDisplacementMeters': round(female_total_offset, 6),
-    **chest_refinement,
+    'shape': female,
+    'sourcesSha256': checksums('female'),
+    **female_refinement,
     **encode_offsets(female_positions, np.frombuffer(
-        base64.b64decode(chest_refinement['topology']['edgeParents']), dtype='<u2').reshape(-1, 2)),
+        base64.b64decode(female_refinement['topology']['edgeParents']), dtype='<u2').reshape(-1, 2)),
 }
 female_output = root / 'src/components/form-guide/female-body-data.json'
 female_output.write_text(json.dumps(female_variant, indent=2) + '\n')
-print(f'Female surface: {female_output.stat().st_size // 1024} KiB; size {chest_strength:.0%}, firmness {firmness_strength:.0%}, upper volume {upper_volume_strength:.0%}')
+print(f'Female surface: {female_output.stat().st_size // 1024} KiB')
