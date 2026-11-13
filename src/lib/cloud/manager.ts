@@ -847,12 +847,16 @@ export class TrainingManager {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), ...authCallbackURLs(this.runtime!.origin) }),
       })
-      if (!response.ok)
+      if (!response.ok) {
+        if (response.status === 429)
+          throw new Error('Please wait a moment before requesting another sign-in link.')
+        const payload = (await this.json(response).catch(() => null)) as { code?: unknown } | null
         throw new Error(
-          response.status === 429
-            ? 'Please wait a moment before requesting another sign-in link.'
+          payload?.code === 'EMAIL_DELIVERY_FAILED'
+            ? 'Your sign-in email could not be sent. Please try again in a few minutes.'
             : 'We couldn’t request your sign-in email. Please try again.',
         )
+      }
       this.message = 'Sign-in email requested. Check your inbox and spam folder for your link.'
     })
   importGuestData = async () => {

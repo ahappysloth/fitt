@@ -1,4 +1,5 @@
 import type { DurableObjectNamespace } from '@cloudflare/workers-types'
+import type { RateLimitNamespaceLike } from '@turnal-io/ratelimit'
 import type { SendEmail } from './email'
 import { isWorkerRuntime } from './runtime'
 export { isWorkerRuntime } from './runtime'
@@ -26,8 +27,12 @@ export type FittEnv = Record<(typeof keys)[number], string> & {
   /** Comma-separated verified emails; absent means no administrator access. */
   FITT_ADMIN_EMAILS?: string
   WORKSPACE_DO?: DurableObjectNamespace
-  /** Shared bucket store for Better Auth's rate limiter (required off localhost). */
-  RATE_LIMIT_DO?: DurableObjectNamespace
+  /**
+   * Shared bucket store for Better Auth's rate limiter (required off localhost).
+   * Typed by the limiter's structural view of a namespace: its `AbortSignal`
+   * is the DOM one, which workers-types' DurableObjectNamespace does not match.
+   */
+  RATE_LIMIT_DO?: RateLimitNamespaceLike
   /** Request-local adapter supplied by the Worker context; not a configured secret. */
   __FITT_SEND_EMAIL?: SendEmail
 }

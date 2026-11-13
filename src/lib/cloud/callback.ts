@@ -30,6 +30,11 @@ const errorMessages = new Map<string, string>([
   ['new_user_signup_disabled', 'New accounts are not available right now. Please try again later.'],
   ['failed_to_create_session', genericFailure],
   ['internal_server_error', genericFailure],
+  // A throttled Google return or email-link click (@turnal-io/auth redirects it here).
+  [
+    'rate_limited',
+    'Too many sign-in attempts from this connection. Wait a moment, then try again.',
+  ],
 ])
 
 /** Accept only known legacy errors or our explicit return marker; never reflect query text. */

@@ -204,6 +204,28 @@ describe('auth callback recovery', () => {
     )
   })
 
+  it('says when the sign-in email could not be sent', async () => {
+    const fixture = harness()
+    fixture.server.actor = null
+    let answer = Response.json(
+      { code: 'EMAIL_DELIVERY_FAILED', message: 'The email could not be sent.' },
+      { status: 503 },
+    )
+    fixture.runtime.request = async (path, init) =>
+      path === '/api/auth/sign-in/magic-link' ? answer : fixture.server.request(path, init)
+    await start(fixture)
+    expect(await fixture.manager.requestMagicLink('alex@example.test')).toBe(false)
+    expect(fixture.manager.getSnapshot().account.error).toBe(
+      'Your sign-in email could not be sent. Please try again in a few minutes.',
+    )
+    expect(fixture.manager.getSnapshot().account.message).toBeNull()
+    answer = Response.json({ error: 'Account services are not configured.' }, { status: 503 })
+    expect(await fixture.manager.requestMagicLink('alex@example.test')).toBe(false)
+    expect(fixture.manager.getSnapshot().account.error).toBe(
+      'We couldn’t request your sign-in email. Please try again.',
+    )
+  })
+
   it('trusts the authenticated session on success and never imports guest data from URL hints', async () => {
     const fixture = harness()
     fixture.storage.setItem(

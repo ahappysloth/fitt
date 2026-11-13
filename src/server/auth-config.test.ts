@@ -1,8 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { afterAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { assertAuthConfig } from '@turnal-io/auth'
-import { createDb } from '@turnal-io/db/serverless'
-import * as schema from '../db/schema'
 import { fittAuthConfig } from './auth'
 import type { FittEnv } from './env'
 
@@ -53,15 +51,9 @@ function environment(overrides: Partial<FittEnv> = {}): FittEnv {
   }
 }
 
-const { db, pool } = createDb({
-  schema,
-  connectionString: environment().DATABASE_URL,
-})
-afterAll(() => pool.end())
-
 const options = { waitUntil: () => {}, sendEmail: async () => {} }
 const check = (env: FittEnv, config = options) =>
-  assertAuthConfig(fittAuthConfig(db, env, config), { workers: true })
+  assertAuthConfig(fittAuthConfig(env, config), { workers: true })
 
 describe('production auth configuration', () => {
   it('declares the rate-limit Durable Object with its own migration', () => {
@@ -79,9 +71,15 @@ describe('production auth configuration', () => {
   it('passes every @turnal-io/auth construction check with the deployed values', () => {
     expect(new URL(wrangler.vars.BETTER_AUTH_URL).protocol).toBe('https:')
     expect(() => check(environment())).not.toThrow()
-    const config = fittAuthConfig(db, environment(), options)
+    const config = fittAuthConfig(environment(), options)
     expect(config.magicLink).toEqual({ enabled: true, allowSignUp: true })
     expect(config.rateLimiter).toBeDefined()
+    // Package defaults Fitt relies on: only pre-auth routes reach the Durable
+    // Object; a rate-limited navigation returns to onAPIError.errorURL.
+    expect(config.rateLimiterScope).toBeUndefined()
+    expect(config.rateLimitRedirectURL).toBeUndefined()
+    expect(config.emailDelivery).toBe('await')
+    expect(config.logger?.disabled).not.toBe(true)
     expect(config.admin).toBeUndefined()
   })
 
@@ -95,7 +93,7 @@ describe('production auth configuration', () => {
       TRUSTED_ORIGINS: ` ${wrangler.vars.TRUSTED_ORIGINS}/ , HTTPS://Preview.Fitt.Example:443/,, http://plain.example, https://*.example `,
     })
     expect(() => check(env)).not.toThrow()
-    expect(fittAuthConfig(db, env, options).trustedOrigins).toEqual([
+    expect(fittAuthConfig(env, options).trustedOrigins).toEqual([
       wrangler.vars.BETTER_AUTH_URL,
       'https://preview.fitt.example',
     ])

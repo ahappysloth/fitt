@@ -82,7 +82,6 @@ describe.skipIf(!enabled)('passwordless auth against development Neon', () => {
           body: JSON.stringify({ email: fixtureEmail, callbackURL: '/' }),
         }),
       )
-      await built.finishEmailDeliveries()
       await Promise.allSettled(pending)
       expect(response.status).toBe(200)
       expect(typeof delivered).toBe('string')

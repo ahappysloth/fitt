@@ -1,7 +1,6 @@
-import { createAuth, type CreateAuthConfig, type SharedRateLimiterLike } from '@turnal-io/auth'
-import { createDurableObjectRateLimiter, type RateLimitNamespaceLike } from '@turnal-io/ratelimit'
+import { createAuth, type CreateAuthConfig } from '@turnal-io/auth'
+import { createDurableObjectRateLimiter } from '@turnal-io/ratelimit'
 import { APIError } from 'better-auth/api'
-import { privateRateLimitKey } from './auth-rate-limit'
 import type { ServerDb } from './db'
 import { trustedOrigins, type FittEnv, type WaitUntil } from './env'
 import { createMailSender, magicLinkEmail, type SendEmail } from './email'
@@ -11,22 +10,25 @@ export async function discardProviderTokens<T extends Record<string, unknown>>(d
   return { data: { ...data, accessToken: null, refreshToken: null, idToken: null } }
 }
 
+// @turnal-io/auth prefixes the lines it writes itself (limiter failure, missing
+// client IP, failed email send, ignored trusted origin, ...); Better Auth's own
+// lines carry no such prefix.
+const PACKAGE_LINE = '[turnalbase/auth] '
+// A driver error thrown inside an endpoint: Fitt's onError below already logs a
+// constant line for it, and driver errors can carry SQL parameters that
+// pattern-based redaction may miss.
+const ENDPOINT_THREW = `${PACKAGE_LINE}Better Auth endpoint threw`
+
 /**
- * Better Auth's limiter, backed by the shared RATE_LIMIT_DO. Better Auth keys
- * buckets `<client ip>|<path>`; the key is HMAC'd before it reaches the Durable
- * Object so, as with Fitt's own Postgres limiter, no IP address is stored.
- * A failing or slow DO is handled by @turnal-io/auth (pre-auth routes refused).
+ * Fitt's auth log sink. Better Auth's own lines (redacted by the package,
+ * mostly request noise) stay out of the logs, as before. The package's own
+ * lines are operational signals and are printed; the package has already
+ * redacted them before they reach this sink.
  */
-export function sharedAuthRateLimiter(
-  namespace: RateLimitNamespaceLike,
-  secret: string,
-): SharedRateLimiterLike {
-  const limiter = createDurableObjectRateLimiter(namespace)
-  return {
-    async take(key, rule) {
-      return limiter.take(await privateRateLimitKey(secret, `better-auth:${key}`), rule)
-    },
-  }
+export function logAuthLine(level: string, message: unknown, ...args: unknown[]) {
+  if (typeof message !== 'string' || !message.startsWith(PACKAGE_LINE)) return
+  if (message.startsWith(ENDPOINT_THREW)) return
+  ;(level === 'error' ? console.error : console.warn)(message, ...args)
 }
 
 const notEnabled = () => {
@@ -34,17 +36,16 @@ const notEnabled = () => {
 }
 
 /**
- * The complete createAuth configuration. Shared with the CI check in
- * auth-config.test.ts (assertAuthConfig), so a configuration that would throw
- * on every production request fails the test suite instead.
+ * The complete createAuth configuration except the request's database.
+ * Shared with the CI check in auth-config.test.ts (assertAuthConfig, which
+ * needs no database), so a configuration that would throw on every production
+ * request fails the test suite instead.
  */
 export function fittAuthConfig(
-  db: ServerDb,
   env: FittEnv,
   options: { waitUntil?: WaitUntil; sendEmail: SendEmail },
-): CreateAuthConfig {
+): Omit<CreateAuthConfig, 'db'> {
   return {
-    db,
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     trustedOrigins: trustedOrigins(env),
@@ -52,8 +53,13 @@ export function fittAuthConfig(
     ...(options.waitUntil ? { waitUntil: options.waitUntil } : {}),
     // Required off localhost; createAuth throws without it, so a missing
     // binding fails loudly. Local Node tooling uses Better Auth's own limiter.
+    // The package HMACs Better Auth's `<ip>|<path>` key (from `secret`) before
+    // it reaches the limiter, which spreads buckets over 16 RateLimitDO
+    // instances. Only pre-auth routes (sign-in, magic link, OAuth callback)
+    // reach it; session reads and sign-out use a per-isolate bucket. Fitt has
+    // no public auth route outside the package's pre-auth list.
     ...(env.RATE_LIMIT_DO
-      ? { rateLimiter: sharedAuthRateLimiter(env.RATE_LIMIT_DO, env.BETTER_AUTH_SECRET) }
+      ? { rateLimiter: createDurableObjectRateLimiter(env.RATE_LIMIT_DO) }
       : {}),
     ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
@@ -61,6 +67,9 @@ export function fittAuthConfig(
     // Anyone with an inbox can create a Fitt account by email, as before.
     magicLink: { enabled: true, allowSignUp: true },
     sendEmail: options.sendEmail,
+    // The magic-link send is awaited: a failed send answers 503
+    // EMAIL_DELIVERY_FAILED, so the browser is told the email did not go out.
+    emailDelivery: 'await',
     emailTemplates: {
       magicLink: magicLinkEmail,
       verification: notEnabled,
@@ -72,11 +81,12 @@ export function fittAuthConfig(
         update: { before: discardProviderTokens },
       },
     },
-    // Fitt policy: Better Auth writes nothing to the logs (the package's
-    // redacting wrapper still sits underneath if this is ever turned on).
-    logger: { disabled: true },
+    // Better Auth's own lines are dropped; the package's own (already
+    // redacted) operational lines are printed. See logAuthLine.
+    logger: { level: 'warn', log: logAuthLine },
     onAPIError: {
-      // Failed OAuth/magic-link callbacks return to the account controls.
+      // Failed or rate-limited (error=rate_limited) OAuth/magic-link
+      // navigations return to the account controls.
       errorURL: new URL('/?account=return', env.BETTER_AUTH_URL).toString(),
       onError(error) {
         if (error instanceof APIError) throw error
@@ -96,25 +106,5 @@ export function buildRequestAuth(
   waitUntil?: WaitUntil,
   sendEmail: SendEmail = createMailSender(env),
 ) {
-  const deliveries: Promise<void>[] = []
-  const built = createAuth(
-    fittAuthConfig(db, env, {
-      waitUntil,
-      sendEmail: (options) => {
-        const pending = sendEmail(options)
-        deliveries.push(pending)
-        void pending.catch(() => {})
-        return pending
-      },
-    }),
-  )
-  return {
-    ...built,
-    async finishEmailDeliveries() {
-      // Turnal dispatch catches/logs transport failures. Track the original
-      // promises so our route can return a truthful failure to the browser.
-      await Promise.resolve()
-      await Promise.all(deliveries)
-    },
-  }
+  return createAuth({ ...fittAuthConfig(env, { waitUntil, sendEmail }), db })
 }

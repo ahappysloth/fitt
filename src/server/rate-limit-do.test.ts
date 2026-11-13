@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createDurableObjectRateLimiter } from '@turnal-io/ratelimit'
+import {
+  createDurableObjectRateLimiter,
+  DEFAULT_IDLE_BUCKET_MS,
+  DEFAULT_SWEEP_INTERVAL_MS,
+} from '@turnal-io/ratelimit'
 import type { DurableObjectState } from '@cloudflare/workers-types'
-import { IDLE_BUCKET_MS, RateLimitDO, SWEEP_INTERVAL_MS } from './rate-limit-do'
+import { RateLimitDO } from './rate-limit-do'
 
 function memoryState() {
   const data = new Map<string, unknown>()
@@ -41,7 +45,7 @@ function memoryState() {
 afterEach(() => vi.useRealTimers())
 
 describe('RateLimitDO', () => {
-  it('serves @turnal-io/ratelimit takes and schedules one idle-bucket sweep', async () => {
+  it('serves @turnal-io/ratelimit takes and arms one idle-bucket cleanup alarm', async () => {
     vi.useFakeTimers({ now: 1_000_000, toFake: ['Date'] })
     const memory = memoryState()
     const object = new RateLimitDO(memory.state)
@@ -51,36 +55,41 @@ describe('RateLimitDO', () => {
         fetch: (url: string, init?: RequestInit) => object.fetch(new Request(url, init)),
       }),
     }
-    const limiter = createDurableObjectRateLimiter(namespace)
+    const limiter = createDurableObjectRateLimiter(namespace, { shards: 1 })
     const rule = { limit: 2, windowMs: 10_000 }
     expect((await limiter.take('bucket', rule)).allowed).toBe(true)
     expect((await limiter.take('bucket', rule)).allowed).toBe(true)
     expect((await limiter.take('bucket', rule)).allowed).toBe(false)
-    expect(memory.alarm()).toBe(1_000_000 + SWEEP_INTERVAL_MS)
+    expect(memory.alarm()).toBe(1_000_000 + DEFAULT_SWEEP_INTERVAL_MS)
     expect((await object.fetch(new Request('https://do/other'))).status).toBe(404)
   })
 
-  it('deletes idle buckets in bounded batches and stops once none remain', async () => {
-    vi.useFakeTimers({ now: 10 * IDLE_BUCKET_MS, toFake: ['Date'] })
+  it('deletes buckets idle for their window in bounded batches and stops once none remain', async () => {
+    vi.useFakeTimers({ now: 10 * DEFAULT_IDLE_BUCKET_MS, toFake: ['Date'] })
     const memory = memoryState()
     const now = Date.now()
     for (let index = 0; index < 300; index += 1) {
       memory.data.set(`idle-${String(index).padStart(3, '0')}`, {
         tokens: 1,
-        updatedAt: now - IDLE_BUCKET_MS - 1,
+        updatedAt: now - 60_001,
+        windowMs: 60_000,
       })
     }
-    memory.data.set('active', { tokens: 1, updatedAt: now - 1_000 })
-    memory.data.set('malformed', 'not a bucket')
+    memory.data.set('active', { tokens: 1, updatedAt: now - 1_000, windowMs: 60_000 })
+    // Written before @turnal-io/ratelimit 1.1 (no windowMs): kept for an hour.
+    memory.data.set('legacy', { tokens: 1, updatedAt: now - 1_000 })
+    memory.data.set('legacy-idle', { tokens: 1, updatedAt: now - DEFAULT_IDLE_BUCKET_MS })
+    memory.data.set('not-a-bucket', 'left alone')
     const object = new RateLimitDO(memory.state)
     await object.alarm()
-    expect([...memory.data.keys()]).toEqual(['active'])
-    expect(memory.alarm()).toBe(now + SWEEP_INTERVAL_MS)
+    expect([...memory.data.keys()].sort()).toEqual(['active', 'legacy', 'not-a-bucket'])
+    expect(memory.alarm()).toBe(now + DEFAULT_SWEEP_INTERVAL_MS)
 
-    memory.data.set('active', { tokens: 1, updatedAt: now - IDLE_BUCKET_MS - 1 })
+    memory.data.set('active', { tokens: 1, updatedAt: now - 60_000, windowMs: 60_000 })
+    memory.data.set('legacy', { tokens: 1, updatedAt: now - DEFAULT_IDLE_BUCKET_MS })
     await memory.state.storage.setAlarm(0)
     await object.alarm()
-    expect(memory.data.size).toBe(0)
+    expect([...memory.data.keys()]).toEqual(['not-a-bucket'])
     expect(memory.alarm()).toBe(0)
   })
 })
