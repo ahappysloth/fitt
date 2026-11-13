@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDb } from '@turnal-io/db/serverless'
+import { makeSignature } from 'better-auth/crypto'
 import { buildRequestAuth, discardProviderTokens, logAuthLine } from './auth'
 import {
   boundedDelivery,
@@ -212,6 +213,114 @@ describe('passwordless authentication', () => {
     }
   })
 
+  it('answers 503 EMAIL_DELIVERY_FAILED through the auth handler', async () => {
+    const output = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    // The verification row is written before the send; no database here.
+    const insert = vi.spyOn(db, 'insert').mockImplementation(
+      () =>
+        ({
+          values: (row: unknown) => ({ returning: async () => [row] }),
+        }) as never,
+    )
+    try {
+      const built = buildRequestAuth(
+        db,
+        env,
+        () => {},
+        async () => {
+          throw new Error('delivery failed for athlete@example.test')
+        },
+      )
+      const response = await built.auth.handler(
+        new Request(`${env.BETTER_AUTH_URL}/api/auth/sign-in/magic-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: env.BETTER_AUTH_URL,
+            'cf-connecting-ip': '203.0.113.30',
+          },
+          body: JSON.stringify({ email: 'athlete@example.test', callbackURL: '/' }),
+        }),
+      )
+      expect(insert).toHaveBeenCalled()
+      // Not replaced by onError's 500: the browser shows "could not be sent".
+      expect(response.status).toBe(503)
+      expect(await response.json()).toMatchObject({ code: 'EMAIL_DELIVERY_FAILED' })
+      const logged = output.mock.calls.flat().map(String).join('\n')
+      expect(logged).toContain('email send failed (magic-link)')
+      expect(logged).not.toContain('athlete@example.test')
+      expect(logged).not.toContain('Authentication action could not complete')
+    } finally {
+      insert.mockRestore()
+      await pool.end()
+      output.mockRestore()
+    }
+  })
+
+  it("keeps Better Auth's own client-error answers instead of a 500", async () => {
+    const output = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    try {
+      const built = buildRequestAuth(db, env, undefined, async () => {})
+      // Request validation raises an APIError of a class other than
+      // better-auth/api's; onError must still recognise it.
+      const response = await built.auth.handler(
+        new Request(`${env.BETTER_AUTH_URL}/api/auth/sign-in/magic-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: env.BETTER_AUTH_URL,
+            'cf-connecting-ip': '203.0.113.31',
+          },
+          body: JSON.stringify({ email: 'not-an-email', callbackURL: '/' }),
+        }),
+      )
+      expect(response.status).toBe(400)
+      expect(await response.json()).toMatchObject({ code: 'VALIDATION_ERROR' })
+      expect(output).not.toHaveBeenCalled()
+    } finally {
+      await pool.end()
+      output.mockRestore()
+    }
+  })
+
+  it('logs only a constant line when a session read fails in the database', async () => {
+    const output = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    const select = vi.spyOn(db, 'select').mockImplementation(() => {
+      throw new Error('Failed query: select from fitt_session params: fixture-session-token')
+    })
+    try {
+      const built = buildRequestAuth(db, env, undefined, async () => {})
+      // A correctly signed cookie, so Better Auth reaches the database.
+      const token = 'fixture-session-token'
+      const signed = `${token}.${await makeSignature(token, env.BETTER_AUTH_SECRET)}`
+      const response = await built.auth.handler(
+        new Request(`${env.BETTER_AUTH_URL}/api/auth/get-session`, {
+          headers: {
+            cookie: `__Secure-better-auth.session_token=${encodeURIComponent(signed)}`,
+            'cf-connecting-ip': '203.0.113.32',
+          },
+        }),
+      )
+      expect(select).toHaveBeenCalled()
+      expect(response.status).toBe(500)
+      expect(await response.text()).not.toContain('fixture-session-token')
+      // The package's "endpoint failed" line carries the driver error as its
+      // cause; Fitt prints its own constant line instead.
+      expect([...output.mock.calls, ...warn.mock.calls]).toEqual([
+        ['[Fitt] Authentication action could not complete'],
+      ])
+    } finally {
+      select.mockRestore()
+      await pool.end()
+      output.mockRestore()
+      warn.mockRestore()
+    }
+  })
+
   it("prints the package's own log lines and drops Better Auth's", () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
@@ -219,6 +328,7 @@ describe('passwordless authentication', () => {
       logAuthLine('error', '[turnalbase/auth] rate limiter failed — REFUSING /sign-in/social', 'x')
       logAuthLine('warn', '[turnalbase/auth] RATE LIMITING HAS NO CLIENT IP: …')
       logAuthLine('error', '[turnalbase/auth] Better Auth endpoint threw:', 'driver detail')
+      logAuthLine('error', '[turnalbase/auth] Better Auth endpoint failed:', 'driver detail')
       logAuthLine('error', 'Failed to create user')
       logAuthLine('warn', 'Social sign-in failed')
       expect(error.mock.calls).toEqual([
@@ -285,12 +395,10 @@ describe('passwordless authentication', () => {
         }),
       )
       expect(response.status).toBe(500)
-      expect(await response.text()).not.toContain('fixture-sensitive-query-parameter')
-      expect(
-        output.mock.calls
-          .flat()
-          .some((value) => String(value).includes('fixture-sensitive-query-parameter')),
-      ).toBe(false)
+      // onError's APIError is the response (since @turnal-io/auth 4.0 the
+      // package, not Better Auth, calls onError).
+      expect(await response.json()).toEqual({ message: 'Account action could not be completed.' })
+      expect(output.mock.calls).toEqual([['[Fitt] Authentication action could not complete']])
     } finally {
       insert.mockRestore()
       await pool.end()

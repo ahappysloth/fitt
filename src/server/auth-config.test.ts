@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { assertAuthConfig } from '@turnal-io/auth'
+import { assertAuthConfig, assertAuthSchema } from '@turnal-io/auth'
+import { boolean, pgTable, text, timestamp, type PgColumnBuilderBase } from 'drizzle-orm/pg-core'
 import { fittAuthConfig } from './auth'
 import type { FittEnv } from './env'
+import * as schema from '../db/schema'
 
 /**
  * createAuth runs per request, so a configuration it refuses would be a 503 on
@@ -81,6 +83,46 @@ describe('production auth configuration', () => {
     expect(config.emailDelivery).toBe('await')
     expect(config.logger?.disabled).not.toBe(true)
     expect(config.admin).toBeUndefined()
+  })
+
+  // Better Auth 1.7 compares the Drizzle schema with what it needs on the
+  // first auth request and answers every auth request with a 500 on a
+  // mismatch. No query is sent: only the schema object is read.
+  it('has the Drizzle schema Better Auth checks on the first request', async () => {
+    await expect(
+      assertAuthSchema(fittAuthConfig(environment(), options), { schema }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('fails the schema check for a missing column or an unwritten NOT NULL column', async () => {
+    const timestamps = {
+      createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    }
+    const user = (extra: Record<string, PgColumnBuilderBase> = {}) =>
+      pgTable('fitt_user', {
+        id: text('id').primaryKey(),
+        name: text('name').notNull(),
+        email: text('email').notNull().unique(),
+        image: text('image'),
+        ...timestamps,
+        ...extra,
+      })
+    const assertWith = (table: ReturnType<typeof user>) =>
+      assertAuthSchema(fittAuthConfig(environment(), options), {
+        schema: { ...schema, user: table },
+      })
+    // email_verified dropped from fitt_user.
+    await expect(assertWith(user())).rejects.toThrow(/Missing columns\s+user\.emailVerified/)
+    // A required column Better Auth never writes: every sign-up would fail.
+    await expect(
+      assertWith(
+        user({
+          emailVerified: boolean('email_verified').notNull().default(false),
+          plan: text('plan').notNull(),
+        }),
+      ),
+    ).rejects.toThrow(/never writes\s+user\.plan/)
   })
 
   it('fails without the shared limiter binding or the request waitUntil', () => {

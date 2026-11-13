@@ -1,6 +1,6 @@
 import { createAuth, type CreateAuthConfig } from '@turnal-io/auth'
 import { createDurableObjectRateLimiter } from '@turnal-io/ratelimit'
-import { APIError } from 'better-auth/api'
+import { APIError, isAPIError } from 'better-auth/api'
 import type { ServerDb } from './db'
 import { trustedOrigins, type FittEnv, type WaitUntil } from './env'
 import { createMailSender, magicLinkEmail, type SendEmail } from './email'
@@ -14,10 +14,14 @@ export async function discardProviderTokens<T extends Record<string, unknown>>(d
 // client IP, failed email send, ignored trusted origin, ...); Better Auth's own
 // lines carry no such prefix.
 const PACKAGE_LINE = '[turnalbase/auth] '
-// A driver error thrown inside an endpoint: Fitt's onError below already logs a
-// constant line for it, and driver errors can carry SQL parameters that
+// A driver error thrown inside an endpoint ("threw"), or a 500-class APIError
+// whose cause is often one ("failed"): Fitt's onError below logs a constant
+// line for each instead, and driver errors can carry SQL parameters that
 // pattern-based redaction may miss.
-const ENDPOINT_THREW = `${PACKAGE_LINE}Better Auth endpoint threw`
+const ENDPOINT_ERRORS = [
+  `${PACKAGE_LINE}Better Auth endpoint threw`,
+  `${PACKAGE_LINE}Better Auth endpoint failed`,
+]
 
 /**
  * Fitt's auth log sink. Better Auth's own lines (redacted by the package,
@@ -27,7 +31,7 @@ const ENDPOINT_THREW = `${PACKAGE_LINE}Better Auth endpoint threw`
  */
 export function logAuthLine(level: string, message: unknown, ...args: unknown[]) {
   if (typeof message !== 'string' || !message.startsWith(PACKAGE_LINE)) return
-  if (message.startsWith(ENDPOINT_THREW)) return
+  if (ENDPOINT_ERRORS.some((prefix) => message.startsWith(prefix))) return
   ;(level === 'error' ? console.error : console.warn)(message, ...args)
 }
 
@@ -94,8 +98,21 @@ export function fittAuthConfig(
       // Failed or rate-limited (error=rate_limited) OAuth/magic-link
       // navigations return to the account controls.
       errorURL: new URL('/?account=return', env.BETTER_AUTH_URL).toString(),
+      // Called by @turnal-io/auth 4 (not Better Auth) for every APIError an
+      // endpoint answers and for any other error that escapes one. isAPIError,
+      // not instanceof: Better Auth 1.7 raises APIErrors from more than one
+      // class (request validation's is not better-auth/api's), and an
+      // instanceof miss would turn a 400 into this 500.
       onError(error) {
-        if (error instanceof APIError) throw error
+        if (isAPIError(error)) {
+          // A constant line only: the error's cause can be a driver error.
+          // EMAIL_DELIVERY_FAILED already has the package's "email send
+          // failed" line. Returning keeps Better Auth's own response.
+          const body = error.body as { code?: unknown } | undefined
+          if (error.statusCode >= 500 && body?.code !== 'EMAIL_DELIVERY_FAILED')
+            console.error('[Fitt] Authentication action could not complete')
+          return
+        }
         // A constant line only: driver errors can carry SQL parameters.
         console.error('[Fitt] Authentication action could not complete')
         throw new APIError('INTERNAL_SERVER_ERROR', {
