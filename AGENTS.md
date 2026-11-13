@@ -27,6 +27,7 @@ the framework-free root entry of `@turnal-io/auth` (see `docs/platform.md`).
   - `db`: `/serverless`, the per-request Neon WebSocket pool behind Drizzle.
   - `email`: magic-link mail; `/workerd` sends it from the Worker over SMTP (port 465).
   - `ratelimit`: the auth rate limiter's Durable Object token bucket (`RATE_LIMIT_DO`).
+  - `security-headers`: the header set `worker.ts` puts on every response (CSP report-only).
 - Worker secrets: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
   `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM`, `FITT_ADMIN_EMAILS`. Vars: `BETTER_AUTH_URL`,
   `TRUSTED_ORIGINS`. Bindings: `ASSETS`, `WORKSPACE_DO`, `RATE_LIMIT_DO`.

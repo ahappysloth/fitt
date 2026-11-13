@@ -38,6 +38,14 @@ Offline navigation uses the complete cached version. A newer online page cannot 
 
 Service workers are enabled only in a production build on a secure HTTP origin. Localhost is supported for testing. The standalone exporter defines `NEXT_PUBLIC_STANDALONE=true`, which disables worker registration and all PWA setup requests in the review artifact.
 
+## Security headers
+
+`worker.ts` sets the security headers from `@turnal-io/security-headers` on every response it returns (`src/server/security-headers.ts`): pages, RSC requests, API routes, public files such as `/sw.js` and the manifest, and the Worker's own realtime and Admin responses. It does this rather than `next.config` `headers()`, because vinext applies those rules only to responses it renders itself; `next.config.ts` keeps only the service-worker and manifest cache rules. Hashed files under `/_next/static/*` are served without running the Worker and keep `public/_headers` (`nosniff`, immutable caching).
+
+HSTS (two years, subdomains), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` and `Permissions-Policy: camera=(), microphone=(), geolocation=()` are enforced. The Content-Security-Policy is sent as `Content-Security-Policy-Report-Only`: the package's `app` preset plus the realtime socket's own `wss:` origin and `data:` fonts. It blocks nothing; enforcing it is a separate change once reports are clean. `tests/security-headers.spec.ts` fails if the app, its 3D guides or the service worker report a violation.
+
+Browsers POST violations to `/api/csp-report` (`src/server/csp-report.ts`). Each is written to the Worker log as one JSON line with `"event":"csp-report"`, the directive, and the blocked, document and source URLs reduced to origin and path (no query strings, fragments or referrers); bodies over 16 KB and anything that is not a JSON report POST are refused. Read them in the Cloudflare dashboard (the `fitt` Worker's Observability logs, filtered on `event = csp-report`; `observability` is enabled in `wrangler.jsonc`) or live with `bunx wrangler tail fitt --format pretty --search csp-report`. Locally, `bun run preview` prints them in its output.
+
 ## Account services
 
 Neon Postgres + Drizzle use `@turnal-io/db/serverless` and the WebSocket driver. Each request owns its pool. Worker background work is drained before pool cleanup through native `waitUntil`; Node test/tooling paths wait for cleanup directly. Node preserves configured HTTPS proxies and TLS trust through a `ws` adapter. Worker requests use the runtime WebSocket implementation. Shared database pools are not cached globally.

@@ -11,16 +11,11 @@ const nextConfig: NextConfig = {
     'ws',
     'https-proxy-agent',
   ],
+  // Security headers are set by the Worker entry on every response it returns
+  // (worker.ts, src/server/security-headers.ts), not here: vinext applies these
+  // rules only to responses it renders itself.
   async headers() {
     return [
-      {
-        source: '/:path*',
-        headers: [
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-        ],
-      },
       {
         source: '/sw.js',
         headers: [

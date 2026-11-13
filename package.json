@@ -50,6 +50,7 @@
     "@turnal-io/db": "1.1.1",
     "@turnal-io/email": "2.2.3",
     "@turnal-io/ratelimit": "1.1.1",
+    "@turnal-io/security-headers": "1.0.0",
     "better-auth": "1.6.34",
     "drizzle-orm": "0.45.4",
     "https-proxy-agent": "9.1.0",
