@@ -6,9 +6,14 @@ import { account, session, user, verification } from '../db/auth'
 import { createRequestDb } from './db'
 import { buildRequestAuth } from './auth'
 import type { FittEnv } from './env'
-import { authContextReady } from './realtime/auth-context'
 
 const enabled = process.env.FITT_RUN_LIVE_DB_TESTS === '1' && !!process.env.DATABASE_URL
+
+/** @turnal-io/auth stores magic-link tokens hashed (Better Auth's SHA-256, base64url). */
+async function storedToken(token: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+  return Buffer.from(digest).toString('base64url')
+}
 
 function emailLink(node: ReactNode): string | undefined {
   if (!isValidElement<{ href?: string; children?: ReactNode }>(node)) return undefined
@@ -39,7 +44,6 @@ describe.skipIf(!enabled)('passwordless auth against development Neon', () => {
   }
 
   beforeAll(async () => {
-    await authContextReady
     resource = await createRequestDb(env.DATABASE_URL)
   })
 
@@ -84,7 +88,14 @@ describe.skipIf(!enabled)('passwordless auth against development Neon', () => {
       expect(typeof delivered).toBe('string')
       const token = new URL(delivered!).searchParams.get('token')
       expect(Boolean(token)).toBe(true)
-      tokens.push(token!)
+      const identifier = await storedToken(token!)
+      const [stored] = await resource.db
+        .select({ identifier: verification.identifier })
+        .from(verification)
+        .where(eq(verification.identifier, identifier))
+      // The database never holds a usable sign-in link.
+      expect(stored?.identifier).toBe(identifier)
+      tokens.push(identifier)
       return delivered!
     }
 

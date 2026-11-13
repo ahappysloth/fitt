@@ -27,9 +27,16 @@
     ],
   },
   "durable_objects": {
-    "bindings": [{ "name": "WORKSPACE_DO", "class_name": "WorkspaceDO" }],
+    "bindings": [
+      { "name": "WORKSPACE_DO", "class_name": "WorkspaceDO" },
+      // Shared Better Auth rate-limit buckets (@turnal-io/ratelimit); required off localhost.
+      { "name": "RATE_LIMIT_DO", "class_name": "RateLimitDO" },
+    ],
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["WorkspaceDO"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["WorkspaceDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["RateLimitDO"] },
+  ],
   "vars": {
     "BETTER_AUTH_URL": "https://fitt.turnal.workers.dev",
     "TRUSTED_ORIGINS": "https://fitt.turnal.workers.dev",

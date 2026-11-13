@@ -10,7 +10,6 @@ vi.mock('./db', () => ({ createRequestDb: state.create }))
 vi.mock('./auth', () => ({
   buildRequestAuth: () => ({ auth: { api: { getSession: state.session } } }),
 }))
-vi.mock('./realtime/auth-context', () => ({ authContextReady: Promise.resolve() }))
 vi.mock('./env', () => ({
   getServerContext: () => ({ env: { DATABASE_URL: 'not-printed' }, waitUntil: state.execution }),
   authIsConfigured: () => true,

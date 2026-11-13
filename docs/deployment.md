@@ -1,6 +1,6 @@
 # Deploying Fitt
 
-Fitt's production Worker is `fitt` in the Cloudflare account whose workers.dev subdomain is `turnal`, at `https://fitt.turnal.workers.dev`. The vinext migration deploys to this existing Worker after local validation. Source configuration in `wrangler.jsonc` declares static assets, the SQLite-backed `WorkspaceDO` binding/migration, authentication origins, and required application secret names. Vite produces the deployable configuration at `dist/server/wrangler.json`; local preview and deployment commands use that generated file.
+Fitt's production Worker is `fitt` in the Cloudflare account whose workers.dev subdomain is `turnal`, at `https://fitt.turnal.workers.dev`. The vinext migration deploys to this existing Worker after local validation. Source configuration in `wrangler.jsonc` declares static assets, the SQLite-backed `WorkspaceDO` (migration `v1`) and `RateLimitDO` (migration `v2`, Better Auth's shared rate-limit buckets) Durable Objects, authentication origins, and required application secret names. Vite produces the deployable configuration at `dist/server/wrangler.json`; local preview and deployment commands use that generated file.
 
 ## Credentials and runtime configuration
 
@@ -27,7 +27,7 @@ Vite development runs on port 5173. `npm run preview` serves the built Worker at
 1. Preserve the deployed Next.js release `dd1f1b2` in `backup/nextjs-before-vinext` and record the currently deployed Cloudflare version before promotion. The backup branch preserves source; the Cloudflare version identifies the deployed artifact to restore if needed.
 2. Confirm the selected Cloudflare account owns the `turnal` workers.dev subdomain and the intended existing Worker is `fitt`. Keep its database, authentication settings, and Durable Object namespace. Migrations remain explicit and are never part of installs, builds, or deployment; this runtime migration does not require schema changes. Automated live checks use uniquely named synthetic fixture accounts in the explicitly selected test database and remove them afterward.
 3. Run the [migration validation checks](vinext-migration.md), including `npm run check:deploy` and `npm run test:worker-account`. The dry run does not publish.
-4. After local checks pass, merge the migration into `main` and push the authorized release. GitHub Actions verifies and deploys that commit to the existing `fitt` Worker. `npm run deploy` is the manual equivalent when explicitly authorized. Preserve the existing `WORKSPACE_DO` binding, `WorkspaceDO` class, and `v1` migration; do not rename its namespace or reset existing Durable Objects.
+4. After local checks pass, merge the migration into `main` and push the authorized release. GitHub Actions verifies and deploys that commit to the existing `fitt` Worker. `npm run deploy` is the manual equivalent when explicitly authorized. Preserve the existing `WORKSPACE_DO` binding, `WorkspaceDO` class, and `v1` migration; do not rename its namespace or reset existing Durable Objects. The `v2` migration creates `RateLimitDO` on the first deployment that includes it; keep the class exported and the tag unchanged afterwards.
 5. Perform the hosted checks below. If a material runtime regression requires rollback, restore the recorded Cloudflare version and revert the migration commit on `main` before another automatic deployment. Do not delete saved training data, change schema, or reset the Durable Object namespace as part of a runtime rollback.
 
 The pre-migration production version is `8a77bb03-b612-40fa-b93c-d62253366322`, backed by `backup/nextjs-before-vinext` at `dd1f1b2`. To restore that deployed artifact when a rollback is needed:
@@ -35,6 +35,8 @@ The pre-migration production version is `8a77bb03-b612-40fa-b93c-d62253366322`, 
 ```sh
 npx wrangler rollback 8a77bb03-b612-40fa-b93c-d62253366322 --name fitt
 ```
+
+The `@turnal-io/auth` 3 upgrade adds the `RateLimitDO` class through migration `v2`. Cloudflare may refuse a rollback to a version that predates a Durable Object migration; if so, roll forward with a fix instead (removing the class later needs its own `deleted_classes` migration). Rate-limit buckets are disposable: deleting them only resets counters.
 
 Then revert the migration commits on `main` so the next successful CI run also deploys the restored source. Coordinate this with any running main deployment to avoid immediately overwriting the rollback.
 

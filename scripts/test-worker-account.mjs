@@ -25,6 +25,14 @@ async function builtWorker() {
     (binding) => binding.name === 'WORKSPACE_DO',
   )
   assert.equal(workspace?.class_name, 'WorkspaceDO', 'The realtime binding must remain configured')
+  const rateLimit = config.durable_objects?.bindings?.find(
+    (binding) => binding.name === 'RATE_LIMIT_DO',
+  )
+  assert.equal(
+    rateLimit?.class_name,
+    'RateLimitDO',
+    'The auth rate-limit binding must be configured',
+  )
   const bundle = resolve(root, '.wrangler/dry-run', basename(config.main))
   const assetsDirectory = resolve(dirname(configPath), config.assets.directory)
   await Promise.all([access(bundle), access(assetsDirectory)])
@@ -85,7 +93,10 @@ test(
           EMAIL_FROM: 'Fitt <fitt@example.test>',
           FITT_ADMIN_EMAILS: 'owner@example.test',
         },
-        durableObjects: { WORKSPACE_DO: { className: 'WorkspaceDO', useSQLite: true } },
+        durableObjects: {
+          WORKSPACE_DO: { className: 'WorkspaceDO', useSQLite: true },
+          RATE_LIMIT_DO: { className: 'RateLimitDO', useSQLite: true },
+        },
         assets: {
           directory: assetsDirectory,
           binding: config.assets.binding,
@@ -126,6 +137,42 @@ test(
           assert.equal(denied.status, 403, path)
           assert.match(denied.headers.get('cache-control'), /no-store/)
         }
+      },
+    )
+
+    await t.test(
+      'builds production-shaped auth and limits it through the shared Durable Object',
+      async () => {
+        // No database or email: /ok and a callback without OAuth state answer
+        // before any query. (Miniflare adds CF-Connecting-IP to every request,
+        // so the refusal of requests without one is pinned by the package's
+        // own workerd test, not here.)
+        const auth = (path, ip) =>
+          runtime.dispatchFetch(`https://fitt.example/api/auth/${path}`, {
+            headers: ip ? { 'cf-connecting-ip': ip } : {},
+            redirect: 'manual',
+          })
+        const ok = await auth('ok', '198.51.100.1')
+        assert.equal(ok.status, 200)
+        assert.deepEqual(await ok.json(), { ok: true })
+        const callback = await auth('callback/google', '198.51.100.2')
+        assert.equal(callback.status, 302)
+        assert.match(callback.headers.get('location'), /^https:\/\/fitt\.example\/\?account=return/)
+        // Better Auth's default rule (100 per 10 s per client, a token bucket
+        // refilling 10 per second) is enforced through RATE_LIMIT_DO; another
+        // client keeps its own bucket.
+        let allowed = 0
+        let limited
+        for (let index = 0; index < 400 && !limited; index += 1) {
+          const response = await auth('ok', '198.51.100.3')
+          await response.arrayBuffer()
+          if (response.status === 200) allowed += 1
+          else limited = response
+        }
+        assert.equal(limited?.status, 429)
+        assert.ok(limited.headers.get('x-retry-after'))
+        assert.ok(allowed >= 100 && allowed < 400, `allowed ${allowed}`)
+        assert.equal((await auth('ok', '198.51.100.4')).status, 200)
       },
     )
 

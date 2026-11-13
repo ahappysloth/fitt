@@ -26,6 +26,8 @@ export type FittEnv = Record<(typeof keys)[number], string> & {
   /** Comma-separated verified emails; absent means no administrator access. */
   FITT_ADMIN_EMAILS?: string
   WORKSPACE_DO?: DurableObjectNamespace
+  /** Shared bucket store for Better Auth's rate limiter (required off localhost). */
+  RATE_LIMIT_DO?: DurableObjectNamespace
   /** Request-local adapter supplied by the Worker context; not a configured secret. */
   __FITT_SEND_EMAIL?: SendEmail
 }
@@ -49,6 +51,7 @@ export function resolveServerEnv(
       : adminFromWorker || local.FITT_ADMIN_EMAILS) ?? '',
   )
   if (worker.WORKSPACE_DO) output.WORKSPACE_DO = worker.WORKSPACE_DO as FittEnv['WORKSPACE_DO']
+  if (worker.RATE_LIMIT_DO) output.RATE_LIMIT_DO = worker.RATE_LIMIT_DO as FittEnv['RATE_LIMIT_DO']
   if (typeof worker.__FITT_SEND_EMAIL === 'function') {
     output.__FITT_SEND_EMAIL = worker.__FITT_SEND_EMAIL as SendEmail
   }
@@ -74,6 +77,8 @@ export function validOrigin(value: string) {
       ['http:', 'https:'].includes(url.protocol) &&
       !url.username &&
       !url.password &&
+      // URL parsing accepts `*` in a host; a wildcard is never an exact origin.
+      !url.hostname.includes('*') &&
       url.pathname === '/' &&
       !url.search &&
       !url.hash &&
@@ -90,6 +95,13 @@ export function authIsConfigured(env: FittEnv) {
   )
 }
 
+/**
+ * Canonical origins (`new URL(value).origin`) from BETTER_AUTH_URL and the
+ * comma-separated TRUSTED_ORIGINS. Whitespace, a trailing slash, upper case or
+ * a default port are normalised; anything that is not an exact http(s) origin
+ * (plain http only on localhost) is dropped. Better Auth and the Fitt request
+ * policy both use this list, and @turnal-io/auth refuses non-canonical entries.
+ */
 export function trustedOrigins(env: FittEnv) {
   return [
     ...new Set(

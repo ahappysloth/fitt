@@ -41,6 +41,7 @@ describe('account request boundaries', () => {
       'http://public.example',
       'https://fitt.example/path',
       'https://name:pass@fitt.example',
+      'https://*.fitt.example',
       'not-a-url',
     ]) {
       expect(validOrigin(origin)).toBe(false)
@@ -63,6 +64,9 @@ describe('account request boundaries', () => {
     expect(
       resolveServerEnv({ __FITT_SEND_EMAIL: 'not-an-adapter' }, local, false).__FITT_SEND_EMAIL,
     ).toBeUndefined()
+    const limiter = { idFromName: () => 'global' }
+    expect(resolveServerEnv({ RATE_LIMIT_DO: limiter }, local, false).RATE_LIMIT_DO).toBe(limiter)
+    expect(resolveServerEnv({}, local, false).RATE_LIMIT_DO).toBeUndefined()
   })
 
   it('bounds streamed body bytes even when Content-Length is missing or deceptive', async () => {

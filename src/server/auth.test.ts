@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createDb } from '@turnal-io/db/serverless'
-import { buildRequestAuth, discardProviderTokens } from './auth'
+import { buildRequestAuth, discardProviderTokens, sharedAuthRateLimiter } from './auth'
 import {
   boundedDelivery,
   createMailSender,
@@ -10,6 +10,18 @@ import {
 import type { FittEnv } from './env'
 import * as schema from '../db/schema'
 import { createElement } from 'react'
+
+// Stand-in for the RATE_LIMIT_DO binding: records the bucket keys and allows everything.
+const takes: Array<{ key: string; limit: number; windowMs: number }> = []
+const rateLimitNamespace = {
+  idFromName: (name: string) => name,
+  get: () => ({
+    fetch: async (_url: string, init: { body: string }) => {
+      takes.push(JSON.parse(init.body))
+      return Response.json({ allowed: true, remaining: 1, resetMs: 1 })
+    },
+  }),
+} as unknown as NonNullable<FittEnv['RATE_LIMIT_DO']>
 
 const env = {
   DATABASE_URL: 'postgresql://fixture:fixture@invalid.example/test',
@@ -22,6 +34,7 @@ const env = {
   SMTP_USER: '',
   SMTP_PASS: '',
   EMAIL_FROM: '',
+  RATE_LIMIT_DO: rateLimitNamespace,
 } satisfies FittEnv
 
 describe('passwordless authentication', () => {
@@ -41,6 +54,46 @@ describe('passwordless authentication', () => {
     } finally {
       await pool.end()
     }
+  })
+
+  it('rate-limits auth routes through the shared Durable Object without storing client IPs', async () => {
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    takes.length = 0
+    try {
+      const built = buildRequestAuth(
+        db,
+        env,
+        () => {},
+        async () => {},
+      )
+      const response = await built.auth.handler(
+        new Request(`${env.BETTER_AUTH_URL}/api/auth/ok`, {
+          headers: { 'cf-connecting-ip': '203.0.113.7' },
+        }),
+      )
+      expect(response.status).toBe(200)
+      expect(takes).toHaveLength(1)
+      expect(takes[0].key).toMatch(/^[0-9a-f]{64}$/)
+      expect(JSON.stringify(takes)).not.toContain('203.0.113.7')
+      // The refusal of pre-auth requests without cf-connecting-ip cannot be
+      // exercised here: Better Auth substitutes 127.0.0.1 when NODE_ENV=test.
+      // scripts/test-worker-account.mjs checks it in the built Worker.
+    } finally {
+      await pool.end()
+    }
+  })
+
+  it("keys the shared limiter by a secret HMAC of Better Auth's bucket key", async () => {
+    takes.length = 0
+    const limiter = sharedAuthRateLimiter(rateLimitNamespace, env.BETTER_AUTH_SECRET)
+    await limiter.take('203.0.113.7|/sign-in/social', { limit: 3, windowMs: 10_000 })
+    await limiter.take('203.0.113.7|/sign-in/social', { limit: 3, windowMs: 10_000 })
+    await limiter.take('203.0.113.8|/sign-in/social', { limit: 3, windowMs: 10_000 })
+    expect(takes[0]).toEqual({ key: takes[1].key, limit: 3, windowMs: 10_000 })
+    expect(takes[2].key).not.toBe(takes[0].key)
+    const other = sharedAuthRateLimiter(rateLimitNamespace, `${env.BETTER_AUTH_SECRET}-other`)
+    await other.take('203.0.113.7|/sign-in/social', { limit: 3, windowMs: 10_000 })
+    expect(takes[3].key).not.toBe(takes[0].key)
   })
 
   it('retains provider identity while discarding unneeded Google credentials', async () => {
