@@ -88,8 +88,9 @@ describe('shared muscle regions', () => {
       const highlights = combined.slice()
       athlete.model('female')
       const femaleGeometry = athlete.mesh.geometry
+      // Both bodies append their own refined vertices after the shared ones.
       expect(femaleGeometry.attributes.muscleWeight.array.slice(0, data.vertices)).toEqual(
-        highlights,
+        highlights.slice(0, data.vertices),
       )
       expect(athlete.mesh.skeleton.boneMatrices).toEqual(pose)
       athlete.highlight([])
