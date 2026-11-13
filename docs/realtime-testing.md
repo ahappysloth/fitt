@@ -1,6 +1,6 @@
 # Realtime validation
 
-Run `npm run test:realtime` (or `node --test scripts/test-realtime.mjs`) to exercise the actual `WorkspaceDO` implementation in local workerd with SQLite Durable Object storage and a real WebSocket client. This test complements `npm test`, whose realtime tests cover origin checks, signed-cookie verification, user-derived routing, connection limits, and hibernation-safe identity state.
+Run `bun run test:realtime` (or `node --test scripts/test-realtime.mjs`) to exercise the actual `WorkspaceDO` implementation in local workerd with SQLite Durable Object storage and a real WebSocket client. This test complements `bun run test`, whose realtime tests cover origin checks, signed-cookie verification, user-derived routing, connection limits, and hibernation-safe identity state.
 
 Requirements are the repository's supported Node version, the pinned `miniflare` and `esbuild` development dependencies, `ws`, and permission to spawn workerd and bind loopback sockets. In the managed cloud environment, use the supported execution approval path if socket restrictions require it. No Neon, Google, SMTP, or Cloudflare deployment credentials are used. No deployment or outgoing email occurs.
 

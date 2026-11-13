@@ -8,11 +8,11 @@ Deployment tooling reads `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Use
 
 GitHub Actions uses three repository secrets:
 
-| Repository secret       | Purpose                                                                                           |
-| ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `GH_PACKAGES_TOKEN`     | Read the private GitHub Packages dependencies; mapped to `GITHUB_PACKAGES_TOKEN` during `npm ci`. |
-| `CLOUDFLARE_API_TOKEN`  | Deploy the Worker.                                                                                |
-| `CLOUDFLARE_ACCOUNT_ID` | Select its Cloudflare account.                                                                    |
+| Repository secret       | Purpose                                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GH_PACKAGES_TOKEN`     | Read the private GitHub Packages dependencies; mapped to `GITHUB_PACKAGES_TOKEN` during `bun install`. |
+| `CLOUDFLARE_API_TOKEN`  | Deploy the Worker.                                                                                     |
+| `CLOUDFLARE_ACCOUNT_ID` | Select its Cloudflare account.                                                                         |
 
 The app needs eight values provisioned separately on the Worker: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM`. Use the Fitt-specific database/auth values already configured for this project. Store all eight as **encrypted Worker secrets**, including `SMTP_HOST` and `EMAIL_FROM`, through Cloudflare's Variables and Secrets settings or Wrangler's secret commands; never commit their values. Worker secrets persist across deployments. Ordinary dashboard variables can be replaced by Wrangler's configured variables on a later deployment. Codex environment variables and GitHub repository secrets do not automatically become Worker bindings.
 
@@ -20,20 +20,20 @@ Private Admin access uses the server-side `FITT_ADMIN_EMAILS` allowlist of verif
 
 The production `BETTER_AUTH_URL` and `TRUSTED_ORIGINS` values are declared in `wrangler.jsonc` as `https://fitt.turnal.workers.dev`. Google's authorized redirect URI remains `https://fitt.turnal.workers.dev/api/auth/callback/google`. The migration does not require a new Worker, hostname, or OAuth callback.
 
-Vite development runs on port 5173. `npm run preview` serves the built Worker at `http://127.0.0.1:4173` and explicitly sets its authentication origins to that address. Wrangler's configured application secret names can read corresponding local environment variables; `.dev.vars.example` documents optional ignored local overrides. The Cloudflare Vite plugin can copy these scoped secrets into ignored `dist/server/.dev.vars` for local preview. Keep server build output private; only `dist/client` is a public asset directory. The runtime allowlist excludes GitHub Packages and Cloudflare deployment credentials.
+Vite development runs on port 5173. `bun run preview` serves the built Worker at `http://127.0.0.1:4173` and explicitly sets its authentication origins to that address. Wrangler's configured application secret names can read corresponding local environment variables; `.dev.vars.example` documents optional ignored local overrides. The Cloudflare Vite plugin can copy these scoped secrets into ignored `dist/server/.dev.vars` for local preview. Keep server build output private; only `dist/client` is a public asset directory. The runtime allowlist excludes GitHub Packages and Cloudflare deployment credentials.
 
 ## Migration release and rollback
 
 1. Preserve the deployed Next.js release `dd1f1b2` in `backup/nextjs-before-vinext` and record the currently deployed Cloudflare version before promotion. The backup branch preserves source; the Cloudflare version identifies the deployed artifact to restore if needed.
 2. Confirm the selected Cloudflare account owns the `turnal` workers.dev subdomain and the intended existing Worker is `fitt`. Keep its database, authentication settings, and Durable Object namespace. Migrations remain explicit and are never part of installs, builds, or deployment; this runtime migration does not require schema changes. Automated live checks use uniquely named synthetic fixture accounts in the explicitly selected test database and remove them afterward.
-3. Run the [migration validation checks](vinext-migration.md), including `npm run check:deploy` and `npm run test:worker-account`. The dry run does not publish.
-4. After local checks pass, merge the migration into `main` and push the authorized release. GitHub Actions verifies and deploys that commit to the existing `fitt` Worker. `npm run deploy` is the manual equivalent when explicitly authorized. Preserve the existing `WORKSPACE_DO` binding, `WorkspaceDO` class, and `v1` migration; do not rename its namespace or reset existing Durable Objects. The `v2` migration creates `RateLimitDO` on the first deployment that includes it; keep the class exported and the tag unchanged afterwards.
+3. Run the [migration validation checks](vinext-migration.md), including `bun run check:deploy` and `bun run test:worker-account`. The dry run does not publish.
+4. After local checks pass, merge the migration into `main` and push the authorized release. GitHub Actions verifies and deploys that commit to the existing `fitt` Worker. `bun run deploy` is the manual equivalent when explicitly authorized. Preserve the existing `WORKSPACE_DO` binding, `WorkspaceDO` class, and `v1` migration; do not rename its namespace or reset existing Durable Objects. The `v2` migration creates `RateLimitDO` on the first deployment that includes it; keep the class exported and the tag unchanged afterwards.
 5. Perform the hosted checks below. If a material runtime regression requires rollback, restore the recorded Cloudflare version and revert the migration commit on `main` before another automatic deployment. Do not delete saved training data, change schema, or reset the Durable Object namespace as part of a runtime rollback.
 
 The pre-migration production version is `8a77bb03-b612-40fa-b93c-d62253366322`, backed by `backup/nextjs-before-vinext` at `dd1f1b2`. To restore that deployed artifact when a rollback is needed:
 
 ```sh
-npx wrangler rollback 8a77bb03-b612-40fa-b93c-d62253366322 --name fitt
+bunx wrangler rollback 8a77bb03-b612-40fa-b93c-d62253366322 --name fitt
 ```
 
 The `@turnal-io/auth` 3 upgrade adds the `RateLimitDO` class through migration `v2`. Cloudflare may refuse a rollback to a version that predates a Durable Object migration; if so, roll forward with a fix instead (removing the class later needs its own `deleted_classes` migration). Rate-limit buckets are disposable: deleting them only resets counters. The limiter uses 16 `RateLimitDO` instances (`global`, `shard-1` … `shard-15`), all under the same class and migration.

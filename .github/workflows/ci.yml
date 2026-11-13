@@ -29,37 +29,41 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+      # Bun installs and runs the scripts; the tools themselves (vite, vitest, wrangler, node --test) still run on Node.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json # "packageManager": "bun@x.y.z"
       - name: Install pinned dependencies
         env:
           GITHUB_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
         run: |
           test -n "$GITHUB_PACKAGES_TOKEN" || { echo "GH_PACKAGES_TOKEN is required to install the private packages."; exit 1; }
-          npm ci
+          bun install --frozen-lockfile
       - name: Generate Worker types
-        run: npm run cf:typegen
+        run: bun run cf:typegen
       - name: Check formatting and types
         run: |
-          npm run format:check
-          npm run typecheck
-          npm run typecheck:worker
+          bun run format:check
+          bun run typecheck
+          bun run typecheck:worker
       - name: Test application rules and Worker modules
         run: |
-          npm test
-          npm run test:realtime
-          npm run test:email-worker
-          npm run test:worker-context
+          bun run test
+          bun run test:realtime
+          bun run test:email-worker
+          bun run test:worker-context
       - name: Build and validate the complete Worker
         run: |
-          npm run check:deploy
-          npm run test:worker-account
+          bun run check:deploy
+          bun run test:worker-account
       - name: Build standalone previews
         run: |
-          npm run build:preview
-          npm run build:form-preview
+          bun run build:preview
+          bun run build:form-preview
       - name: Install the browser test runtime
-        run: npx playwright install --with-deps chromium
+        run: bunx playwright install --with-deps chromium
       - name: Test desktop and mobile workflows
-        run: npm run test:e2e -- --reporter=line,github
+        run: bun run test:e2e --reporter=line,github
       - name: Preserve failed browser diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -84,18 +88,22 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
+      # Bun installs and runs the scripts; the tools themselves (vite, vitest, wrangler, node --test) still run on Node.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json # "packageManager": "bun@x.y.z"
       - name: Install pinned dependencies
         env:
           GITHUB_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
-        run: npm ci
+        run: bun install --frozen-lockfile
       # Rebuild from the checked commit; do not deploy a downloaded PR artifact.
       # Cloudflare deploy credentials are available only to the deployment step.
       - name: Build the release
         run: |
-          npm run cf:typegen
-          npm run build:worker
+          bun run cf:typegen
+          bun run build:worker
       - name: Deploy the built Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy --config dist/server/wrangler.json
+        run: bunx wrangler deploy --config dist/server/wrangler.json

@@ -12,4 +12,4 @@ Both studio viewers use left-drag to rotate, middle-drag to pan, and the scroll 
 
 The demo uses local component state and scoped styles: sample workouts, XP, celebrations, accent, motion, and model selections never write to the training store, browser storage, or account services. Client component source is public JavaScript, so it must contain no privileged data or secrets. All future privileged operations must enforce server authorization independently of UI visibility.
 
-Admin is an online tool. The service worker excludes Admin documents, API responses, and RSC requests. The shareable local HTML exports remain available through `npm run build:form-preview` and `npm run build:design-preview`; their generated files are never deployed as public routes.
+Admin is an online tool. The service worker excludes Admin documents, API responses, and RSC requests. The shareable local HTML exports remain available through `bun run build:form-preview` and `bun run build:design-preview`; their generated files are never deployed as public routes.

@@ -80,7 +80,7 @@ python scripts/build-form-model.py \
   /path/to/fitt-human-weights.json \
   /path/to/targets
 
-npx prettier --write \
+bunx prettier --write \
   src/components/form-guide/male-body-data.json \
   src/components/form-guide/female-body-data.json
 ```

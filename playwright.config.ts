@@ -58,7 +58,7 @@ export default defineConfig({
   webServer: externalLiveOrigin
     ? undefined
     : {
-        command: 'npm run preview',
+        command: 'bun run preview',
         env: {
           BETTER_AUTH_URL: 'http://127.0.0.1:4173',
           TRUSTED_ORIGINS: 'http://127.0.0.1:4173',

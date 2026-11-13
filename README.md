@@ -4,18 +4,18 @@ A responsive, installable calisthenics app built with **vinext, React 19, and Ta
 
 ## Develop
 
-Use Node.js 22.12+ and npm (validated with Node 24). Installing the private `@turnal-io/*` packages requires `GITHUB_PACKAGES_TOKEN` with package read access; `.npmrc` contains only a variable reference. In the managed environment, use the configured registry HTTP-secret binding. Do not put its value in source files.
+Use Bun 1.4.4 (pinned by `packageManager` in `package.json`) to install and run scripts, with Node.js 22.12+ also installed (validated with Node 24): the scripts still run Vite, Vitest, Wrangler and `node --test` on Node. Use `bun run test`, not `bun test`, which would start Bun's own test runner. Installing the private `@turnal-io/*` packages requires `GITHUB_PACKAGES_TOKEN` with package read access; `.npmrc` contains only a variable reference. In the managed environment, use the configured registry HTTP-secret binding. Do not put its value in source files.
 
 ```sh
-npm ci
-npm run dev
+bun install --frozen-lockfile
+bun run dev
 ```
 
 Development runs on port **5173**. To test the production app, including offline support:
 
 ```sh
-npm run build
-npm run preview
+bun run build
+bun run preview
 ```
 
 The built Worker runs locally through Wrangler on **http://127.0.0.1:4173**. This exercises the same Worker routing, bindings, and static assets as a deployment. A service worker caches the app, local fonts, exercise instructions, and existing animated guides after a successful initial load. Installation requires HTTPS in production; localhost also supports development testing. On iOS, use Safari → Share → Add to Home Screen.
@@ -31,7 +31,7 @@ The built Worker runs locally through Wrangler on **http://127.0.0.1:4173**. Thi
 - **Optional accounts:** Google or magic-link sign-in, explicit device-history import, account-scoped offline changes, conflict resolution, and cross-device sync. Active workouts remain on the device where they started.
 - **Accessible interaction:** responsive desktop/mobile navigation, keyboard-operated dialogs, visible focus states, reduced-motion support, and a calm celebration option.
 
-The interface preserves the F logo and approved charcoal/electric-lime design. Knee Push-up now has an interactive 3D form-guide prototype; the remaining exercise illustrations are reused pending review. Run `npm run build:form-preview` to create `preview/fitt-form-studio.html`. See the [form-guide foundation](docs/form-guides.md) and [asset provenance](assets/form-guide/README.md).
+The interface preserves the F logo and approved charcoal/electric-lime design. Knee Push-up now has an interactive 3D form-guide prototype; the remaining exercise illustrations are reused pending review. Run `bun run build:form-preview` to create `preview/fitt-form-studio.html`. See the [form-guide foundation](docs/form-guides.md) and [asset provenance](assets/form-guide/README.md).
 
 ## Training and rewards
 
@@ -54,7 +54,7 @@ Malformed original data is preserved and automatic writes pause. The recovery ba
 ## ChatGPT and standalone previews
 
 ```sh
-npm run build:preview
+bun run build:preview
 ```
 
 Open **`preview/fitt.html`** for the complete app in a single HTML file. It bundles JavaScript, styles, fonts, icons, and guides and needs no running server or external assets. This is also the file to open in ChatGPT's web preview. The root `index.html` is an exporter source entry and cannot run directly in a file viewer.
@@ -65,44 +65,44 @@ The approved component study remains in `design-preview/` for reference. It is s
 
 ## Validate
 
-Both type checks first regenerate the ignored `cloudflare-env.d.ts` with `npm run cf:typegen`, which supplies the `cloudflare:workers` and binding types. Rerun it after changing `wrangler.jsonc` if your editor reports missing Worker types.
+Both type checks first regenerate the ignored `cloudflare-env.d.ts` with `bun run cf:typegen`, which supplies the `cloudflare:workers` and binding types. Rerun it after changing `wrangler.jsonc` if your editor reports missing Worker types.
 
 ```sh
-npm run typecheck
-npm run typecheck:worker
-npm test
-npm run test:realtime
-npm run test:email-worker
-npm run test:worker-context
-npm run format:check
-npm run check:compatibility
-npm run check:deploy
-npm run test:worker-account
-npm run build:preview
-npm run build:form-preview
-npm run test:e2e
+bun run typecheck
+bun run typecheck:worker
+bun run test
+bun run test:realtime
+bun run test:email-worker
+bun run test:worker-context
+bun run format:check
+bun run check:compatibility
+bun run check:deploy
+bun run test:worker-account
+bun run build:preview
+bun run build:form-preview
+bun run test:e2e
 ```
 
 Unit tests cover progression/regression, equipment combinations, reward/calendar rules, backup integrity, service-worker caching, account isolation, offline queues, merge conflicts, request validation, and realtime authentication. Playwright covers desktop and mobile workflows, including offline reload, saved routines, full/partial workouts, resume, backups, legacy migration, quota failures, real cross-tab conflicts, and an opaque embedded preview. Build the Worker and both standalone previews before running it. The suite starts or reuses the built Worker on port 4173. Current migration results and outstanding hosted checks are recorded in [vinext migration validation](docs/vinext-migration.md).
 
-With the Fitt development database migrated, `npm run test:db` runs actual transaction/auth tests and `npm run test:account` exercises two browser devices, explicit import, offline replay, and account isolation. These opt-in tests create uniquely named fixture users and delete only those fixtures afterward. They never send email to a real recipient. See [account setup and validation](docs/accounts.md). The separate [realtime runtime test](docs/realtime-testing.md) exercises the Durable Object in local workerd without external services. `test:email-worker` verifies the actual Worker mail module and rendering with a stubbed delivery transport; real SMTP delivery still needs a hosted check.
+With the Fitt development database migrated, `bun run test:db` runs actual transaction/auth tests and `bun run test:account` exercises two browser devices, explicit import, offline replay, and account isolation. These opt-in tests create uniquely named fixture users and delete only those fixtures afterward. They never send email to a real recipient. See [account setup and validation](docs/accounts.md). The separate [realtime runtime test](docs/realtime-testing.md) exercises the Durable Object in local workerd without external services. `test:email-worker` verifies the actual Worker mail module and rendering with a stubbed delivery transport; real SMTP delivery still needs a hosted check.
 
-The cloud environment provides `/usr/bin/chromium`. Elsewhere, use `npx playwright install chromium` or set `CHROMIUM_PATH`. Mobile tests emulate Chromium; Safari installation still needs a real iOS device check before release.
+The cloud environment provides `/usr/bin/chromium`. Elsewhere, use `bunx playwright install chromium` or set `CHROMIUM_PATH`. Mobile tests emulate Chromium; Safari installation still needs a real iOS device check before release.
 
 ## Cloudflare and account services
 
 The configured deployment target is `https://fitt.turnal.workers.dev`. See [deployment setup](docs/deployment.md) for Worker secrets, Google callbacks, first deployment, and the GitHub Actions workflow.
 
 ```sh
-npm run build:worker
-npm run dev:worker
+bun run build:worker
+bun run dev:worker
 ```
 
-Vite produces the Worker module graph in `dist/server/`, static assets in `dist/client/`, and the deployment configuration at `dist/server/wrangler.json`. The source `worker.ts` handles authenticated realtime upgrades, gates Admin documents, delegates app requests to `vinext/server/app-router-entry`, and exports `WorkspaceDO` and the auth rate-limit `RateLimitDO`. Native `cloudflare:workers` bindings supply the request environment and background-work lifetime. `npm run check:deploy` validates this output with a Wrangler dry run and **does not publish**. Afterward, `npm run test:worker-account` checks account metadata, origin rejection, production-shaped auth construction and its shared rate limiter, private Admin boundaries, realtime routing, and assets in local workerd using synthetic bindings. `npm run test:worker-context` separately verifies request cleanup with native Worker bindings.
+Vite produces the Worker module graph in `dist/server/`, static assets in `dist/client/`, and the deployment configuration at `dist/server/wrangler.json`. The source `worker.ts` handles authenticated realtime upgrades, gates Admin documents, delegates app requests to `vinext/server/app-router-entry`, and exports `WorkspaceDO` and the auth rate-limit `RateLimitDO`. Native `cloudflare:workers` bindings supply the request environment and background-work lifetime. `bun run check:deploy` validates this output with a Wrangler dry run and **does not publish**. Afterward, `bun run test:worker-account` checks account metadata, origin rejection, production-shaped auth construction and its shared rate limiter, private Admin boundaries, realtime routing, and assets in local workerd using synthetic bindings. `bun run test:worker-context` separately verifies request cleanup with native Worker bindings.
 
-The migration deploys to the existing `fitt` Worker and production URL after local validation. The existing Google callback and hostname remain valid. Keep `backup/nextjs-before-vinext` pointing to release `dd1f1b2` and record the active Cloudflare version before merging the migration into `main`. The main workflow deploys the checked commit; `npm run deploy` is the equivalent authorized manual build and deployment command.
+The migration deploys to the existing `fitt` Worker and production URL after local validation. The existing Google callback and hostname remain valid. Keep `backup/nextjs-before-vinext` pointing to release `dd1f1b2` and record the active Cloudflare version before merging the migration into `main`. The main workflow deploys the checked commit; `bun run deploy` is the equivalent authorized manual build and deployment command.
 
-Accounts use Neon/Drizzle through `@turnal-io/db/serverless`, passwordless Better Auth through `@turnal-io/auth` (rate-limited through the `RateLimitDO` Durable Object), and `WorkspaceDO` with WebSocket Hibernation. Copy the names in `.env.example` into your development environment; use `.dev.vars.example` for optional ignored Worker-local configuration and provision deployed Worker secrets separately. Apply the versioned schema explicitly with `npm run db:migrate`; neither app startup nor builds apply migrations. SMTP uses TLS on port 465. The managed cloud environment's HTTP proxy cannot enable public SMTP, so hosted delivery still needs validation on an appropriate runtime. See [account setup](docs/accounts.md) and [platform details](docs/platform.md). The `next` package is not installed; vinext supplies the `next/*` runtime and types.
+Accounts use Neon/Drizzle through `@turnal-io/db/serverless`, passwordless Better Auth through `@turnal-io/auth` (rate-limited through the `RateLimitDO` Durable Object), and `WorkspaceDO` with WebSocket Hibernation. Copy the names in `.env.example` into your development environment; use `.dev.vars.example` for optional ignored Worker-local configuration and provision deployed Worker secrets separately. Apply the versioned schema explicitly with `bun run db:migrate`; neither app startup nor builds apply migrations. SMTP uses TLS on port 465. The managed cloud environment's HTTP proxy cannot enable public SMTP, so hosted delivery still needs validation on an appropriate runtime. See [account setup](docs/accounts.md) and [platform details](docs/platform.md). The `next` package is not installed; vinext supplies the `next/*` runtime and types.
 
 ## Project structure
 

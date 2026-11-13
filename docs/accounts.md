@@ -6,7 +6,7 @@ Fitt can be used without signing in. Account features add cloud storage while ke
 
 Use the ten names in `.env.example`: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `TRUSTED_ORIGINS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, and `EMAIL_FROM`. Supply credentials through environment settings or ignored local configuration. Use a Fitt-specific signing secret generated with `openssl rand -base64 32` and a pooled Neon development-branch URL. `@turnal-io/auth` refuses a secret shorter than 32 characters, an obvious placeholder, or a low-variety string, in every environment including tests. Do not set `BETTER_AUTH_SECRETS` or `BETTER_AUTH_TRUSTED_ORIGINS` in the environment: Better Auth reads them by itself, and the package refuses the first and validates the second. No secret has a `NEXT_PUBLIC_` prefix.
 
-Vite development uses port 5173. `npm run build && npm run preview` runs the built Worker at `http://127.0.0.1:4173`, with both authentication origins explicitly set to that address. Local Wrangler can read the application variables declared in `wrangler.jsonc` from the process environment; `.dev.vars.example` documents optional ignored Worker-local configuration. Package/deployment credentials are not application bindings. Google's authorized callback must be exactly `<BETTER_AUTH_URL>/api/auth/callback/google`. Production origins must use HTTPS; use exact origins, not wildcards. Fitt canonicalises `BETTER_AUTH_URL` and the comma-separated `TRUSTED_ORIGINS` (surrounding whitespace, a trailing slash, upper case and default ports are fine) and drops entries that can never match a browser origin (wildcards, paths, `http:` other than `localhost`/`127.0.0.1`/`[::1]`). The development origin `http://localhost:5173` and preview origin `http://127.0.0.1:4173` count as localhost. Codex environment variables do not automatically populate a deployed Worker.
+Vite development uses port 5173. `bun run build && bun run preview` runs the built Worker at `http://127.0.0.1:4173`, with both authentication origins explicitly set to that address. Local Wrangler can read the application variables declared in `wrangler.jsonc` from the process environment; `.dev.vars.example` documents optional ignored Worker-local configuration. Package/deployment credentials are not application bindings. Google's authorized callback must be exactly `<BETTER_AUTH_URL>/api/auth/callback/google`. Production origins must use HTTPS; use exact origins, not wildcards. Fitt canonicalises `BETTER_AUTH_URL` and the comma-separated `TRUSTED_ORIGINS` (surrounding whitespace, a trailing slash, upper case and default ports are fine) and drops entries that can never match a browser origin (wildcards, paths, `http:` other than `localhost`/`127.0.0.1`/`[::1]`). The development origin `http://localhost:5173` and preview origin `http://127.0.0.1:4173` count as localhost. Codex environment variables do not automatically populate a deployed Worker.
 
 The production origin remains `https://fitt.turnal.workers.dev` during the vinext migration. Its two public auth-origin values are declared in `wrangler.jsonc`; the other eight application values must be provisioned on the Worker. `wrangler.jsonc` also declares the `RATE_LIMIT_DO` Durable Object binding (class `RateLimitDO`, migration tag `v2`) that holds Better Auth's rate-limit buckets; account services refuse to start on a non-localhost origin without it. It needs no secret or variable. The existing Google callback, `https://fitt.turnal.workers.dev/api/auth/callback/google`, remains unchanged. No additional Worker, hostname, or OAuth callback is required. See [deployment setup](deployment.md) for GitHub secret names and release workflow, and [migration validation](vinext-migration.md) for the current verification status.
 
@@ -27,8 +27,8 @@ SMTP follows Juno: implicit TLS on port 465 through `@turnal-io/email`, with bou
 ## Migrations
 
 ```sh
-npm run db:generate -- --name describe_the_change
-npm run db:migrate
+bun run db:generate --name describe_the_change
+bun run db:migrate
 ```
 
 Generation is offline and produces reviewable SQL under `drizzle/`. Applying migrations is explicit, uses the configured database, and is not part of builds, installs, or app startup. One database transaction acquires a transaction-scoped PostgreSQL advisory lock before creating or re-reading the journal; it then applies pending SQL and journal entries before committing. This keeps one PostgreSQL backend pinned through Neon's transaction pooler and releases the lock automatically on commit or rollback. The runner uses Drizzle's migration-file reader without nesting Drizzle's own transaction-owning migrator. The journal format remains isolated under `fitt_meta`; app tables use the `fitt_` prefix. Every applied timestamp and hash must match a local migration file; older or diverged checkouts stop before applying new SQL. Keep migration SQL transaction-safe (no `BEGIN`/`COMMIT` or concurrent index creation), keep applied files immutable, and add a new migration for schema changes. Use a development branch before production migrations.
@@ -54,19 +54,19 @@ The browser saves an immutable outbox before sending. It merges independent addi
 `worker.ts` handles `/api/realtime` before delegating to `vinext/server/app-router-entry`. It checks the browser origin, pre-checks the session cookie's signature with `@turnal-io/auth`'s `verifySessionCookie`, and then requires an unexpired session row for that token; a signed-out or expired session's cookie still has a valid signature, so the database lookup is what authorises the channel. The authenticated account selects its Durable Object; clients cannot select another account. Only internal server writes publish revision hints. WebSocket Hibernation stores bounded attachments; alarms expire connections and force fresh authorization. The channel carries no workout documents and is not required for syncing.
 
 ```sh
-npm run typecheck
-npm run typecheck:worker
-npm test
-npm run test:realtime
-npm run test:email-worker
-npm run test:worker-context
-npm run test:db
-npm run check:deploy
-npm run test:worker-account
-npm run build:preview
-npm run build:form-preview
-npm run test:e2e
-npm run test:account
+bun run typecheck
+bun run typecheck:worker
+bun run test
+bun run test:realtime
+bun run test:email-worker
+bun run test:worker-context
+bun run test:db
+bun run check:deploy
+bun run test:worker-account
+bun run build:preview
+bun run build:form-preview
+bun run test:e2e
+bun run test:account
 ```
 
 Live tests require a migrated development database and opt in via `FITT_RUN_LIVE_DB_TESTS=1` (set by `test:db`/`test:account`). Each test creates unique fixture users and removes those users with cascading data cleanup. Browser tests default to the built Worker on `http://127.0.0.1:4173`. For an explicitly authorized hosted check, set `FITT_LIVE_TEST_ORIGIN` to the exact HTTPS origin and use its matching database and signing secret; only the live-account suite runs, without a local server. Short-lived fixture sessions use secure cookies on HTTPS, traces are disabled, and managed proxy settings remain active. The tests do not bypass production auth or add a test-login endpoint.

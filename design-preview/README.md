@@ -4,7 +4,7 @@ An isolated, interactive design preview for review before changing the productio
 
 Run `node design-preview/build.mjs` from the repository root, then open `preview/fitt-redesign.html`. The output is a self-contained HTML file, including fonts and exercise illustrations, with no server or network requests required.
 
-Run `npx tsc --project design-preview/tsconfig.json` to type-check the prototype. Shared visual primitives live in `components.tsx`, original artwork in `Artwork.tsx`, and sample data in `demo-data.ts`.
+Run `bunx tsc --project design-preview/tsconfig.json` to type-check the prototype. Shared visual primitives live in `components.tsx`, original artwork in `Artwork.tsx`, and sample data in `demo-data.ts`.
 
 All workout history, XP, awards, and personal bests in this prototype are sample data. Interactions stay in memory. The preview never reads or writes the app's localStorage and never registers a service worker. “Reset demo” restores the starting state.
 

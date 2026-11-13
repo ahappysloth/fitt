@@ -12,7 +12,7 @@ out
 public/sw.js
 next-env.d.ts
 cloudflare-env.d.ts
-package-lock.json
+bun.lock
 
 src/components/form-guide/body-data.json
 assets/form-guide/CC0-1.0.txt

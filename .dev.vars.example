@@ -1,5 +1,5 @@
 # Worker-local preview bindings, copied privately to .dev.vars (ignored).
-# npm run preview overrides the built Worker's origin to 127.0.0.1:4173.
+# bun run preview overrides the built Worker's origin to 127.0.0.1:4173.
 # Vite development uses port 5173. Never commit filled-in files.
 DATABASE_URL=
 BETTER_AUTH_SECRET=
