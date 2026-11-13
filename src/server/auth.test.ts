@@ -99,6 +99,34 @@ describe('passwordless authentication', () => {
     }
   })
 
+  it('limits signed-in routes per isolate even though auth is built per request', async () => {
+    const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
+    takes.length = 0
+    try {
+      // A fresh auth instance per request, as in production; the per-isolate
+      // buckets live at module scope, so they still accumulate.
+      const session = () =>
+        buildRequestAuth(
+          db,
+          env,
+          () => {},
+          async () => {},
+        ).auth.handler(
+          new Request(`${env.BETTER_AUTH_URL}/api/auth/get-session`, {
+            headers: { 'cf-connecting-ip': '203.0.113.20' },
+          }),
+        )
+      const statuses: number[] = []
+      for (let index = 0; index < 101; index += 1) statuses.push((await session()).status)
+      // Better Auth's default rule: 100 per 10 seconds per client IP.
+      expect(statuses.slice(0, 100).every((status) => status === 200)).toBe(true)
+      expect(statuses[100]).toBe(429)
+      expect(takes).toHaveLength(0)
+    } finally {
+      await pool.end()
+    }
+  })
+
   it('returns a rate-limited browser navigation to the account controls', async () => {
     const { db, pool } = createDb({ schema, connectionString: env.DATABASE_URL })
     allowed = false
