@@ -46,3 +46,18 @@ color (not colour), center, gray, behavior, favorite, canceled, labeled, modelin
   - Builds and deploys never touch the schema: run `bun run db:migrate` yourself (docs/accounts.md).
   - Type checks regenerate the ignored `cloudflare-env.d.ts`; rerun `bun run cf:typegen` after editing
     `wrangler.jsonc`.
+
+## Docs stay in sync with the code
+
+Docs are part of the change, not a follow-up. Every branch updates, in the same branch, each doc its
+change makes wrong: `README.md`, this file, and `docs/*.md` (`docs/deployment.md` for deploy and
+config, `docs/platform.md`, `docs/accounts.md`, `docs/training-engine.md`, `docs/workout-flow.md`
+and the rest), plus any user-facing help or copy in the app. Update what changed, add what's new,
+delete what no longer exists. `docs/vinext-migration.md` is a record of that migration: correct it
+only where it would mislead.
+
+Before opening a PR, verify the docs against the code: grep them for every name the change touched
+(commands, scripts, env vars, bindings, routes, tables, file paths, exported APIs) and confirm each
+mention is still true. Purely internal work with nothing a doc describes is exempt. A PR that changes
+behavior, setup or configuration but touches no doc is incomplete: if the sweep found nothing to
+change, say what it checked in the PR body.
