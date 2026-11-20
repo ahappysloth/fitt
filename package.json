@@ -47,7 +47,7 @@
     "@radix-ui/react-select": "2.4.1",
     "@radix-ui/react-tooltip": "1.4.1",
     "@react-email/render": "2.2.0",
-    "@turnal-io/auth": "4.0.0",
+    "@turnal-io/auth": "4.1.0",
     "@turnal-io/db": "1.1.1",
     "@turnal-io/email": "2.2.3",
     "@turnal-io/ratelimit": "1.1.1",
