@@ -11,6 +11,7 @@ Router API surface; it may differ from the Next.js you know. Auth is built with
 the framework-free root entry of `@turnal-io/auth` (see `docs/platform.md`).
 
 ## Language
+
 American English everywhere: UI copy, docs, comments, commit messages and new identifiers.
 color (not colour), center, gray, behavior, favorite, canceled, labeled, modeling, toward, license,
 -ize/-ization (not -ise/-isation). No British spellings. Exceptions: fixed web APIs such as
