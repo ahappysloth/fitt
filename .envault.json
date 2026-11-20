@@ -1,5 +1,6 @@
 {
   "server": "https://api.envault.turnal.io",
+  "workspace": "personal",
   "repo": "fitt",
   "environments": {
     "local": {
