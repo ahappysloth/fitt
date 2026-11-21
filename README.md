@@ -26,7 +26,7 @@ The built Worker runs locally through Wrangler on **http://127.0.0.1:4173**. Thi
 - **Workout:** editable reps, timed holds, added vest weight in kilograms, effort ratings, rest/hold timers, exercise swaps, and autosave/resume. Hard or missed sets adjust upcoming targets.
 - **Routine builder:** choose and reorder movements, set targets, save reusable workouts, and edit or delete them. Leaving unsaved changes requires confirmation.
 - **Journey:** workout history, weekly activity, comparable personal bests, XP, levels, and milestone awards derived from real saved sessions.
-- **Library:** 26 exercises with equipment and muscle filters, written technique instructions, front/back muscle diagrams, and the existing offline animated guides.
+- **Library:** 41 exercises with equipment and muscle filters, written technique instructions, front/back muscle diagrams, and the existing offline animated guides.
 - **Settings:** name, beginner/intermediate level, equipment, focus, session length, weekly goal, playful/calm celebrations, install guidance, and validated backup/restore.
 - **Optional accounts:** Google or magic-link sign-in, explicit device-history import, account-scoped offline changes, conflict resolution, and cross-device sync. Active workouts remain on the device where they started.
 - **Accessible interaction:** responsive desktop/mobile navigation, keyboard-operated dialogs, visible focus states, reduced-motion support, and a calm celebration option.

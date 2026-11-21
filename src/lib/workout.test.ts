@@ -208,12 +208,13 @@ describe('progression responds to actual performance', () => {
     ])
     expect(next.exerciseId).toBe('pushup')
     expect(next.sets[0].target).toBe(6)
-    const lungeTop = targetRange(byId['reverse-lunge'], 'health')[1]
-    const unavailable = prescribe(byId['reverse-lunge'], defaultProfile, [
-      session('reverse-lunge', lungeTop),
-      session('reverse-lunge', lungeTop),
+    // Hollow holds lead to bar and parallettes work, which a no-equipment profile skips.
+    const holdTop = targetRange(byId['hollow-hold'], 'health')[1]
+    const unavailable = prescribe(byId['hollow-hold'], defaultProfile, [
+      session('hollow-hold', holdTop),
+      session('hollow-hold', holdTop),
     ])
-    expect(unavailable.exerciseId).toBe('reverse-lunge')
+    expect(unavailable.exerciseId).toBe('hollow-hold')
   })
   it('reduces weight before changing variation after a hard session', () => {
     const next = prescribe(byId.pushup, { ...defaultProfile, equipment: ['vest'] }, [
@@ -229,8 +230,13 @@ describe('progression responds to actual performance', () => {
     expect(next.exerciseId).toBe('knee-pushup')
   })
   it('never prescribes an added load that its own backup parser cannot reload', () => {
-    const exercise = byId['diamond-pushup']
-    const profile: Profile = { ...defaultProfile, equipment: ['vest'], level: 'intermediate' }
+    // Pull-ups end their ladder, so progress continues with added load.
+    const exercise = byId.pullup
+    const profile: Profile = {
+      ...defaultProfile,
+      equipment: ['vest', 'bar'],
+      level: 'intermediate',
+    }
     const history = [
       session(exercise.id, exercise.max, { load: 300, targetLoad: 300 }),
       session(exercise.id, exercise.max, { load: 300, targetLoad: 300 }),
@@ -792,14 +798,16 @@ describe('training goals', () => {
     const vest: Profile = {
       ...defaultProfile,
       goal: 'muscle',
-      equipment: ['vest', 'bench'],
+      equipment: ['vest'],
       level: 'intermediate',
     }
-    const next = prescribe(byId['split-squat'], vest, [
-      session('split-squat', 15),
-      session('split-squat', 15),
+    // Shrimp squats end the squat ladder, so progress continues with added load.
+    const top = targetRange(byId['shrimp-squat'], 'muscle')[1]
+    const next = prescribe(byId['shrimp-squat'], vest, [
+      session('shrimp-squat', top),
+      session('shrimp-squat', top),
     ])
-    expect(next.sets[0]).toMatchObject({ target: 12, load: 5 })
+    expect(next.sets[0]).toMatchObject({ target: top - 3, load: 5 })
   })
   it('sizes sessions and rest for the goal', () => {
     const strength = generateWorkout({ ...defaultProfile, goal: 'strength', duration: 30 }, [])
@@ -953,9 +961,9 @@ describe('stalled progress', () => {
     ).not.toContain('three sessions')
   })
   it('suggests a slower lowering, or a vest, at the top of a range with nowhere to go', () => {
-    const top = targetRange(byId['reverse-lunge'], 'health')[1]
-    const history = [session('reverse-lunge', top), session('reverse-lunge', top)]
-    expect(prescribe(byId['reverse-lunge'], defaultProfile, history).note).toBe(
+    const top = targetRange(byId['shrimp-squat'], 'health')[1]
+    const history = [session('shrimp-squat', top), session('shrimp-squat', top)]
+    expect(prescribe(byId['shrimp-squat'], defaultProfile, history).note).toBe(
       'You’ve reached this range. Lower over three seconds each rep, or add a weighted vest in Settings.',
     )
     const holdTop = targetRange(byId['hollow-hold'], 'health')[1]
@@ -963,9 +971,9 @@ describe('stalled progress', () => {
     expect(prescribe(byId['hollow-hold'], defaultProfile, holds).note).toBe(
       'You’ve reached this range. Brace harder and keep the position strict to keep progressing.',
     )
-    const pikeTop = targetRange(byId['pike-pushup'], 'health')[1]
-    const pikes = [session('pike-pushup', pikeTop), session('pike-pushup', pikeTop)]
-    expect(prescribe(byId['pike-pushup'], defaultProfile, pikes).note).toBe(
+    const archerTop = targetRange(byId['archer-pushup'], 'health')[1]
+    const archers = [session('archer-pushup', archerTop), session('archer-pushup', archerTop)]
+    expect(prescribe(byId['archer-pushup'], defaultProfile, archers).note).toBe(
       'You’ve reached this range. Lower over three seconds each rep to keep progressing.',
     )
   })

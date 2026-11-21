@@ -334,6 +334,154 @@ export const demos: Record<string, Demo> = {
     action: 'Lower head ahead of hands · hips high',
     reset: 'Press through your shoulders',
   },
+  'decline-pushup': {
+    start: p([267, 110], [247, 124], [251, 166], [255, 208], [190, 134], [147, 139], [105, 143]),
+    end: p([279, 173], [256, 179], [223, 189], [255, 208], [198, 164], [151, 153], [105, 143]),
+    view: 'SIDE VIEW',
+    action: 'Lower chest · feet stay on the bench',
+    reset: 'Return with control · keep breathing',
+    equipment: 'bench',
+  },
+  'archer-pushup': {
+    start: p([200, 57], [200, 81], [150, 81], [100, 81], [200, 139], [185, 180], [181, 221], {
+      elbow2: [250, 81],
+      hand2: [300, 81],
+      knee2: [215, 180],
+      foot2: [219, 221],
+    }),
+    end: p([155, 57], [155, 81], [111, 105], [100, 81], [170, 137], [176, 179], [181, 221], {
+      elbow2: [228, 81],
+      hand2: [300, 81],
+      knee2: [199, 179],
+      foot2: [219, 221],
+    }),
+    view: 'TOP VIEW',
+    action: 'Shift toward the left hand shown · other arm straight',
+    reset: 'Return with control · keep breathing',
+  },
+  'doorway-row': {
+    start: p([236, 76], [246, 98], [273, 116], [301, 134], [222, 151], [203, 184], [183, 218]),
+    end: p([277, 89], [278, 113], [270, 145], [301, 134], [240, 157], [211, 188], [183, 218]),
+    view: 'SIDE VIEW',
+    action: 'Pull chest toward the frame · heels planted',
+    reset: 'Return with control · keep breathing',
+    equipment: 'wall',
+  },
+  'table-row': {
+    start: p([207, 173], [184, 177], [163, 160], [140, 143], [229, 200], [268, 181], [285, 218]),
+    end: p([179, 124], [158, 137], [173, 166], [140, 143], [210, 164], [252, 177], [285, 218]),
+    view: 'SIDE VIEW',
+    action: 'Pull chest to the heavy table edge',
+    reset: 'Return with control · keep breathing',
+    equipment: 'bench',
+  },
+  'ring-pullup': {
+    start: hang,
+    end: pull,
+    view: 'FRONT VIEW',
+    action: 'Pull chin above rings · turn palms inward',
+    reset: 'Return with control · keep breathing',
+    equipment: 'rings',
+  },
+  'step-up': {
+    start: p([199, 51], [199, 75], [214, 105], [229, 134], [199, 133], [157, 130], [139, 143], {
+      knee2: [199, 176],
+      foot2: [199, 218],
+    }),
+    end: p([139, -24], [139, 0], [154, 30], [169, 59], [139, 58], [139, 101], [139, 143], {
+      knee2: [164, 93],
+      foot2: [174, 134],
+    }),
+    view: 'SIDE VIEW',
+    action: 'Drive through the right foot on the step',
+    reset: 'Return with control · keep breathing',
+    equipment: 'bench',
+  },
+  'shrimp-squat': {
+    start: p([246, 51], [246, 75], [273, 95], [301, 116], [246, 133], [246, 176], [246, 218], {
+      knee2: [220, 168],
+      foot2: [179, 157],
+    }),
+    end: p([275, 109], [258, 126], [280, 103], [301, 116], [217, 167], [259, 177], [246, 218], {
+      knee2: [186, 198],
+      foot2: [145, 187],
+    }),
+    view: 'SIDE VIEW',
+    action: 'Lower the right knee behind · left heel planted',
+    reset: 'Return with control · keep breathing',
+    equipment: 'wall',
+  },
+  'single-leg-rdl': {
+    start: standing,
+    end: p([285, 113], [263, 121], [280, 150], [297, 179], [208, 140], [204, 180], [196, 218], {
+      knee2: [165, 128],
+      foot2: [124, 116],
+    }),
+    view: 'SIDE VIEW',
+    action: 'Hinge on the left leg shown · reach right leg back',
+    reset: 'Return with control · keep breathing',
+  },
+  'hamstring-walkout': {
+    start: bridge,
+    end: p([102, 203], [125, 203], [158, 206], [190, 208], [180, 185], [225, 192], [268, 208]),
+    view: 'SIDE VIEW',
+    action: 'Walk heels away · keep hips lifted',
+    reset: 'Return with control · keep breathing',
+  },
+  'nordic-lower': {
+    start: p([210, 63], [210, 87], [238, 105], [257, 132], [210, 145], [210, 203], [167, 203]),
+    end: p([326, 136], [305, 148], [294, 179], [317, 202], [255, 177], [210, 203], [167, 203]),
+    view: 'SIDE VIEW',
+    action: 'Lower from the knees · hands ready to catch',
+    reset: 'Return with control · keep breathing',
+  },
+  'hanging-knee-raise': {
+    start: p([200, 68], [200, 92], [200, 67], [200, 42], [200, 150], [200, 191], [200, 232]),
+    end: p([200, 68], [200, 92], [200, 67], [200, 42], [200, 150], [241, 150], [241, 191]),
+    view: 'SIDE VIEW',
+    action: 'Curl knees up · avoid swinging',
+    reset: 'Return with control · keep breathing',
+    equipment: 'bar',
+  },
+  'one-leg-l-sit': {
+    start: p([175, 84], [175, 108], [178, 141], [180, 175], [175, 166], [217, 151], [211, 193], {
+      knee2: [217, 151],
+      foot2: [211, 193],
+    }),
+    end: p([175, 84], [175, 108], [178, 141], [180, 175], [175, 166], [219, 166], [261, 166], {
+      knee2: [217, 151],
+      foot2: [211, 193],
+    }),
+    view: 'SIDE VIEW',
+    action: 'Extend the right leg shown · keep left knee tucked',
+    reset: 'Return with control · keep breathing',
+    equipment: 'parallettes',
+  },
+  'l-sit': {
+    start: p([175, 84], [175, 108], [178, 141], [180, 175], [175, 166], [217, 151], [211, 193]),
+    end: p([175, 84], [175, 108], [178, 141], [180, 175], [175, 166], [219, 166], [261, 166]),
+    view: 'SIDE VIEW',
+    action: 'Straighten both legs · press shoulders down',
+    reset: 'Return with control · keep breathing',
+    equipment: 'parallettes',
+  },
+  'elevated-pike-pushup': {
+    start: p([222, 146], [231, 125], [230, 167], [230, 208], [220, 68], [265, 68], [301, 95]),
+    end: p([216, 185], [235, 171], [263, 190], [230, 208], [219, 115], [262, 101], [301, 95]),
+    view: 'SIDE VIEW',
+    action: 'Lower head ahead of hands · feet on wall',
+    reset: 'Return with control · keep breathing',
+    equipment: 'wall',
+  },
+  'wall-handstand-hold': {
+    start: p([276, 160], [276, 184], [274, 217], [274, 250], [285, 127], [296, 84], [301, 42]),
+    end: p([276, 160], [276, 184], [274, 217], [274, 250], [285, 127], [296, 84], [301, 42]),
+    view: 'SIDE VIEW',
+    action: 'Hold chest toward wall · walk feet down to exit',
+    reset: 'Return with control · keep breathing',
+    equipment: 'wall',
+    hold: true,
+  },
 }
 
 function interpolate(a: Pose, b: Pose, t: number, exerciseId?: string): Pose {
@@ -355,6 +503,9 @@ function interpolate(a: Pose, b: Pose, t: number, exerciseId?: string): Pose {
   return pose
 }
 const proneExercises = new Set([
+  'decline-pushup',
+  'archer-pushup',
+  'elevated-pike-pushup',
   'pushup',
   'knee-pushup',
   'incline-pushup',
@@ -643,6 +794,14 @@ export function ExerciseThumbnail({
   const demo = demos[exerciseId]
   if (!demo) return null
   const showEnd = [
+    'step-up',
+    'shrimp-squat',
+    'single-leg-rdl',
+    'hamstring-walkout',
+    'nordic-lower',
+    'hanging-knee-raise',
+    'one-leg-l-sit',
+    'l-sit',
     'squat',
     'reverse-lunge',
     'split-squat',
