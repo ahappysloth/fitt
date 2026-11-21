@@ -87,9 +87,8 @@ calls informed by that evidence.
 
 ## Not yet implemented
 
-Recommended by the review and left for follow-up: new movements to close ladder dead ends (decline/archer push-ups,
-dips, rows that lead to pull-ups, step-ups, single-leg RDLs, L-sits), weekly volume
-targets per pattern with upper/lower splits at 4+ sessions a week, optional
+Recommended by the review and left for follow-up: dips (the other ladder dead-end
+movements have shipped), weekly volume targets per pattern with upper/lower splits at 4+ sessions a week, optional
 deload suggestions, conditioning
 finishers for the fat-loss goal, using a swapped-in movement's own history, and a
 one-time "Choose your goal" card for people who set up before goals existed.
